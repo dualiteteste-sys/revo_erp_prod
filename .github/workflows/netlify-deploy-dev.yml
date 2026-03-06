@@ -133,3 +133,35 @@ jobs:
         run: |
           set -euo pipefail
           npx -y netlify-cli@17 deploy --prod --dir dist --site "$NETLIFY_SITE_ID" --message "deploy(dev) ${GITHUB_SHA}"
+
+      - name: Smoke test DEV (health check pós-deploy)
+        if: steps.app_changes.outputs.should_deploy_app == 'true' && steps.precheck.outputs.should_deploy == 'true'
+        env:
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL_DEV }}
+        run: |
+          set -euo pipefail
+
+          site_url="${VITE_SITE_URL:-}"
+          if [[ -z "$site_url" ]]; then
+            echo "::warning::VITE_SITE_URL_DEV não configurado — pulando smoke test. Configure o secret para habilitar."
+            exit 0
+          fi
+
+          # Aguarda até 60s para o CDN propagar o novo deploy
+          max_attempts=6
+          attempt=0
+          http_code="000"
+          while [[ $attempt -lt $max_attempts ]]; do
+            attempt=$((attempt + 1))
+            http_code="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 15 --location "${site_url}/" || echo '000')"
+            if [[ "$http_code" == "200" ]]; then
+              echo "::notice::Smoke test DEV passou (HTTP ${http_code}) — ${site_url}/"
+              exit 0
+            fi
+            echo "[SMOKE][DEV] Tentativa ${attempt}/${max_attempts}: HTTP ${http_code}. Aguardando 10s..."
+            sleep 10
+          done
+
+          echo "::error::Smoke test DEV falhou após ${max_attempts} tentativas. Último HTTP code: ${http_code}"
+          echo "::error::URL: ${site_url}/"
+          exit 1

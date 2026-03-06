@@ -29,11 +29,11 @@ if (!redirectedToCanonical && !redirectedAuthCallback) {
         blockAllMedia: true,
       }),
     ],
-    // Tracing
-    tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!
-    // Session Replay
-    replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
-    replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
+    // Tracing: 10% em prod (economiza quota Sentry), 100% em dev para diagnóstico completo
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
+    // Session Replay: 5% de sessões normais em prod, 100% quando há erro
+    replaysSessionSampleRate: import.meta.env.PROD ? 0.05 : 0.1,
+    replaysOnErrorSampleRate: 1.0,
   });
 
   initRouteSnapshot(router);
