@@ -27,8 +27,9 @@ export type NfeImportItem = {
   qcom: number;
   vuncom: number;
   vprod: number;
+  n_lote?: string | null;
   match_produto_id: string | null;
-  match_strategy: 'codigo' | 'ean' | 'none';
+  match_strategy: 'sku' | 'ean' | 'none';
 };
 
 export type PreviewResult = {
