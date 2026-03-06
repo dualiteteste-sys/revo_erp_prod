@@ -474,7 +474,9 @@ const ContasPagarPage: React.FC = () => {
                 onSelectAllMatching={() => selection.selectAllMatching()}
                 onClear={() => selection.clear()}
                 actions={
-                  selection.mode === 'explicit' && selection.selectedCount > 0 ? (
+                  selection.mode === 'explicit' &&
+                  selection.selectedCount > 0 &&
+                  (totalsState.data?.total_saldo ?? 0) > 0 ? (
                     <Button size="sm" onClick={() => setIsBaixaLoteOpen(true)} className="gap-1">
                       <CheckCheck size={14} />
                       Baixar selecionados
