@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useContasPagar } from '@/hooks/useContasPagar';
 import { useToast } from '@/contexts/ToastProvider';
 import * as financeiroService from '@/services/financeiro';
-import { Loader2, PlusCircle, Search, TrendingDown, X, DatabaseBackup } from 'lucide-react';
+import { CheckCheck, Loader2, PlusCircle, Search, TrendingDown, X, DatabaseBackup } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
@@ -13,6 +13,7 @@ import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagarSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
+import BaixaEmLoteModal from '@/components/financeiro/common/BaixaEmLoteModal';
 import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
@@ -67,6 +68,7 @@ const ContasPagarPage: React.FC = () => {
   const [contaToPay, setContaToPay] = useState<financeiroService.ContaPagar | null>(null);
   const [isEstornoOpen, setIsEstornoOpen] = useState(false);
   const [contaToReverse, setContaToReverse] = useState<financeiroService.ContaPagar | null>(null);
+  const [isBaixaLoteOpen, setIsBaixaLoteOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
@@ -92,6 +94,7 @@ const ContasPagarPage: React.FC = () => {
     setContaToPay(null);
     setIsEstornoOpen(false);
     setContaToReverse(null);
+    setIsBaixaLoteOpen(false);
 
     const contaId = searchParams.get('contaId');
     if (contaId) {
@@ -240,6 +243,32 @@ const ContasPagarPage: React.FC = () => {
   const clearDateFilters = () => {
     setFilterStartDate(null);
     setFilterEndDate(null);
+  };
+
+  const handleBaixaLote = async ({
+    contaCorrenteId,
+    dataISO,
+  }: {
+    contaCorrenteId: string | null;
+    dataISO: string;
+  }) => {
+    const ids = Array.from(selection.selectedIds);
+    const result = await financeiroService.pagarContasPagarLote({
+      ids,
+      dataPagamento: dataISO,
+      contaCorrenteId,
+    });
+    setIsBaixaLoteOpen(false);
+    selection.clear();
+    refresh();
+    if (result.skipped > 0) {
+      addToast(
+        `${result.settled} baixa(s) realizada(s). ${result.skipped} pulada(s) (já pagas ou com erro).`,
+        'warning',
+      );
+    } else {
+      addToast(`${result.settled} baixa(s) realizada(s) com sucesso!`, 'success');
+    }
   };
 
   const handleSeed = async () => {
@@ -444,6 +473,16 @@ const ContasPagarPage: React.FC = () => {
                 ]}
                 onSelectAllMatching={() => selection.selectAllMatching()}
                 onClear={() => selection.clear()}
+                actions={
+                  selection.mode === 'explicit' &&
+                  selection.selectedCount > 0 &&
+                  (totalsState.data?.total_saldo ?? 0) > 0 ? (
+                    <Button size="sm" onClick={() => setIsBaixaLoteOpen(true)} className="gap-1">
+                      <CheckCheck size={14} />
+                      Baixar selecionados
+                    </Button>
+                  ) : undefined
+                }
               />
               {effectiveLoading && effectiveContas.length === 0 ? (
                 <div className="h-96 flex items-center justify-center">
@@ -619,6 +658,15 @@ const ContasPagarPage: React.FC = () => {
         confirmText="Sim, Excluir"
         isLoading={isDeleting}
         variant="danger"
+      />
+
+      <BaixaEmLoteModal
+        isOpen={isBaixaLoteOpen}
+        onClose={() => setIsBaixaLoteOpen(false)}
+        tipo="pagar"
+        selectedCount={selection.selectedCount}
+        totalSaldo={totalsState.data?.total_saldo ?? null}
+        onConfirm={handleBaixaLote}
       />
     </div>
   );

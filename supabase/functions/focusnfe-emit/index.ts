@@ -13,6 +13,16 @@ function json(status: number, body: unknown, headers: Record<string, string>) {
 }
 
 // ---------------------------------------------------------------------------
+// Rejection code parser (NFE-STA-01)
+// ---------------------------------------------------------------------------
+
+function parseRejectionCode(mensagem: string | null | undefined): string | null {
+  if (!mensagem) return null;
+  const m = mensagem.match(/Rejei[çc][aã]o:?\s*(\d{3,4})/i);
+  return m ? m[1] : null;
+}
+
+// ---------------------------------------------------------------------------
 // Focus NFe API helpers
 // ---------------------------------------------------------------------------
 
@@ -500,9 +510,15 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq("id", emissao_id);
       } else if (focusStatus === "erro_autorizacao" || focusStatus === "rejeitado") {
+        const rejectMsg = focusData?.mensagem || focusData?.mensagem_sefaz || JSON.stringify(focusData);
+        const rejectionCode = parseRejectionCode(rejectMsg);
+        const { data: curRow } = await admin.from("fiscal_nfe_emissoes")
+          .select("reprocess_count").eq("id", emissao_id).single();
         await admin.from("fiscal_nfe_emissoes").update({
           status: "rejeitada",
-          last_error: focusData?.mensagem || focusData?.mensagem_sefaz || JSON.stringify(focusData),
+          last_error: rejectMsg,
+          rejection_code: rejectionCode,
+          reprocess_count: (curRow?.reprocess_count ?? 0) + 1,
           updated_at: new Date().toISOString(),
         }).eq("id", emissao_id);
       } else {
