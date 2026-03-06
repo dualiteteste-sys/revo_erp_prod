@@ -21,6 +21,8 @@ export type NfeEmissaoRow = {
   total_nfe: number | null;
   payload: any;
   last_error: string | null;
+  rejection_code: string | null;
+  reprocess_count: number;
   created_at: string;
   updated_at: string;
   pedido_origem_id: string | null;
@@ -51,11 +53,21 @@ export type NfeAuditRow = {
   source: string | null;
 };
 
-export async function fiscalNfeEmissoesList(params: { status?: string; q?: string; limit?: number } = {}) {
+export async function fiscalNfeEmissoesList(
+  params: {
+    status?: string;
+    q?: string;
+    limit?: number;
+    dataInicio?: string | null;
+    dataFim?: string | null;
+  } = {},
+) {
   return callRpc<NfeEmissaoRow[]>('fiscal_nfe_emissoes_list', {
     p_status: params.status ?? null,
     p_q: params.q ?? null,
     p_limit: params.limit ?? 200,
+    p_data_inicio: params.dataInicio ?? null,
+    p_data_fim: params.dataFim ?? null,
   });
 }
 
