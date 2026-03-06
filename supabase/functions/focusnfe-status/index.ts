@@ -12,6 +12,13 @@ function json(status: number, body: unknown, headers: Record<string, string>) {
   });
 }
 
+// NFE-STA-01: extract SEFAZ rejection code from error message
+function parseRejectionCode(mensagem: string | null | undefined): string | null {
+  if (!mensagem) return null;
+  const m = mensagem.match(/Rejei[çc][aã]o:?\s*(\d{3,4})/i);
+  return m ? m[1] : null;
+}
+
 function getFocusApiToken(ambiente: string): string {
   if (ambiente === "producao") {
     return (Deno.env.get("FOCUSNFE_API_TOKEN_PROD") ?? "").trim();
@@ -153,10 +160,13 @@ Deno.serve(async (req) => {
     });
 
     if (!focusResponse.ok) {
+      const isUnavailable = focusResponse.status >= 500 || focusResponse.status === 429;
       return json(200, {
         ok: true,
         status: "processando",
-        detail: "Aguardando resposta da SEFAZ",
+        detail: isUnavailable
+          ? "SEFAZ temporariamente indisponível. Retentando automaticamente."
+          : "Aguardando resposta da SEFAZ",
         focus_response: focusData,
       }, cors);
     }
@@ -192,9 +202,14 @@ Deno.serve(async (req) => {
 
     if (focusStatus === "erro_autorizacao" || focusStatus === "rejeitado") {
       const errorMsg = focusData?.mensagem || focusData?.mensagem_sefaz || "";
+      const rejectionCode = parseRejectionCode(errorMsg);
+      const { data: curRow } = await admin.from("fiscal_nfe_emissoes")
+        .select("reprocess_count").eq("id", emissao_id).single();
       await admin.from("fiscal_nfe_emissoes").update({
         status: "rejeitada",
         last_error: errorMsg,
+        rejection_code: rejectionCode,
+        reprocess_count: (curRow?.reprocess_count ?? 0) + 1,
         updated_at: new Date().toISOString(),
       }).eq("id", emissao_id);
 

@@ -7,7 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Download, Eye, FileText, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
+import { AlertTriangle, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -25,6 +25,7 @@ import {
   fiscalNfeSubmit,
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
+import { getRejectionInfo, parseRejectionCode } from '@/lib/fiscal/nfe-rejection-catalog';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -46,6 +47,8 @@ type NfeEmissao = {
   ambiente: AmbienteNfe;
   payload: any;
   last_error: string | null;
+  rejection_code: string | null;
+  reprocess_count: number;
   created_at: string;
   updated_at: string;
   pedido_origem_id?: string | null;
@@ -91,6 +94,59 @@ function formatDate(value: string | null | undefined) {
   }
 }
 
+function isProcessandoStale(row: { status: string; updated_at: string }) {
+  return (
+    row.status === 'processando' &&
+    Date.now() - new Date(row.updated_at).getTime() > 10 * 60 * 1000
+  );
+}
+
+type RejectionCardProps = {
+  code: string | null;
+  lastError: string | null;
+  reprocessCount: number;
+};
+
+function RejectionCard({ code, lastError, reprocessCount }: RejectionCardProps) {
+  const info = getRejectionInfo(code);
+  if (!info && !lastError) return null;
+
+  if (!info) {
+    // Fallback: raw display (backward compat)
+    if (!lastError) return null;
+    return (
+      <div className="text-xs text-red-600 mt-1">
+        {lastError.includes(' | ')
+          ? lastError.split(' | ').map((part, i) =>
+              i === 0
+                ? <div key={i} className="font-semibold">{part}</div>
+                : <div key={i} className="ml-2">{part.split('; ').map((field, j) => <div key={j}>• {field}</div>)}</div>
+            )
+          : lastError}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs space-y-1">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono font-bold bg-red-200 text-red-800">
+          [{code}]
+        </span>
+        <span className="font-semibold text-red-800">{info.descricao}</span>
+        {reprocessCount > 0 && (
+          <span className="ml-auto text-red-500 whitespace-nowrap">Tentativa {reprocessCount}</span>
+        )}
+      </div>
+      <p className="text-red-700">{info.causa}</p>
+      <div className="flex items-start gap-1 text-amber-800 bg-amber-50 rounded px-1.5 py-1">
+        <Lightbulb size={12} className="mt-0.5 shrink-0 text-amber-600" />
+        <span>{info.acao}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function NfeEmissoesPage() {
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
@@ -116,6 +172,8 @@ export default function NfeEmissoesPage() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
   const [sort, setSort] = useState<SortState<string>>({ column: 'atualizado', direction: 'desc' });
 
   const columns: TableColumnWidthDef[] = [
@@ -150,6 +208,8 @@ export default function NfeEmissoesPage() {
         status: statusFilter || undefined,
         q: search.trim() || undefined,
         limit: 200,
+        dataInicio: dataInicio || null,
+        dataFim: dataFim || null,
       });
 
       const list: NfeEmissao[] = (data || []).map((r: any) => ({
@@ -170,8 +230,13 @@ export default function NfeEmissoesPage() {
         ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
         payload: r.payload ?? {},
         last_error: r.last_error ?? null,
+        rejection_code: r.rejection_code ?? null,
+        reprocess_count: r.reprocess_count ?? 0,
         created_at: r.created_at,
         updated_at: r.updated_at,
+        pedido_origem_id: r.pedido_origem_id ?? null,
+        danfe_url: r.danfe_url ?? null,
+        xml_url: r.xml_url ?? null,
       }));
 
       setRows(list);
@@ -181,7 +246,7 @@ export default function NfeEmissoesPage() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, empresaId, search, statusFilter]);
+  }, [addToast, empresaId, search, statusFilter, dataInicio, dataFim]);
 
   useEffect(() => {
     if (!empresaId) return;
@@ -222,8 +287,36 @@ export default function NfeEmissoesPage() {
     const rascunhos = rows.filter((r) => r.status === 'rascunho').length;
     const autorizadas = rows.filter((r) => r.status === 'autorizada').length;
     const pendentes = rows.filter((r) => ['enfileirada', 'processando'].includes(r.status)).length;
-    return { total, rascunhos, autorizadas, pendentes };
+    const totalAutorizadasValor = rows
+      .filter((r) => r.status === 'autorizada')
+      .reduce((sum, r) => sum + (r.total_nfe ?? r.valor_total ?? 0), 0);
+    return { total, rascunhos, autorizadas, pendentes, totalAutorizadasValor };
   }, [rows]);
+
+  const exportCsv = () => {
+    const headers = ['Número', 'Série', 'Chave de Acesso', 'Destinatário', 'Natureza da Operação', 'Ambiente', 'Valor Total (R$)', 'Status', 'Emissão'];
+    const csvRows = rows.map((r) => [
+      r.numero ?? '',
+      r.serie ?? '',
+      r.chave_acesso ?? '',
+      r.destinatario_nome ?? '',
+      r.natureza_operacao ?? '',
+      r.ambiente === 'producao' ? 'Produção' : 'Homologação',
+      (r.total_nfe ?? r.valor_total ?? 0).toFixed(2).replace('.', ','),
+      STATUS_LABEL[r.status] ?? r.status,
+      new Date(r.created_at).toLocaleDateString('pt-BR'),
+    ]);
+    const csv = [headers, ...csvRows]
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nfe-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const sortedRows = useMemo(() => {
     return sortRows(
@@ -646,9 +739,9 @@ export default function NfeEmissoesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-          <p className="text-xs text-slate-700 font-semibold">Total (últimos 200)</p>
+          <p className="text-xs text-slate-700 font-semibold">Total (filtro)</p>
           <p className="text-2xl font-bold text-slate-800">{totals.total}</p>
         </div>
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
@@ -663,9 +756,13 @@ export default function NfeEmissoesPage() {
           <p className="text-xs text-amber-700 font-semibold">Pendentes</p>
           <p className="text-2xl font-bold text-amber-800">{totals.pendentes}</p>
         </div>
+        <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+          <p className="text-xs text-green-700 font-semibold">Valor Autorizado</p>
+          <p className="text-xl font-bold text-green-800 truncate">{formatCurrency(totals.totalAutorizadasValor)}</p>
+        </div>
       </div>
 
-      <div className="mb-4 flex gap-4 items-center">
+      <div className="mb-4 flex flex-wrap gap-3 items-center">
         <div className="relative flex-grow max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
@@ -686,6 +783,29 @@ export default function NfeEmissoesPage() {
           <option value="cancelada">Cancelada</option>
           <option value="erro">Erro</option>
         </Select>
+        <input
+          type="date"
+          value={dataInicio}
+          onChange={(e) => setDataInicio(e.target.value)}
+          title="Data de emissão: início"
+          className="p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <input
+          type="date"
+          value={dataFim}
+          onChange={(e) => setDataFim(e.target.value)}
+          title="Data de emissão: fim"
+          className="p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <button
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          title="Exportar lista atual como CSV (abre corretamente no Excel)"
+          className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+        >
+          <Download size={16} />
+          Exportar CSV
+        </button>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -718,17 +838,12 @@ export default function NfeEmissoesPage() {
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <span className="font-semibold">{STATUS_LABEL[row.status] || row.status}</span>
-                      {row.last_error ? (
-                        <div className="text-xs text-red-600 mt-1">
-                          {row.last_error.includes(' | ')
-                            ? row.last_error.split(' | ').map((part, i) =>
-                                i === 0
-                                  ? <div key={i} className="font-semibold">{part}</div>
-                                  : <div key={i} className="ml-2">{part.split('; ').map((field, j) => <div key={j}>• {field}</div>)}</div>
-                              )
-                            : row.last_error
-                          }
-                        </div>
+                      {(row.rejection_code || row.last_error) ? (
+                        <RejectionCard
+                          code={row.rejection_code}
+                          lastError={row.last_error}
+                          reprocessCount={row.reprocess_count}
+                        />
                       ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
@@ -765,8 +880,17 @@ export default function NfeEmissoesPage() {
                         ) : null}
                         {row.status === 'processando' ? (
                           <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-amber-100 text-amber-800">
-                            <Loader2 size={16} className="animate-spin" />
-                            Processando
+                            {isProcessandoStale(row)
+                              ? <AlertTriangle size={16} className="text-amber-600" />
+                              : <Loader2 size={16} className="animate-spin" />}
+                            {isProcessandoStale(row) ? 'Aguardando SEFAZ (+10 min)' : 'Processando'}
+                            <button
+                              className="ml-1 underline text-xs font-normal hover:text-amber-900"
+                              title="Verificar status agora"
+                              onClick={() => void fiscalNfeConsultaStatus(row.id).then(() => fetchList())}
+                            >
+                              Verificar
+                            </button>
                           </span>
                         ) : null}
                         <button
