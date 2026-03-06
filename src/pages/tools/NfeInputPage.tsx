@@ -26,6 +26,7 @@ import {
   getRecebimento,
   listRecebimentoItens,
   setRecebimentoClassificacao,
+  updateRecebimentoItemLote,
   updateRecebimentoItemProduct,
 } from '@/services/recebimento';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
@@ -73,10 +74,11 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [importId, setImportId] = useState<string | null>(null);
   const [recebimentoId, setRecebimentoId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
-  const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
+  const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string, codigo?: string | null }>>({}); // item_id -> { id, name, codigo }
+  const [lotesManual, setLotesManual] = useState<Record<string, string>>({}); // item_id -> lote
   const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
   const [matchSort, setMatchSort] = useState<SortState<'item' | 'qty' | 'vinculo' | 'status'>>({ column: 'status', direction: 'asc' });
-  const [confSort, setConfSort] = useState<SortState<'item' | 'qtyXml' | 'qtyConf' | 'status'>>({ column: 'item', direction: 'asc' });
+  const [confSort, setConfSort] = useState<SortState<'item' | 'qtyXml' | 'qtyConf' | 'lote' | 'status'>>({ column: 'item', direction: 'asc' });
 
   const [clienteXml, setClienteXml] = useState<{ id: string; nome: string; doc: string } | null>(null);
   const [createClientOpen, setCreateClientOpen] = useState(false);
@@ -107,6 +109,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     { id: 'item', defaultWidth: 420, minWidth: 260 },
     { id: 'qtyXml', defaultWidth: 150, minWidth: 130 },
     { id: 'qtyConf', defaultWidth: 170, minWidth: 150 },
+    { id: 'lote', defaultWidth: 200, minWidth: 140 },
     { id: 'status', defaultWidth: 160, minWidth: 140 },
   ];
   const { widths: confWidths, startResize: startConfResize } = useTableColumnWidths({
@@ -225,6 +228,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         { id: 'item', type: 'string', getValue: (it: any) => it.xprod ?? '' },
         { id: 'qtyXml', type: 'number', getValue: (it: any) => typeof it.qcom === 'number' ? it.qcom : Number(it.qcom) },
         { id: 'qtyConf', type: 'number', getValue: (it: any) => conferidas[it.item_id] ?? NaN },
+        { id: 'lote', type: 'string', getValue: (it: any) => lotesManual[it.item_id] ?? it.n_lote ?? '' },
         { id: 'status', type: 'custom', getValue: (it: any) => {
           const qty = conferidas[it.item_id];
           const qtyNumber = typeof qty === 'number' && !Number.isNaN(qty) ? qty : NaN;
@@ -235,7 +239,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         }, compare: (a, b) => Number(a) - Number(b) },
       ] as const
     );
-  }, [confSort, conferidas, previewData?.itens]);
+  }, [confSort, conferidas, lotesManual, previewData?.itens]);
 
   const requestClientCreation = async (initialValues: Partial<PartnerDetails>): Promise<{ id: string; nome: string; doc: string } | null> => {
     setCreateClientInitialValues(initialValues);
@@ -526,6 +530,18 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         })
       );
 
+      // Atualiza lote de cada item (XML ou entrada manual)
+      const lotesParaAtualizar = itensAtualizados.filter(
+        (item) => lotesManual[item.fiscal_nfe_item_id] !== undefined
+      );
+      if (lotesParaAtualizar.length > 0) {
+        await Promise.all(
+          lotesParaAtualizar.map((item) =>
+            updateRecebimentoItemLote(item.id, lotesManual[item.fiscal_nfe_item_id] || null)
+          )
+        );
+      }
+
       if (embedded && autoFinalizeMaterialCliente) {
         if (features.loading) {
           addToast('Carregando recursos do plano. Tente novamente em alguns segundos.', 'info');
@@ -610,11 +626,17 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       addToast('Vincule todos os itens a um produto para continuar para a conferência.', 'warning');
       return;
     }
+    // Inicializa lotes a partir dos dados do XML (n_lote do <rastro>)
+    const initLotes: Record<string, string> = {};
+    for (const it of previewData.itens || []) {
+      if (it.n_lote) initLotes[it.item_id] = it.n_lote;
+    }
+    setLotesManual(initLotes);
     setStep('conferencia');
   };
 
   const handleMatchSelect = (itemId: string, product: any) => {
-    setManualMatches(prev => ({ ...prev, [itemId]: { id: product.id, name: product.descricao } }));
+    setManualMatches(prev => ({ ...prev, [itemId]: { id: product.id, name: product.descricao, codigo: product.codigo ?? null } }));
   };
 
   // Renderização
@@ -821,14 +843,30 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                               <div>
                                 <p className="font-medium">
                                   {item.match_produto_id
-                                    ? 'Produto encontrado automaticamente'
+                                    ? (item.match_strategy === 'sku'
+                                        ? `Encontrado por SKU: ${item.cprod}`
+                                        : item.match_strategy === 'ean'
+                                        ? `Encontrado por EAN: ${item.ean}`
+                                        : 'Produto encontrado automaticamente')
                                     : manualMatches[item.item_id]?.name || 'Produto vinculado manualmente'}
                                 </p>
-                                {item.match_strategy && (
-                                  <span className="text-xs bg-green-100 px-2 py-0.5 rounded-full capitalize">
-                                    {item.match_strategy}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {item.match_produto_id && item.match_strategy !== 'none' && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                      {item.match_strategy === 'sku' ? 'SKU' : 'EAN'}
+                                    </span>
+                                  )}
+                                  {!item.match_produto_id && manualMatches[item.item_id] && (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                      Manual
+                                    </span>
+                                  )}
+                                  {!item.match_produto_id && manualMatches[item.item_id]?.codigo && (
+                                    <span className="text-xs text-gray-500">
+                                      Cód: {manualMatches[item.item_id]?.codigo}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               {!item.match_produto_id && (
                                 <button
@@ -934,6 +972,14 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                       className="px-4 py-3"
                     />
                     <ResizableSortableTh
+                      columnId="lote"
+                      label="Lote"
+                      sort={confSort}
+                      onSort={(col) => setConfSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startConfResize}
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
                       columnId="status"
                       label="Status"
                       sort={confSort}
@@ -973,6 +1019,20 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                             className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             aria-label={`Quantidade conferida do item ${item.n_item}`}
                             title="Quantidade conferida"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={lotesManual[item.item_id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setLotesManual((prev) => ({ ...prev, [item.item_id]: val }));
+                            }}
+                            placeholder="Ex: L2024-001"
+                            className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                            aria-label={`Lote do item ${item.n_item}`}
+                            title="Número do lote"
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
