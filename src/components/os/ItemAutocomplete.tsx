@@ -221,6 +221,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
       >
         <ProductFormPanel
           product={null}
+          initialValues={query.trim() ? { nome: query.trim() } : undefined}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
           saveProduct={(data) => saveProduct(data, '')} // empresaId is handled in service if empty/context

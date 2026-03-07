@@ -211,7 +211,7 @@ export default function ServiceAutocomplete({
         size="2xl"
       >
         <ProductFormPanel
-          product={{ tipo: 'servico' as any }} // Cast to any to avoid TS error with strict enum
+          product={{ tipo: 'servico' as any, ...(query.trim() ? { nome: query.trim() } : {}) }} // Cast to any to avoid TS error with strict enum
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
           saveProduct={async (data) => {
