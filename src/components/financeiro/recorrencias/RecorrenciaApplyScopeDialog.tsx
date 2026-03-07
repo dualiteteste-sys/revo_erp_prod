@@ -3,32 +3,59 @@ import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { FinanceiroRecorrenciaApplyScope } from '@/services/financeiroRecorrencias';
 
-type Option = {
+export type RecorrenciaApplyScopeDialogTipo = 'recorrencia' | 'parcelamento' | 'standalone';
+
+type OptionDef = {
   value: FinanceiroRecorrenciaApplyScope;
   title: string;
   description: string;
-  onlyRecorrente?: boolean;
 };
 
-const OPTIONS: Option[] = [
-  {
-    value: 'single',
-    title: 'Somente esta conta',
-    description: 'Salva apenas este lançamento.',
-  },
-  {
-    value: 'future',
-    title: 'Esta e próximas (futuras)',
-    description: 'Atualiza a recorrência e aplica em contas futuras ainda em aberto.',
-    onlyRecorrente: true,
-  },
-  {
-    value: 'all_open',
-    title: 'Todas em aberto',
-    description: 'Atualiza a recorrência e aplica em todas as contas em aberto (da mesma recorrência).',
-    onlyRecorrente: true,
-  },
-];
+function buildOptions(tipo: RecorrenciaApplyScopeDialogTipo): OptionDef[] {
+  if (tipo === 'recorrencia') {
+    return [
+      {
+        value: 'single',
+        title: 'Somente esta conta',
+        description: 'Salva apenas este lançamento, sem afetar os demais.',
+      },
+      {
+        value: 'future',
+        title: 'Esta e as próximas',
+        description: 'Aplica a alteração nesta e nas contas futuras ainda em aberto desta recorrência.',
+      },
+      {
+        value: 'all_open',
+        title: 'Todas em aberto',
+        description: 'Aplica a alteração em todas as contas em aberto desta recorrência.',
+      },
+    ];
+  }
+
+  if (tipo === 'parcelamento') {
+    return [
+      {
+        value: 'single',
+        title: 'Somente esta parcela',
+        description: 'Salva apenas esta parcela, sem afetar as demais.',
+      },
+      {
+        value: 'all_open',
+        title: 'Todas as parcelas em aberto',
+        description: 'Aplica a alteração em todas as parcelas deste parcelamento que ainda estão em aberto.',
+      },
+    ];
+  }
+
+  // standalone: apenas confirmação da própria conta
+  return [
+    {
+      value: 'single',
+      title: 'Somente esta conta',
+      description: 'Salva apenas este lançamento.',
+    },
+  ];
+}
 
 export default function RecorrenciaApplyScopeDialog(props: {
   open: boolean;
@@ -37,19 +64,32 @@ export default function RecorrenciaApplyScopeDialog(props: {
   onScopeChange: (scope: FinanceiroRecorrenciaApplyScope) => void;
   onConfirm: () => void;
   isLoading: boolean;
-  isRecorrente?: boolean;
+  tipo?: RecorrenciaApplyScopeDialogTipo;
   title?: string;
   description?: string;
 }) {
-  const isRecorrente = props.isRecorrente ?? false;
+  const tipo = props.tipo ?? 'standalone';
+  const options = buildOptions(tipo);
+
   const title =
     props.title ??
-    (isRecorrente ? 'Aplicar alteração em conta recorrente' : 'Salvar alteração');
+    (tipo === 'recorrencia'
+      ? 'Aplicar alteração em conta recorrente'
+      : tipo === 'parcelamento'
+        ? 'Salvar alteração em conta parcelada'
+        : 'Salvar alteração');
+
   const description =
     props.description ??
-    (isRecorrente
+    (tipo === 'recorrencia'
       ? 'Esta conta faz parte de uma recorrência. Escolha o escopo para aplicar a alteração.'
-      : 'Escolha como deseja salvar a alteração nesta conta.');
+      : tipo === 'parcelamento'
+        ? 'Esta conta faz parte de um parcelamento. Escolha o escopo para aplicar a alteração.'
+        : 'Escolha como deseja salvar a alteração nesta conta.');
+
+  // Garantir que o scope seja válido para o tipo atual
+  const validScopes = options.map((o) => o.value);
+  const effectiveScope = validScopes.includes(props.scope) ? props.scope : options[0].value;
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -60,19 +100,16 @@ export default function RecorrenciaApplyScopeDialog(props: {
         </DialogHeader>
 
         <div className="mt-4 grid gap-3">
-          {OPTIONS.map((opt) => {
-            const disabled = !isRecorrente && !!opt.onlyRecorrente;
-            const checked = props.scope === opt.value;
+          {options.map((opt) => {
+            const checked = effectiveScope === opt.value;
             return (
               <label
                 key={opt.value}
                 className={[
-                  'flex items-start gap-3 rounded-xl border px-4 py-3 transition',
-                  disabled
-                    ? 'cursor-not-allowed opacity-40 border-gray-100 bg-gray-50'
-                    : checked
-                      ? 'cursor-pointer border-blue-400 bg-blue-50/60'
-                      : 'cursor-pointer border-gray-200 bg-white/60 hover:bg-white',
+                  'flex items-start gap-3 rounded-xl border px-4 py-3 transition cursor-pointer',
+                  checked
+                    ? 'border-blue-400 bg-blue-50/60'
+                    : 'border-gray-200 bg-white/60 hover:bg-white',
                 ].join(' ')}
               >
                 <input
@@ -80,15 +117,12 @@ export default function RecorrenciaApplyScopeDialog(props: {
                   name="recorrencia_apply_scope"
                   value={opt.value}
                   checked={checked}
-                  disabled={disabled}
-                  onChange={() => !disabled && props.onScopeChange(opt.value)}
+                  onChange={() => props.onScopeChange(opt.value)}
                   className="mt-1 h-4 w-4 accent-blue-600"
                 />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-gray-900">{opt.title}</div>
-                  <div className="text-xs text-gray-600">
-                    {disabled ? 'Disponível apenas para contas recorrentes.' : opt.description}
-                  </div>
+                  <div className="text-xs text-gray-600">{opt.description}</div>
                 </div>
               </label>
             );

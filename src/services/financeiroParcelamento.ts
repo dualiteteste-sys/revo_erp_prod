@@ -105,3 +105,38 @@ export async function createParcelamentoContasAReceber(params: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Parcelamento — propagação de alterações
+// ---------------------------------------------------------------------------
+
+export type ParcelamentoForConta = {
+  parcelamento_id: string;
+  numero_parcela: number;
+  total_parcelas: number;
+};
+
+export type ParcelamentoApplyUpdateResult = {
+  ok: boolean;
+  updated_accounts: number;
+};
+
+export async function getParcelamentoForConta(params: {
+  contaPagarId?: string;
+  contaReceberId?: string;
+}): Promise<ParcelamentoForConta | null> {
+  return callRpc<ParcelamentoForConta | null>('financeiro_parcelamento_get_for_conta', {
+    p_conta_pagar_id: params.contaPagarId ?? null,
+    p_conta_receber_id: params.contaReceberId ?? null,
+  });
+}
+
+export async function applyParcelamentoUpdate(params: {
+  parcelamentoId: string;
+  patch: Record<string, unknown>;
+}): Promise<ParcelamentoApplyUpdateResult> {
+  return callRpc<ParcelamentoApplyUpdateResult>('financeiro_parcelamento_apply_update', {
+    p_parcelamento_id: params.parcelamentoId,
+    p_patch: params.patch,
+  });
+}
+
