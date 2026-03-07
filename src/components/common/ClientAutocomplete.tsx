@@ -196,7 +196,7 @@ export default function ClientAutocomplete({
       >
         <PartnerFormPanel
           partner={null}
-          initialValues={{ tipo: isSupplier ? 'fornecedor' : 'cliente' }}
+          initialValues={{ tipo: isSupplier ? 'fornecedor' : 'cliente', ...(query.trim() ? { nome: query.trim() } : {}) }}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
         />
