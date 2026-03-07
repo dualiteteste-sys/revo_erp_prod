@@ -185,49 +185,44 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
     return patch;
   };
 
-  const shouldAskRecorrenciaScope = () => {
-    if (!isGeradaPorRecorrencia) return false;
+  const shouldAskScope = () => {
+    if (!isEditing) return false;
     const patch = buildRecorrenciaPatch();
     const propagatableKeys = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor'];
     return propagatableKeys.some((k) => k in patch);
   };
 
-  const applyRecorrencia = async (scope: FinanceiroRecorrenciaApplyScope) => {
-    const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
-    if (!ocorrenciaId) {
-      addToast('Não foi possível identificar a recorrência desta conta.', 'error');
-      return;
-    }
-
+  const applyScope = async (scope: FinanceiroRecorrenciaApplyScope) => {
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
-    const patch = buildRecorrenciaPatch();
     setIsSaving(true);
     try {
-      const result = await applyRecorrenciaUpdate({
-        ocorrenciaId,
-        scope,
-        patch,
-      });
-
-      if (isStaleAction(token, empresaSnapshot)) return;
-      if (!result?.ok) {
-        addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
-        return;
+      if (isGeradaPorRecorrencia && scope !== 'single') {
+        const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
+        if (!ocorrenciaId) {
+          addToast('Não foi possível identificar a recorrência desta conta.', 'error');
+          return;
+        }
+        const patch = buildRecorrenciaPatch();
+        const result = await applyRecorrenciaUpdate({ ocorrenciaId, scope, patch });
+        if (isStaleAction(token, empresaSnapshot)) return;
+        if (!result?.ok) {
+          addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
+          return;
+        }
+        addToast(`Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`, 'success');
+        const refreshed = await getContaAReceberDetails(String(conta?.id));
+        if (isStaleAction(token, empresaSnapshot)) return;
+        onSaveSuccess(refreshed);
+      } else {
+        const savedConta = await saveContaAReceber(formData);
+        if (isStaleAction(token, empresaSnapshot)) return;
+        addToast('Conta a receber salva com sucesso!', 'success');
+        onSaveSuccess(savedConta);
       }
-
-      const msg =
-        scope === 'single'
-          ? 'Conta recorrente atualizada.'
-          : `Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`;
-      addToast(msg, 'success');
-
-      const refreshed = await getContaAReceberDetails(String(conta?.id));
-      if (isStaleAction(token, empresaSnapshot)) return;
-      onSaveSuccess(refreshed);
     } catch (e: any) {
       if (isStaleAction(token, empresaSnapshot)) return;
-      addToast(e?.message || 'Erro ao aplicar alteração na recorrência.', 'error');
+      addToast(e?.message || 'Erro ao salvar conta.', 'error');
     } finally {
       if (isStaleAction(token, empresaSnapshot)) return;
       setIsSaving(false);
@@ -297,7 +292,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         return;
       }
 
-      if (shouldAskRecorrenciaScope()) {
+      if (shouldAskScope()) {
         setRecApplyScope('single');
         setRecApplyOpen(true);
         return;
@@ -393,9 +388,10 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         scope={recApplyScope}
         onScopeChange={setRecApplyScope}
         isLoading={isSaving}
+        isRecorrente={isGeradaPorRecorrencia}
         onConfirm={async () => {
           setRecApplyOpen(false);
-          await applyRecorrencia(recApplyScope);
+          await applyScope(recApplyScope);
         }}
       />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">

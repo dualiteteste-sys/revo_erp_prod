@@ -7,23 +7,26 @@ type Option = {
   value: FinanceiroRecorrenciaApplyScope;
   title: string;
   description: string;
+  onlyRecorrente?: boolean;
 };
 
 const OPTIONS: Option[] = [
   {
     value: 'single',
     title: 'Somente esta conta',
-    description: 'Ajusta apenas este lançamento (não altera a recorrência).',
+    description: 'Salva apenas este lançamento.',
   },
   {
     value: 'future',
     title: 'Esta e próximas (futuras)',
     description: 'Atualiza a recorrência e aplica em contas futuras ainda em aberto.',
+    onlyRecorrente: true,
   },
   {
     value: 'all_open',
     title: 'Todas em aberto',
     description: 'Atualiza a recorrência e aplica em todas as contas em aberto (da mesma recorrência).',
+    onlyRecorrente: true,
   },
 ];
 
@@ -34,13 +37,19 @@ export default function RecorrenciaApplyScopeDialog(props: {
   onScopeChange: (scope: FinanceiroRecorrenciaApplyScope) => void;
   onConfirm: () => void;
   isLoading: boolean;
+  isRecorrente?: boolean;
   title?: string;
   description?: string;
 }) {
-  const title = props.title ?? 'Aplicar alteração em conta recorrente';
+  const isRecorrente = props.isRecorrente ?? false;
+  const title =
+    props.title ??
+    (isRecorrente ? 'Aplicar alteração em conta recorrente' : 'Salvar alteração');
   const description =
     props.description ??
-    'Esta conta foi gerada por uma recorrência. Escolha o escopo para aplicar a alteração (estado da arte).';
+    (isRecorrente
+      ? 'Esta conta faz parte de uma recorrência. Escolha o escopo para aplicar a alteração.'
+      : 'Escolha como deseja salvar a alteração nesta conta.');
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -52,13 +61,18 @@ export default function RecorrenciaApplyScopeDialog(props: {
 
         <div className="mt-4 grid gap-3">
           {OPTIONS.map((opt) => {
+            const disabled = !isRecorrente && !!opt.onlyRecorrente;
             const checked = props.scope === opt.value;
             return (
               <label
                 key={opt.value}
                 className={[
-                  'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition',
-                  checked ? 'border-blue-400 bg-blue-50/60' : 'border-gray-200 bg-white/60 hover:bg-white',
+                  'flex items-start gap-3 rounded-xl border px-4 py-3 transition',
+                  disabled
+                    ? 'cursor-not-allowed opacity-40 border-gray-100 bg-gray-50'
+                    : checked
+                      ? 'cursor-pointer border-blue-400 bg-blue-50/60'
+                      : 'cursor-pointer border-gray-200 bg-white/60 hover:bg-white',
                 ].join(' ')}
               >
                 <input
@@ -66,12 +80,15 @@ export default function RecorrenciaApplyScopeDialog(props: {
                   name="recorrencia_apply_scope"
                   value={opt.value}
                   checked={checked}
-                  onChange={() => props.onScopeChange(opt.value)}
+                  disabled={disabled}
+                  onChange={() => !disabled && props.onScopeChange(opt.value)}
                   className="mt-1 h-4 w-4 accent-blue-600"
                 />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-gray-900">{opt.title}</div>
-                  <div className="text-xs text-gray-600">{opt.description}</div>
+                  <div className="text-xs text-gray-600">
+                    {disabled ? 'Disponível apenas para contas recorrentes.' : opt.description}
+                  </div>
                 </div>
               </label>
             );
@@ -101,4 +118,3 @@ export default function RecorrenciaApplyScopeDialog(props: {
     </Dialog>
   );
 }
-
