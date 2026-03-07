@@ -20,7 +20,7 @@ import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Switch } from '@/components/ui/switch';
-import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
+import RecorrenciaApplyScopeDialog, { type RecorrenciaApplyScopeDialogTipo } from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
 import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import {
@@ -31,7 +31,12 @@ import {
   type FinanceiroRecorrenciaApplyScope,
   type FinanceiroRecorrenciaFrequencia,
 } from '@/services/financeiroRecorrencias';
-import { createParcelamentoContasPagar } from '@/services/financeiroParcelamento';
+import {
+  applyParcelamentoUpdate,
+  createParcelamentoContasPagar,
+  getParcelamentoForConta,
+  type ParcelamentoForConta,
+} from '@/services/financeiroParcelamento';
 
 interface ContasPagarFormPanelProps {
   conta: Partial<ContaPagar> | null;
@@ -71,6 +76,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
   const [isParcelado, setIsParcelado] = useState(false);
   const [parcelarCondicao, setParcelarCondicao] = useState<string>('1x');
   const [parcelarOpen, setParcelarOpen] = useState(false);
+  const [parcelamentoInfo, setParcelamentoInfo] = useState<ParcelamentoForConta | null>(null);
 
   const valorTotalProps = useNumericField(formData.valor_total, (value) => handleFormChange('valor_total', value));
   const valorPagoProps = useNumericField(formData.valor_pago, (value) => handleFormChange('valor_pago', value));
@@ -143,6 +149,28 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
     };
   }, [addToast, conta?.id]);
 
+  // Detectar se a conta é uma parcela de parcelamento
+  useEffect(() => {
+    const contaId = String(conta?.id || '');
+    const origemTipo = (conta as any)?.origem_tipo ?? null;
+    if (!contaId || origemTipo !== 'PARCELAMENTO_PARCELA') {
+      setParcelamentoInfo(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const info = await getParcelamentoForConta({ contaPagarId: contaId });
+        if (!cancelled) setParcelamentoInfo(info);
+      } catch {
+        if (!cancelled) setParcelamentoInfo(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [conta?.id, (conta as any)?.origem_tipo]);
+
   const handleFormChange = (field: keyof ContaPagarPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -152,6 +180,8 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
     const origemId = (formData as any)?.origem_id ?? (conta as any)?.origem_id ?? null;
     return isEditing && origemTipo === 'RECORRENCIA' && !!origemId;
   })();
+
+  const isGeradaPorParcelamento = isEditing && parcelamentoInfo !== null;
 
   const buildRecorrenciaPatch = () => {
     const base: any = conta ?? {};
@@ -181,44 +211,66 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
     return patch;
   };
 
-  const shouldAskRecorrenciaScope = () => {
-    if (!isGeradaPorRecorrencia) return false;
+  const buildParcelamentoPatch = () => {
+    const base: any = conta ?? {};
+    const patch: Record<string, any> = {};
+    // Campos seguros para propagação em parcelamentos (sem valor_total nem data_vencimento)
+    const keys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id'];
+    for (const k of keys) {
+      const next = (formData as any)?.[k];
+      const prev = (base as any)?.[k];
+      const normNext = next ?? null;
+      const normPrev = prev ?? null;
+      if (String(normNext) !== String(normPrev)) patch[k] = normNext;
+    }
+    return patch;
+  };
+
+  const shouldAskScope = () => {
+    if (!isEditing) return false;
+    if (isGeradaPorParcelamento) {
+      return Object.keys(buildParcelamentoPatch()).length > 0;
+    }
     const patch = buildRecorrenciaPatch();
     const propagatableKeys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id', 'valor_total'];
     return propagatableKeys.some((k) => k in patch);
   };
 
-  const applyRecorrencia = async (scope: FinanceiroRecorrenciaApplyScope) => {
-    const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
-    if (!ocorrenciaId) {
-      addToast('Não foi possível identificar a recorrência desta conta.', 'error');
-      return;
-    }
-
-    const patch = buildRecorrenciaPatch();
+  const applyScope = async (scope: FinanceiroRecorrenciaApplyScope) => {
     setIsSaving(true);
     try {
-      const result = await applyRecorrenciaUpdate({
-        ocorrenciaId,
-        scope,
-        patch,
-      });
-
-      if (!result?.ok) {
-        addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
-        return;
+      if (isGeradaPorParcelamento && parcelamentoInfo && scope === 'all_open') {
+        const patch = buildParcelamentoPatch();
+        const result = await applyParcelamentoUpdate({ parcelamentoId: parcelamentoInfo.parcelamento_id, patch });
+        if (!result?.ok) {
+          addToast('Não foi possível aplicar a alteração no parcelamento.', 'error');
+          return;
+        }
+        addToast(`Parcelamento atualizado. Parcelas afetadas: ${result.updated_accounts ?? 0}.`, 'success');
+        const refreshed = await getContaPagarDetails(String(conta?.id));
+        onSaveSuccess(refreshed);
+      } else if (isGeradaPorRecorrencia && scope !== 'single') {
+        const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
+        if (!ocorrenciaId) {
+          addToast('Não foi possível identificar a recorrência desta conta.', 'error');
+          return;
+        }
+        const patch = buildRecorrenciaPatch();
+        const result = await applyRecorrenciaUpdate({ ocorrenciaId, scope, patch });
+        if (!result?.ok) {
+          addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
+          return;
+        }
+        addToast(`Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`, 'success');
+        const refreshed = await getContaPagarDetails(String(conta?.id));
+        onSaveSuccess(refreshed);
+      } else {
+        const savedConta = await saveContaPagar(formData);
+        addToast('Conta a pagar salva com sucesso!', 'success');
+        onSaveSuccess(savedConta);
       }
-
-      const msg =
-        scope === 'single'
-          ? 'Conta recorrente atualizada.'
-          : `Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`;
-      addToast(msg, 'success');
-
-      const refreshed = await getContaPagarDetails(String(conta?.id));
-      onSaveSuccess(refreshed);
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao aplicar alteração na recorrência.', 'error');
+      addToast(e?.message || 'Erro ao salvar conta.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -280,7 +332,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
         return;
       }
 
-      if (shouldAskRecorrenciaScope()) {
+      if (shouldAskScope()) {
         setRecApplyScope('single');
         setRecApplyOpen(true);
         return;
@@ -335,9 +387,12 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
         scope={recApplyScope}
         onScopeChange={setRecApplyScope}
         isLoading={isSaving}
+        tipo={
+          (isGeradaPorRecorrencia ? 'recorrencia' : isGeradaPorParcelamento ? 'parcelamento' : 'standalone') as RecorrenciaApplyScopeDialogTipo
+        }
         onConfirm={async () => {
           setRecApplyOpen(false);
-          await applyRecorrencia(recApplyScope);
+          await applyScope(recApplyScope);
         }}
       />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
