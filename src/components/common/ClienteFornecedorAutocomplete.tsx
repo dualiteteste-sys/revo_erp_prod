@@ -201,7 +201,7 @@ export default function ClienteFornecedorAutocomplete({
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Novo Cliente/Fornecedor" size="4xl">
         <PartnerFormPanel
           partner={null}
-          initialValues={{ tipo: 'ambos' }}
+          initialValues={{ tipo: 'ambos', ...(query.trim() ? { nome: query.trim() } : {}) }}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
         />
