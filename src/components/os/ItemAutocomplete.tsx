@@ -15,9 +15,10 @@ type Props = {
   placeholder?: string;
   type?: 'all' | 'product' | 'service';
   clearOnSelect?: boolean;
+  createProductInitialValues?: Record<string, any>;
 };
 
-export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all', clearOnSelect = true }: Props) {
+export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all', clearOnSelect = true, createProductInitialValues }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -221,7 +222,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
       >
         <ProductFormPanel
           product={null}
-          initialValues={query.trim() ? { nome: query.trim() } : undefined}
+          initialValues={{ ...createProductInitialValues, ...(query.trim() ? { nome: query.trim() } : {}) }}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
           saveProduct={(data) => saveProduct(data, '')} // empresaId is handled in service if empty/context
