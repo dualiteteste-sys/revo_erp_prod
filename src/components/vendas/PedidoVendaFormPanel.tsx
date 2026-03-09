@@ -131,17 +131,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   useEffect(() => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
     let alive = true;
-    const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     (async () => {
       try {
         const rows = await searchCondicoesPagamento({ tipo: 'ambos', q: null, limit: 50 });
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-        if (!alive) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setCondicoesPagamento(rows ?? []);
       } catch {
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-        if (!alive) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setCondicoesPagamento([]);
       }
     })();
@@ -233,36 +230,37 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   useEffect(() => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
-    const token = ++actionTokenRef.current;
+    let alive = true;
     const empresaSnapshot = activeEmpresaId;
-    const load = async () => {
+    (async () => {
       try {
         const rows = await listTabelasPreco();
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTabelasPreco(rows ?? []);
       } catch {
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTabelasPreco([]);
       }
-    };
-    void load();
+    })();
+    return () => { alive = false; };
   }, [activeEmpresaId, authLoading, empresaChanged]);
 
   useEffect(() => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
-    const token = ++actionTokenRef.current;
+    let alive = true;
     const empresaSnapshot = activeEmpresaId;
     // COM-01: vendedores para comissões (opcional)
-    void (async () => {
+    (async () => {
       try {
         const data = await listVendedores(undefined, true);
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setVendedores(data);
       } catch {
-        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        if (!alive || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setVendedores([]);
       }
     })();
+    return () => { alive = false; };
   }, [activeEmpresaId, authLoading, empresaChanged]);
 
   useEffect(() => {
@@ -1126,36 +1124,21 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           <div className="sm:col-span-3">
              <Input label="Data Entrega" type="date" value={formData.data_entrega || ''} onChange={e => handleHeaderChange('data_entrega', e.target.value)} disabled={isLocked} />
           </div>
-          <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-3">
             <Select
               label="Condição de Pagamento"
-              name="condicao_pagamento_preset"
-              value={condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim()) ? (formData.condicao_pagamento || '').trim() : '_custom'}
-              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value === '_custom' ? '' : e.target.value)}
+              name="condicao_pagamento"
+              value={formData.condicao_pagamento || ''}
+              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value)}
               disabled={isLocked}
             >
+              <option value="">Selecione...</option>
               {condicoesPagamento.map((c) => (
                 <option key={c.id} value={c.condicao}>
-                  {c.nome} • {c.condicao}
+                  {c.nome}
                 </option>
               ))}
-              <option value="_custom">Outra (digitar ao lado)</option>
             </Select>
-            <Input
-              label="Condição manual"
-              name="condicao_pagamento"
-              value={
-                condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim())
-                  ? ''
-                  : (formData.condicao_pagamento || '')
-              }
-              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value)}
-              disabled={
-                isLocked ||
-                condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim())
-              }
-              placeholder="Ex: 30/60/90"
-            />
           </div>
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Tabela de preço</label>
