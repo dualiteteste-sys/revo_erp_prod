@@ -87,8 +87,8 @@ export async function listRecebimentoItens(recebimentoId: string): Promise<Receb
 
 export type CreateRecebimentoFromXmlStatus = 'created' | 'exists' | 'reopened';
 
-export async function createRecebimentoFromXml(importId: string): Promise<{ id: string; status: CreateRecebimentoFromXmlStatus }> {
-    return callRpc('create_recebimento_from_xml', { p_import_id: importId });
+export async function createRecebimentoFromXml(importId: string, fornecedorId?: string | null): Promise<{ id: string; status: CreateRecebimentoFromXmlStatus }> {
+    return callRpc('create_recebimento_from_xml', { p_import_id: importId, p_fornecedor_id: fornecedorId ?? null });
 }
 
 export async function conferirItem(itemId: string, quantidade: number): Promise<void> {
