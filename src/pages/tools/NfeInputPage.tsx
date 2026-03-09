@@ -33,6 +33,7 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { documentMask } from '@/lib/masks';
 import { searchClients, type PartnerDetails } from '@/services/partners';
+import { searchSuppliers } from '@/services/compras';
 import { logger } from '@/lib/logger';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
@@ -80,17 +81,17 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [matchSort, setMatchSort] = useState<SortState<'item' | 'qty' | 'vinculo' | 'status'>>({ column: 'status', direction: 'asc' });
   const [confSort, setConfSort] = useState<SortState<'item' | 'qtyXml' | 'qtyConf' | 'lote' | 'status'>>({ column: 'item', direction: 'asc' });
 
-  const [clienteXml, setClienteXml] = useState<{ id: string; nome: string; doc: string } | null>(null);
-  const [createClientOpen, setCreateClientOpen] = useState(false);
-  const [createClientInitialValues, setCreateClientInitialValues] = useState<Partial<PartnerDetails> | null>(null);
-  const createClientResolverRef = useRef<((value: { id: string; nome: string; doc: string } | null) => void) | null>(null);
-  const clientPromptedRef = useRef<string | null>(null);
+  const [fornecedorXml, setFornecedorXml] = useState<{ id: string; nome: string; doc: string } | null>(null);
+  const [createFornecedorOpen, setCreateFornecedorOpen] = useState(false);
+  const [createFornecedorInitialValues, setCreateFornecedorInitialValues] = useState<Partial<PartnerDetails> | null>(null);
+  const createFornecedorResolverRef = useRef<((value: { id: string; nome: string; doc: string } | null) => void) | null>(null);
+  const fornecedorPromptedRef = useRef<string | null>(null);
 
-  const closeCreateClientModal = (result: { id: string; nome: string; doc: string } | null) => {
-    setCreateClientOpen(false);
-    setCreateClientInitialValues(null);
-    const resolve = createClientResolverRef.current;
-    createClientResolverRef.current = null;
+  const closeCreateFornecedorModal = (result: { id: string; nome: string; doc: string } | null) => {
+    setCreateFornecedorOpen(false);
+    setCreateFornecedorInitialValues(null);
+    const resolve = createFornecedorResolverRef.current;
+    createFornecedorResolverRef.current = null;
     resolve?.(result);
   };
 
@@ -140,7 +141,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     return root?.infNFe ?? null;
   };
 
-  const buildClientInitialValuesFromXml = (infNFe: any): Partial<PartnerDetails> | null => {
+  const buildFornecedorInitialValuesFromXml = (infNFe: any): Partial<PartnerDetails> | null => {
     const cnpjRaw = get(infNFe, 'emit.CNPJ');
     const cnpj = digitsOnly(cnpjRaw);
     if (!cnpj) return null;
@@ -169,10 +170,10 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     const hasEndereco = endereco && Object.values(endereco).some((v) => v && String(v).trim().length > 0);
 
     return {
-      tipo: 'cliente' as any,
+      tipo: 'fornecedor' as any,
       tipo_pessoa: 'juridica' as any,
       doc_unico: documentMask(cnpj),
-      nome: nome || fantasia || 'Cliente (XML)',
+      nome: nome || fantasia || 'Fornecedor (XML)',
       fantasia: fantasia || nome || null,
       email: email || null,
       telefone: telefone || null,
@@ -241,79 +242,86 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     );
   }, [confSort, conferidas, lotesManual, previewData?.itens]);
 
-  const requestClientCreation = async (initialValues: Partial<PartnerDetails>): Promise<{ id: string; nome: string; doc: string } | null> => {
-    setCreateClientInitialValues(initialValues);
-    setCreateClientOpen(true);
+  const requestFornecedorCreation = async (initialValues: Partial<PartnerDetails>): Promise<{ id: string; nome: string; doc: string } | null> => {
+    setCreateFornecedorInitialValues(initialValues);
+    setCreateFornecedorOpen(true);
     return await new Promise((resolve) => {
-      createClientResolverRef.current = resolve;
+      createFornecedorResolverRef.current = resolve;
     });
   };
 
-  const resolveClienteFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
+  const resolveFornecedorFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(cnpj);
     if (!doc) return null;
 
     try {
-      const hits = await searchClients(doc, 5);
-      const exact = hits.find(h => digitsOnly(h.doc_unico) === doc) || hits[0];
-      if (!exact) return null;
-      return { id: exact.id, nome: exact.nome, doc: exact.doc_unico || doc };
+      // Procurar primeiro entre fornecedores (tipo='fornecedor'|'ambos')
+      const suppliers = await searchSuppliers(doc);
+      const exactSupplier = suppliers.find(h => digitsOnly(h.doc_unico) === doc) || suppliers[0];
+      if (exactSupplier) return { id: exactSupplier.id, nome: exactSupplier.nome, doc: exactSupplier.doc_unico || doc };
+
+      // Fallback: procurar entre clientes (evita duplicata se já existir como cliente)
+      const clients = await searchClients(doc, 5);
+      const exactClient = clients.find(h => digitsOnly(h.doc_unico) === doc) || clients[0];
+      if (exactClient) return { id: exactClient.id, nome: exactClient.nome, doc: exactClient.doc_unico || doc };
+
+      return null;
     } catch (e) {
-      logger.warn('[NFE][CTA][resolveClienteFromCnpj] failed', { err: e });
+      logger.warn('[NFE][SUP][resolveFornecedorFromCnpj] failed', { err: e });
       return null;
     }
   };
 
-  const ensureClienteFromNfe = async (): Promise<{ id: string; nome: string; doc: string } | null> => {
+  const ensureFornecedorFromNfe = async (): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(previewData?.import?.emitente_cnpj || null);
     if (!doc) return null;
 
-    if (clienteXml?.id && digitsOnly(clienteXml.doc) === doc) return clienteXml;
+    if (fornecedorXml?.id && digitsOnly(fornecedorXml.doc) === doc) return fornecedorXml;
 
-    const resolved = await resolveClienteFromCnpj(doc);
+    const resolved = await resolveFornecedorFromCnpj(doc);
     if (resolved) return resolved;
 
     const infNFe = getInfNfe();
-    const initialValues = infNFe ? buildClientInitialValuesFromXml(infNFe) : null;
+    const initialValues = infNFe ? buildFornecedorInitialValuesFromXml(infNFe) : null;
 
     const ok = await confirm({
-      title: 'Cliente não cadastrado',
+      title: 'Fornecedor não cadastrado',
       description:
-        `Não encontramos um cliente com o CNPJ ${documentMask(doc)}.\n\nDeseja cadastrar agora? ` +
-        'O cadastro será aberto com os dados do XML pré-preenchidos (como no botão de IA do CNPJ).',
-      confirmText: 'Cadastrar cliente',
+        `Não encontramos um fornecedor com o CNPJ ${documentMask(doc)}.\n\nDeseja cadastrar agora? ` +
+        'O cadastro será aberto com os dados do XML pré-preenchidos.',
+      confirmText: 'Cadastrar fornecedor',
       cancelText: 'Agora não',
       variant: 'primary',
     });
     if (!ok) return null;
 
     if (!initialValues) {
-      addToast('Não foi possível extrair os dados do cliente a partir do XML.', 'error');
+      addToast('Não foi possível extrair os dados do fornecedor a partir do XML.', 'error');
       return null;
     }
 
-    const created = await requestClientCreation(initialValues);
-    if (created) setClienteXml(created);
+    const created = await requestFornecedorCreation(initialValues);
+    if (created) setFornecedorXml(created);
     return created;
   };
 
-  const maybePromptCadastrarCliente = async (infNFe: any) => {
+  const maybePromptCadastrarFornecedor = async (infNFe: any) => {
     const doc = digitsOnly(get(infNFe, 'emit.CNPJ') || null);
     if (!doc) return;
-    if (clientPromptedRef.current === doc) return;
-    clientPromptedRef.current = doc;
+    if (fornecedorPromptedRef.current === doc) return;
+    fornecedorPromptedRef.current = doc;
 
-    const resolved = await resolveClienteFromCnpj(doc);
+    const resolved = await resolveFornecedorFromCnpj(doc);
     if (resolved) {
-      setClienteXml(resolved);
+      setFornecedorXml(resolved);
       return;
     }
 
-    const initialValues = buildClientInitialValuesFromXml(infNFe);
+    const initialValues = buildFornecedorInitialValuesFromXml(infNFe);
     if (!initialValues) return;
 
     const ok = await confirm({
-      title: 'Cadastrar cliente do XML?',
+      title: 'Cadastrar fornecedor do XML?',
       description: `Encontramos o CNPJ ${documentMask(doc)} no XML, mas ele ainda não está cadastrado.\n\nDeseja cadastrar agora?`,
       confirmText: 'Cadastrar',
       cancelText: 'Depois',
@@ -321,10 +329,10 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     });
     if (!ok) return;
 
-    const created = await requestClientCreation(initialValues);
+    const created = await requestFornecedorCreation(initialValues);
     if (created) {
-      setClienteXml(created);
-      addToast('Cliente cadastrado. Você pode continuar a importação.', 'success');
+      setFornecedorXml(created);
+      addToast('Fornecedor cadastrado. Você pode continuar a importação.', 'success');
     }
   };
 
@@ -437,12 +445,12 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       const preview = await previewBeneficiamento(id);
       setPreviewData(preview);
 
-      // Estado da arte: se o cliente (emitente) ainda não existe, oferecer cadastro com dados do XML.
+      // Estado da arte: se o fornecedor (emitente) ainda não existe, oferecer cadastro com dados do XML.
       // Mantém o controle com o usuário e evita criar registros automaticamente sem confirmação.
       try {
-        await maybePromptCadastrarCliente(infNFe);
+        await maybePromptCadastrarFornecedor(infNFe);
       } catch (e) {
-        logger.warn('[NFE_IMPORT][PROMPT_CLIENT] failed', { err: e });
+        logger.warn('[NFE_IMPORT][PROMPT_FORNECEDOR] failed', { err: e });
       }
 
       setStep('matching');
@@ -484,8 +492,8 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         return;
       }
 
-      // 1. Criar o Recebimento (Pré-Nota)
-      const { id: recebimentoId, status } = await createRecebimentoFromXml(importId);
+      // 1. Criar o Recebimento (Pré-Nota) — vincula fornecedor do XML
+      const { id: recebimentoId, status } = await createRecebimentoFromXml(importId, fornecedorXml?.id ?? null);
       setRecebimentoId(recebimentoId);
 
       // 2. Aplicar Matches Manuais (se houver)
@@ -560,13 +568,13 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
           return;
         }
 
-        const cliente = await ensureClienteFromNfe();
-        if (!cliente?.id) {
-          addToast('Cadastre/seleciona o cliente do XML para continuar.', 'warning');
+        const fornecedor = await ensureFornecedorFromNfe();
+        if (!fornecedor?.id) {
+          addToast('Cadastre o fornecedor do XML para continuar.', 'warning');
           return;
         }
 
-        await setRecebimentoClassificacao(recebimentoId, 'material_cliente', cliente.id);
+        await setRecebimentoClassificacao(recebimentoId, 'material_cliente', fornecedor.id);
         try {
           const result = await finalizarRecebimentoV2(recebimentoId);
 
@@ -643,24 +651,24 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   return (
     <div className="p-1">
       <Modal
-        isOpen={createClientOpen}
-        onClose={() => closeCreateClientModal(null)}
-        title="Cadastrar cliente do XML"
+        isOpen={createFornecedorOpen}
+        onClose={() => closeCreateFornecedorModal(null)}
+        title="Cadastrar fornecedor do XML"
         size="xl"
       >
         <PartnerFormPanel
           partner={null}
-          initialValues={createClientInitialValues ?? undefined}
+          initialValues={createFornecedorInitialValues ?? undefined}
           onSaveSuccess={(saved) => {
             const result = {
               id: saved.id,
-              nome: String(saved.nome || '').trim() || 'Cliente',
+              nome: String(saved.nome || '').trim() || 'Fornecedor',
               doc: digitsOnly((saved as any).doc_unico || '') || digitsOnly(previewData?.import?.emitente_cnpj || null),
             };
-            setClienteXml(result);
-            closeCreateClientModal(result);
+            setFornecedorXml(result);
+            closeCreateFornecedorModal(result);
           }}
-          onClose={() => closeCreateClientModal(null)}
+          onClose={() => closeCreateFornecedorModal(null)}
         />
       </Modal>
 
