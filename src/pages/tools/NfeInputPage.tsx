@@ -896,6 +896,13 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                                 placeholder="Buscar produto para vincular..."
                                 onlySales={false}
                                 type="product"
+                                createProductInitialValues={{
+                                  nome: item.xprod || '',
+                                  sku: item.cprod || '',
+                                  gtin: item.ean || '',
+                                  unidade: item.ucom || 'un',
+                                  preco_custo: item.vuncom || 0,
+                                }}
                               />
                             </div>
                           )}
