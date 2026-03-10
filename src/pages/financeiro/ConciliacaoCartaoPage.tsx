@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, Plus, RefreshCw, Repeat2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import {
@@ -599,7 +599,17 @@ function TituloRow({
           )}
         </td>
       )}
-      <td className="px-4 py-2 text-gray-800 font-medium truncate max-w-[250px]">{titulo.descricao}</td>
+      <td className="px-4 py-2 text-gray-800 font-medium truncate max-w-[250px]">
+        <span className="inline-flex items-center gap-1.5">
+          {titulo.descricao}
+          {titulo.origem_tipo === 'RECORRENCIA' && (
+            <span title="Conta recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-700">
+              <Repeat2 size={11} />
+              Recorrente
+            </span>
+          )}
+        </span>
+      </td>
       <td className="px-4 py-2 text-gray-600 truncate max-w-[180px]">{personName || '—'}</td>
       <td className="px-4 py-2 text-gray-600">{dateBR(titulo.data_vencimento)}</td>
       <td className="px-4 py-2 text-right font-semibold text-gray-900">{brl.format(titulo.saldo ?? titulo.valor)}</td>
