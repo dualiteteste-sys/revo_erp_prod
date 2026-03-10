@@ -2,13 +2,22 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { fetchConciliacaoCartao, type ConciliacaoGroup, type ConciliacaoResult, type ConciliacaoTitulo } from '@/services/conciliacaoCartao';
+import {
+  fetchConciliacaoCartaoReceber,
+  fetchConciliacaoCartaoPagar,
+  type ConciliacaoGroup,
+  type ConciliacaoResult,
+  type ConciliacaoTitulo,
+} from '@/services/conciliacaoCartao';
 import { receberContasAReceberLote } from '@/services/contasAReceber';
+import { pagarContasPagarLote } from '@/services/financeiro';
 import BaixaEmLoteModal from '@/components/financeiro/common/BaixaEmLoteModal';
 import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
+
+type Tipo = 'receber' | 'pagar';
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateBR = (iso: string) => {
@@ -17,17 +26,33 @@ const dateBR = (iso: string) => {
   return d.toLocaleDateString('pt-BR');
 };
 
+// Status label helpers per tipo
+const PAID_STATUS: Record<Tipo, string> = { receber: 'recebido', pagar: 'paga' };
+const PAID_LABEL: Record<Tipo, string> = { receber: 'Recebido', pagar: 'Pago' };
+const PENDING_LABEL: Record<Tipo, string> = { receber: 'A receber', pagar: 'A pagar' };
+const PERSON_LABEL: Record<Tipo, string> = { receber: 'Cliente', pagar: 'Fornecedor' };
+const DROPDOWN_TIPO: Record<Tipo, 'recebimento' | 'pagamento'> = { receber: 'recebimento', pagar: 'pagamento' };
+const STATUS_OPTIONS_PAID: Record<Tipo, { value: string; label: string }> = {
+  receber: { value: 'recebido', label: 'Recebidos' },
+  pagar: { value: 'pago', label: 'Pagos' },
+};
+
+function isPaid(status: string, tipo: Tipo): boolean {
+  return status === PAID_STATUS[tipo];
+}
+
 export default function ConciliacaoCartaoPage() {
   const { activeEmpresaId } = useAuth();
   const { addToast } = useToast();
   const lastEmpresaRef = useRef(activeEmpresaId);
 
+  const [tipo, setTipo] = useState<Tipo>('pagar');
   const [formaPagamento, setFormaPagamento] = useState<string>('Cartão de crédito');
   const [statusFilter, setStatusFilter] = useState<string>('pendentes');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  const [data, setData] = useState<ConciliacaoResult | null>(null);
+  const [data, setData] = useState<ConciliacaoResult<any> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
@@ -46,11 +71,19 @@ export default function ConciliacaoCartaoPage() {
     }
   }, [activeEmpresaId]);
 
+  // Reset selection on tipo change
+  useEffect(() => {
+    setData(null);
+    setSelectedIds(new Set());
+    setStatusFilter('pendentes');
+  }, [tipo]);
+
   const loadData = useCallback(async () => {
     if (!activeEmpresaId) return;
     setLoading(true);
     try {
-      const result = await fetchConciliacaoCartao({
+      const fetchFn = tipo === 'pagar' ? fetchConciliacaoCartaoPagar : fetchConciliacaoCartaoReceber;
+      const result = await fetchFn({
         formaPagamento: formaPagamento || 'Cartão de crédito',
         status: statusFilter,
         startDate: startDate || null,
@@ -58,7 +91,7 @@ export default function ConciliacaoCartaoPage() {
       });
       setData(result);
       // Auto-expand all groups
-      const dates = new Set((result?.groups || []).map((g) => g.data_vencimento));
+      const dates = new Set((result?.groups || []).map((g: ConciliacaoGroup) => g.data_vencimento));
       setExpandedDates(dates);
       setSelectedIds(new Set());
     } catch (e: any) {
@@ -66,7 +99,7 @@ export default function ConciliacaoCartaoPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeEmpresaId, formaPagamento, statusFilter, startDate, endDate, addToast]);
+  }, [activeEmpresaId, tipo, formaPagamento, statusFilter, startDate, endDate, addToast]);
 
   useEffect(() => {
     void loadData();
@@ -91,7 +124,7 @@ export default function ConciliacaoCartaoPage() {
   };
 
   const selectAllInGroup = (group: ConciliacaoGroup) => {
-    const pendingIds = group.titulos.filter((t) => t.status !== 'recebido').map((t) => t.id);
+    const pendingIds = group.titulos.filter((t) => !isPaid(t.status, tipo)).map((t) => t.id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const allSelected = pendingIds.every((id) => next.has(id));
@@ -105,13 +138,13 @@ export default function ConciliacaoCartaoPage() {
   };
 
   const openBaixaDia = (group: ConciliacaoGroup) => {
-    const pendingTitulos = group.titulos.filter((t) => t.status !== 'recebido');
+    const pendingTitulos = group.titulos.filter((t) => !isPaid(t.status, tipo));
     if (!pendingTitulos.length) {
-      addToast('Todos os títulos deste dia já foram recebidos.', 'info');
+      addToast(`Todos os títulos deste dia já foram ${tipo === 'pagar' ? 'pagos' : 'recebidos'}.`, 'info');
       return;
     }
     const ids = pendingTitulos.map((t) => t.id);
-    const total = pendingTitulos.reduce((acc, t) => acc + Number(t.valor || 0), 0);
+    const total = pendingTitulos.reduce((acc, t) => acc + Number(t.saldo ?? t.valor ?? 0), 0);
     setBaixaModalIds(ids);
     setBaixaModalTotal(total);
     setBaixaModalOpen(true);
@@ -119,14 +152,14 @@ export default function ConciliacaoCartaoPage() {
 
   const openBaixaSelecionados = () => {
     if (!selectedIds.size) return;
-    const allTitulos = (data?.groups || []).flatMap((g) => g.titulos);
-    const selected = allTitulos.filter((t) => selectedIds.has(t.id) && t.status !== 'recebido');
+    const allTitulos = (data?.groups || []).flatMap((g: ConciliacaoGroup) => g.titulos);
+    const selected = allTitulos.filter((t: ConciliacaoTitulo) => selectedIds.has(t.id) && !isPaid(t.status, tipo));
     if (!selected.length) {
       addToast('Nenhum título pendente selecionado.', 'info');
       return;
     }
-    const ids = selected.map((t) => t.id);
-    const total = selected.reduce((acc, t) => acc + Number(t.valor || 0), 0);
+    const ids = selected.map((t: ConciliacaoTitulo) => t.id);
+    const total = selected.reduce((acc: number, t: ConciliacaoTitulo) => acc + Number(t.saldo ?? t.valor ?? 0), 0);
     setBaixaModalIds(ids);
     setBaixaModalTotal(total);
     setBaixaModalOpen(true);
@@ -134,13 +167,22 @@ export default function ConciliacaoCartaoPage() {
 
   const handleBaixaConfirm = async ({ contaCorrenteId, dataISO }: { contaCorrenteId: string | null; dataISO: string }) => {
     try {
-      const res = await receberContasAReceberLote({
-        ids: baixaModalIds,
-        dataPagamento: dataISO,
-        contaCorrenteId,
-      });
-      const count = (res as any)?.total ?? baixaModalIds.length;
-      addToast(`${count} recebimento(s) registrado(s).`, 'success');
+      if (tipo === 'pagar') {
+        const res = await pagarContasPagarLote({
+          ids: baixaModalIds,
+          dataPagamento: dataISO,
+          contaCorrenteId,
+        });
+        addToast(`${res.settled} pagamento(s) registrado(s).`, 'success');
+      } else {
+        const res = await receberContasAReceberLote({
+          ids: baixaModalIds,
+          dataPagamento: dataISO,
+          contaCorrenteId,
+        });
+        const count = (res as any)?.settled ?? (res as any)?.total ?? baixaModalIds.length;
+        addToast(`${count} recebimento(s) registrado(s).`, 'success');
+      }
       setBaixaModalOpen(false);
       setBaixaModalIds([]);
       setSelectedIds(new Set());
@@ -152,14 +194,19 @@ export default function ConciliacaoCartaoPage() {
 
   const selectedTotal = useMemo(() => {
     if (!selectedIds.size || !data) return 0;
-    const allTitulos = data.groups.flatMap((g) => g.titulos);
+    const allTitulos = data.groups.flatMap((g: ConciliacaoGroup) => g.titulos);
     return allTitulos
-      .filter((t) => selectedIds.has(t.id) && t.status !== 'recebido')
-      .reduce((acc, t) => acc + Number(t.valor || 0), 0);
-  }, [selectedIds, data]);
+      .filter((t: ConciliacaoTitulo) => selectedIds.has(t.id) && !isPaid(t.status, tipo))
+      .reduce((acc: number, t: ConciliacaoTitulo) => acc + Number(t.saldo ?? t.valor ?? 0), 0);
+  }, [selectedIds, data, tipo]);
 
   const summary = data?.summary;
-  const groups = data?.groups || [];
+  const groups: ConciliacaoGroup[] = data?.groups || [];
+
+  // Normalize summary values for both types
+  const summaryPending = tipo === 'pagar' ? summary?.total_a_pagar : summary?.total_a_receber;
+  const summaryOverdue = summary?.total_vencido;
+  const summarySettled = tipo === 'pagar' ? summary?.total_pago : summary?.total_recebido;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -171,7 +218,7 @@ export default function ConciliacaoCartaoPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Conciliação de Cartão</h1>
-            <p className="text-sm text-gray-500">Recebíveis agrupados por data de vencimento</p>
+            <p className="text-sm text-gray-500">Títulos agrupados por data de vencimento</p>
           </div>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading} className="gap-2">
@@ -180,12 +227,38 @@ export default function ConciliacaoCartaoPage() {
         </Button>
       </div>
 
+      {/* Toggle Receber / Pagar */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setTipo('pagar')}
+          className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+            tipo === 'pagar'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Contas a Pagar
+        </button>
+        <button
+          type="button"
+          onClick={() => setTipo('receber')}
+          className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+            tipo === 'receber'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Contas a Receber
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end bg-white rounded-xl border border-gray-200 p-4">
         <div className="sm:col-span-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
           <MeioPagamentoDropdown
-            tipo="recebimento"
+            tipo={DROPDOWN_TIPO[tipo]}
             value={formaPagamento}
             onChange={(v) => setFormaPagamento(v || 'Cartão de crédito')}
             placeholder="Selecione..."
@@ -199,7 +272,7 @@ export default function ConciliacaoCartaoPage() {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="pendentes">Pendentes / Vencidos</option>
-          <option value="recebido">Recebidos</option>
+          <option value={STATUS_OPTIONS_PAID[tipo].value}>{STATUS_OPTIONS_PAID[tipo].label}</option>
           <option value="todos">Todos</option>
         </Select>
         <Input
@@ -229,9 +302,9 @@ export default function ConciliacaoCartaoPage() {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <SummaryCard label="A receber" value={summary.total_a_receber} color="blue" />
-          <SummaryCard label="Vencido" value={summary.total_vencido} color="red" />
-          <SummaryCard label="Recebido" value={summary.total_recebido} color="green" />
+          <SummaryCard label={PENDING_LABEL[tipo]} value={summaryPending ?? 0} color="blue" />
+          <SummaryCard label="Vencido" value={summaryOverdue ?? 0} color="red" />
+          <SummaryCard label={PAID_LABEL[tipo]} value={summarySettled ?? 0} color="green" />
         </div>
       )}
 
@@ -257,6 +330,7 @@ export default function ConciliacaoCartaoPage() {
         <DateGroup
           key={group.data_vencimento}
           group={group}
+          tipo={tipo}
           expanded={expandedDates.has(group.data_vencimento)}
           selectedIds={selectedIds}
           onToggleExpand={() => toggleExpand(group.data_vencimento)}
@@ -271,7 +345,7 @@ export default function ConciliacaoCartaoPage() {
       <BaixaEmLoteModal
         isOpen={baixaModalOpen}
         onClose={() => setBaixaModalOpen(false)}
-        tipo="receber"
+        tipo={tipo}
         selectedCount={baixaModalIds.length}
         totalSaldo={baixaModalTotal}
         onConfirm={handleBaixaConfirm}
@@ -296,6 +370,7 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
 
 function DateGroup({
   group,
+  tipo,
   expanded,
   selectedIds,
   onToggleExpand,
@@ -305,6 +380,7 @@ function DateGroup({
   statusFilter,
 }: {
   group: ConciliacaoGroup;
+  tipo: Tipo;
   expanded: boolean;
   selectedIds: Set<string>;
   onToggleExpand: () => void;
@@ -313,7 +389,9 @@ function DateGroup({
   onBaixaDia: () => void;
   statusFilter: string;
 }) {
-  const pendingTitulos = group.titulos.filter((t) => t.status !== 'recebido');
+  const paidStatus = PAID_STATUS[tipo];
+  const paidFilterValue = STATUS_OPTIONS_PAID[tipo].value;
+  const pendingTitulos = group.titulos.filter((t) => t.status !== paidStatus);
   const allPendingSelected = pendingTitulos.length > 0 && pendingTitulos.every((t) => selectedIds.has(t.id));
   const hasPending = pendingTitulos.length > 0;
   const isOverdue = new Date(group.data_vencimento + 'T00:00:00') < new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
@@ -339,7 +417,7 @@ function DateGroup({
             — {brl.format(group.total_valor)} ({group.total_titulos} título{group.total_titulos !== 1 ? 's' : ''})
           </span>
         </div>
-        {hasPending && statusFilter !== 'recebido' && (
+        {hasPending && statusFilter !== paidFilterValue && (
           <Button
             variant="outline"
             size="sm"
@@ -361,7 +439,7 @@ function DateGroup({
           <table className="w-full text-sm">
             <thead className="bg-gray-50/80">
               <tr>
-                {hasPending && statusFilter !== 'recebido' && (
+                {hasPending && statusFilter !== paidFilterValue && (
                   <th className="w-10 px-3 py-2 text-center">
                     <input
                       type="checkbox"
@@ -372,7 +450,7 @@ function DateGroup({
                   </th>
                 )}
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{PERSON_LABEL[tipo]}</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -383,9 +461,10 @@ function DateGroup({
                 <TituloRow
                   key={t.id}
                   titulo={t}
+                  tipo={tipo}
                   selected={selectedIds.has(t.id)}
                   onToggle={() => onToggleSelect(t.id)}
-                  showCheckbox={hasPending && statusFilter !== 'recebido'}
+                  showCheckbox={hasPending && statusFilter !== paidFilterValue}
                 />
               ))}
             </tbody>
@@ -398,24 +477,28 @@ function DateGroup({
 
 function TituloRow({
   titulo,
+  tipo,
   selected,
   onToggle,
   showCheckbox,
 }: {
   titulo: ConciliacaoTitulo;
+  tipo: Tipo;
   selected: boolean;
   onToggle: () => void;
   showCheckbox: boolean;
 }) {
-  const isRecebido = titulo.status === 'recebido';
+  const paid = isPaid(titulo.status, tipo);
   const isOverdue =
-    !isRecebido && new Date(titulo.data_vencimento + 'T00:00:00') < new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+    !paid && new Date(titulo.data_vencimento + 'T00:00:00') < new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+
+  const personName = tipo === 'pagar' ? titulo.fornecedor_nome : titulo.cliente_nome;
 
   return (
-    <tr className={`hover:bg-gray-50/50 transition ${isRecebido ? 'opacity-60' : ''}`}>
+    <tr className={`hover:bg-gray-50/50 transition ${paid ? 'opacity-60' : ''}`}>
       {showCheckbox && (
         <td className="w-10 px-3 py-2 text-center">
-          {!isRecebido && (
+          {!paid && (
             <input
               type="checkbox"
               checked={selected}
@@ -426,20 +509,20 @@ function TituloRow({
         </td>
       )}
       <td className="px-4 py-2 text-gray-800 font-medium truncate max-w-[250px]">{titulo.descricao}</td>
-      <td className="px-4 py-2 text-gray-600 truncate max-w-[180px]">{titulo.cliente_nome || '—'}</td>
+      <td className="px-4 py-2 text-gray-600 truncate max-w-[180px]">{personName || '—'}</td>
       <td className="px-4 py-2 text-gray-600">{dateBR(titulo.data_vencimento)}</td>
-      <td className="px-4 py-2 text-right font-semibold text-gray-900">{brl.format(titulo.valor)}</td>
+      <td className="px-4 py-2 text-right font-semibold text-gray-900">{brl.format(titulo.saldo ?? titulo.valor)}</td>
       <td className="px-4 py-2 text-center">
         <span
           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-            isRecebido
+            paid
               ? 'bg-emerald-100 text-emerald-700'
               : isOverdue
                 ? 'bg-red-100 text-red-700'
                 : 'bg-amber-100 text-amber-700'
           }`}
         >
-          {isRecebido ? 'Recebido' : isOverdue ? 'Vencido' : 'Pendente'}
+          {paid ? PAID_LABEL[tipo] : isOverdue ? 'Vencido' : 'Pendente'}
         </span>
       </td>
     </tr>
