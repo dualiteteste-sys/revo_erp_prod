@@ -232,7 +232,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
       return Object.keys(buildParcelamentoPatch()).length > 0;
     }
     const patch = buildRecorrenciaPatch();
-    const propagatableKeys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id', 'valor_total'];
+    const propagatableKeys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id', 'valor_total', 'data_vencimento'];
     return propagatableKeys.some((k) => k in patch);
   };
 
