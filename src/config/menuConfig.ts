@@ -140,7 +140,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Contas a Pagar', icon: TrendingDown, href: '/app/financeiro/contas-a-pagar', permission: { domain: 'contas_a_pagar', action: 'view' } },
       { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo', permission: { domain: 'centros_de_custo', action: 'view' } },
       { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
-      { name: 'Conciliação Cartão', icon: CreditCard, href: '/app/financeiro/conciliacao-cartao', permission: { domain: 'contas_a_receber', action: 'view' } },
+      { name: 'Conciliação Cartão', icon: CreditCard, href: '/app/financeiro/conciliacao-cartao', permission: { domain: 'contas_a_pagar', action: 'view' } },
       { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato', permission: { domain: 'tesouraria', action: 'view' } },
       { name: 'DRE', icon: FileText, href: '/app/financeiro/dre', permission: { domain: 'relatorios_financeiro', action: 'view' } },
       { name: 'Relatórios', icon: BarChart2, href: '/app/financeiro/relatorios', permission: { domain: 'relatorios_financeiro', action: 'view' } },
