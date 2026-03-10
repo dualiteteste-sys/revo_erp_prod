@@ -236,7 +236,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       return Object.keys(buildParcelamentoPatch()).length > 0;
     }
     const patch = buildRecorrenciaPatch();
-    const propagatableKeys = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor'];
+    const propagatableKeys = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor', 'data_vencimento'];
     return propagatableKeys.some((k) => k in patch);
   };
 
