@@ -56,25 +56,35 @@ export default function ConciliacaoCartaoPage() {
   const [loading, setLoading] = useState(false);
 
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Map<id, saldo> — persists across filter changes so user can accumulate selections
+  const [selectedMap, setSelectedMap] = useState<Map<string, number>>(new Map());
 
   const [baixaModalOpen, setBaixaModalOpen] = useState(false);
   const [baixaModalIds, setBaixaModalIds] = useState<string[]>([]);
   const [baixaModalTotal, setBaixaModalTotal] = useState<number>(0);
+
+  // Derived from selectedMap for UI
+  const selectedIds = useMemo(() => new Set(selectedMap.keys()), [selectedMap]);
+  const selectedTotal = useMemo(() => {
+    let total = 0;
+    for (const val of selectedMap.values()) total += val;
+    return total;
+  }, [selectedMap]);
 
   // Reset on empresa change
   useEffect(() => {
     if (activeEmpresaId !== lastEmpresaRef.current) {
       lastEmpresaRef.current = activeEmpresaId;
       setData(null);
-      setSelectedIds(new Set());
+      setSelectedMap(new Map());
     }
   }, [activeEmpresaId]);
 
   // Reset selection on tipo change
   useEffect(() => {
     setData(null);
-    setSelectedIds(new Set());
+    setSelectedMap(new Map());
     setStatusFilter('pendentes');
   }, [tipo]);
 
@@ -93,7 +103,7 @@ export default function ConciliacaoCartaoPage() {
       // Auto-expand all groups
       const dates = new Set((result?.groups || []).map((g: ConciliacaoGroup) => g.data_vencimento));
       setExpandedDates(dates);
-      setSelectedIds(new Set());
+      // NOTE: selections are NOT cleared — user can accumulate across filter changes
     } catch (e: any) {
       addToast(e?.message || 'Erro ao carregar dados.', 'error');
     } finally {
@@ -114,24 +124,27 @@ export default function ConciliacaoCartaoPage() {
     });
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  const toggleSelect = (titulo: ConciliacaoTitulo) => {
+    setSelectedMap((prev) => {
+      const next = new Map(prev);
+      if (next.has(titulo.id)) {
+        next.delete(titulo.id);
+      } else {
+        next.set(titulo.id, Number(titulo.saldo ?? titulo.valor ?? 0));
+      }
       return next;
     });
   };
 
   const selectAllInGroup = (group: ConciliacaoGroup) => {
-    const pendingIds = group.titulos.filter((t) => !isPaid(t.status, tipo)).map((t) => t.id);
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      const allSelected = pendingIds.every((id) => next.has(id));
+    const pending = group.titulos.filter((t) => !isPaid(t.status, tipo));
+    setSelectedMap((prev) => {
+      const next = new Map(prev);
+      const allSelected = pending.every((t) => next.has(t.id));
       if (allSelected) {
-        pendingIds.forEach((id) => next.delete(id));
+        pending.forEach((t) => next.delete(t.id));
       } else {
-        pendingIds.forEach((id) => next.add(id));
+        pending.forEach((t) => next.set(t.id, Number(t.saldo ?? t.valor ?? 0)));
       }
       return next;
     });
@@ -151,15 +164,13 @@ export default function ConciliacaoCartaoPage() {
   };
 
   const openBaixaSelecionados = () => {
-    if (!selectedIds.size) return;
-    const allTitulos = (data?.groups || []).flatMap((g: ConciliacaoGroup) => g.titulos);
-    const selected = allTitulos.filter((t: ConciliacaoTitulo) => selectedIds.has(t.id) && !isPaid(t.status, tipo));
-    if (!selected.length) {
+    if (!selectedMap.size) return;
+    const ids = Array.from(selectedMap.keys());
+    const total = selectedTotal;
+    if (ids.length === 0) {
       addToast('Nenhum título pendente selecionado.', 'info');
       return;
     }
-    const ids = selected.map((t: ConciliacaoTitulo) => t.id);
-    const total = selected.reduce((acc: number, t: ConciliacaoTitulo) => acc + Number(t.saldo ?? t.valor ?? 0), 0);
     setBaixaModalIds(ids);
     setBaixaModalTotal(total);
     setBaixaModalOpen(true);
@@ -185,20 +196,12 @@ export default function ConciliacaoCartaoPage() {
       }
       setBaixaModalOpen(false);
       setBaixaModalIds([]);
-      setSelectedIds(new Set());
+      setSelectedMap(new Map());
       void loadData();
     } catch (e: any) {
       addToast(e?.message || 'Erro ao processar baixa.', 'error');
     }
   };
-
-  const selectedTotal = useMemo(() => {
-    if (!selectedIds.size || !data) return 0;
-    const allTitulos = data.groups.flatMap((g: ConciliacaoGroup) => g.titulos);
-    return allTitulos
-      .filter((t: ConciliacaoTitulo) => selectedIds.has(t.id) && !isPaid(t.status, tipo))
-      .reduce((acc: number, t: ConciliacaoTitulo) => acc + Number(t.saldo ?? t.valor ?? 0), 0);
-  }, [selectedIds, data, tipo]);
 
   const summary = data?.summary;
   const groups: ConciliacaoGroup[] = data?.groups || [];
@@ -207,6 +210,16 @@ export default function ConciliacaoCartaoPage() {
   const summaryPending = tipo === 'pagar' ? summary?.total_a_pagar : summary?.total_a_receber;
   const summaryOverdue = summary?.total_vencido;
   const summarySettled = tipo === 'pagar' ? summary?.total_pago : summary?.total_recebido;
+
+  // Count how many selected items are NOT visible in current view
+  const visibleIds = useMemo(() => new Set(groups.flatMap((g) => g.titulos.map((t) => t.id))), [groups]);
+  const hiddenSelectedCount = useMemo(() => {
+    let count = 0;
+    for (const id of selectedMap.keys()) {
+      if (!visibleIds.has(id)) count++;
+    }
+    return count;
+  }, [selectedMap, visibleIds]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -289,7 +302,7 @@ export default function ConciliacaoCartaoPage() {
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
         />
-        {selectedIds.size > 0 && (
+        {selectedMap.size > 0 && (
           <div className="sm:col-span-3 flex items-end">
             <Button onClick={openBaixaSelecionados} className="w-full gap-2">
               <CheckSquare size={16} />
@@ -342,13 +355,20 @@ export default function ConciliacaoCartaoPage() {
       ))}
 
       {/* Selection Totalizer Bar — sticky bottom */}
-      {selectedIds.size > 0 && (
+      {selectedMap.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
           <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Selecionados</p>
-                <p className="text-lg font-bold text-gray-900">{selectedIds.size} título{selectedIds.size !== 1 ? 's' : ''}</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {selectedMap.size} título{selectedMap.size !== 1 ? 's' : ''}
+                  {hiddenSelectedCount > 0 && (
+                    <span className="text-sm font-normal text-gray-500 ml-1">
+                      ({hiddenSelectedCount} fora do filtro atual)
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="h-8 w-px bg-gray-200" />
               <div>
@@ -360,14 +380,14 @@ export default function ConciliacaoCartaoPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectedIds(new Set())}
+                onClick={() => setSelectedMap(new Map())}
                 className="text-gray-600"
               >
                 Limpar seleção
               </Button>
               <Button onClick={openBaixaSelecionados} className="gap-2">
                 <CheckSquare size={16} />
-                Baixar {selectedIds.size} selecionado(s)
+                Baixar {selectedMap.size} selecionado(s)
               </Button>
             </div>
           </div>
@@ -417,7 +437,7 @@ function DateGroup({
   expanded: boolean;
   selectedIds: Set<string>;
   onToggleExpand: () => void;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (titulo: ConciliacaoTitulo) => void;
   onSelectAll: () => void;
   onBaixaDia: () => void;
   statusFilter: string;
@@ -496,7 +516,7 @@ function DateGroup({
                   titulo={t}
                   tipo={tipo}
                   selected={selectedIds.has(t.id)}
-                  onToggle={() => onToggleSelect(t.id)}
+                  onToggle={() => onToggleSelect(t)}
                   showCheckbox={hasPending && statusFilter !== paidFilterValue}
                 />
               ))}
@@ -527,8 +547,15 @@ function TituloRow({
 
   const personName = tipo === 'pagar' ? titulo.fornecedor_nome : titulo.cliente_nome;
 
+  const handleRowClick = () => {
+    if (!paid && showCheckbox) onToggle();
+  };
+
   return (
-    <tr className={`hover:bg-gray-50/50 transition ${paid ? 'opacity-60' : ''}`}>
+    <tr
+      className={`hover:bg-gray-50/50 transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''}`}
+      onClick={handleRowClick}
+    >
       {showCheckbox && (
         <td className="w-10 px-3 py-2 text-center">
           {!paid && (
@@ -536,6 +563,7 @@ function TituloRow({
               type="checkbox"
               checked={selected}
               onChange={onToggle}
+              onClick={(e) => e.stopPropagation()}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
           )}
