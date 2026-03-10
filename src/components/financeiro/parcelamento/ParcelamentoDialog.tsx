@@ -6,6 +6,7 @@ import { previewParcelamento, type ParcelamentoPreviewItem } from '@/services/fi
 import { useToast } from '@/contexts/ToastProvider';
 import Select from '@/components/ui/forms/Select';
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
+import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 
 type Props = {
   open: boolean;
@@ -14,8 +15,9 @@ type Props = {
   total: number;
   defaultCondicao?: string | null;
   defaultBaseDateISO?: string | null;
+  defaultFormaPagamento?: string | null;
   confirmText?: string;
-  onConfirm: (params: { condicao: string; baseDateISO: string; preview: ParcelamentoPreviewItem[] }) => Promise<void>;
+  onConfirm: (params: { condicao: string; baseDateISO: string; preview: ParcelamentoPreviewItem[]; formaPagamento: string | null }) => Promise<void>;
 };
 
 function formatMoneyBRL(n: number): string {
@@ -29,6 +31,7 @@ export default function ParcelamentoDialog({
   total,
   defaultCondicao,
   defaultBaseDateISO,
+  defaultFormaPagamento,
   confirmText = 'Gerar títulos',
   onConfirm,
 }: Props) {
@@ -37,6 +40,7 @@ export default function ParcelamentoDialog({
   const [condicaoPresetId, setCondicaoPresetId] = React.useState<string>('');
   const [condicao, setCondicao] = React.useState<string>('');
   const [baseDateISO, setBaseDateISO] = React.useState<string>('');
+  const [formaPagamento, setFormaPagamento] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [preview, setPreview] = React.useState<ParcelamentoPreviewItem[]>([]);
@@ -45,9 +49,10 @@ export default function ParcelamentoDialog({
     if (!open) return;
     setCondicao((defaultCondicao ?? '').trim() || '1x');
     setBaseDateISO((defaultBaseDateISO ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10));
+    setFormaPagamento(defaultFormaPagamento ?? null);
     setPreview([]);
     setCondicaoPresetId('');
-  }, [open, defaultCondicao, defaultBaseDateISO]);
+  }, [open, defaultCondicao, defaultBaseDateISO, defaultFormaPagamento]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -116,7 +121,7 @@ export default function ParcelamentoDialog({
 
     setLoading(true);
     try {
-      await onConfirm({ condicao: condicao || '1x', baseDateISO, preview });
+      await onConfirm({ condicao: condicao || '1x', baseDateISO, preview, formaPagamento });
       onClose();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar títulos.', 'error');
@@ -178,6 +183,15 @@ export default function ParcelamentoDialog({
             value={baseDateISO}
             onChange={(e) => setBaseDateISO(e.target.value)}
           />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+            <MeioPagamentoDropdown
+              tipo="recebimento"
+              value={formaPagamento}
+              onChange={setFormaPagamento}
+              placeholder="Selecione..."
+            />
+          </div>
         </div>
 
         <div className="rounded-xl border border-white/30 bg-white/70 overflow-hidden">
