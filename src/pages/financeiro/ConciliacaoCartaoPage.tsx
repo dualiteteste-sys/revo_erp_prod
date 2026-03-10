@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, RefreshCw } from 'lucide-react';
+import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import {
@@ -16,6 +16,8 @@ import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
+import SideSheet from '@/components/ui/SideSheet';
+import QuickCreateContaPagarPanel from '@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel';
 
 type Tipo = 'receber' | 'pagar';
 
@@ -63,6 +65,8 @@ export default function ConciliacaoCartaoPage() {
   const [baixaModalOpen, setBaixaModalOpen] = useState(false);
   const [baixaModalIds, setBaixaModalIds] = useState<string[]>([]);
   const [baixaModalTotal, setBaixaModalTotal] = useState<number>(0);
+
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   // Derived from selectedMap for UI
   const selectedIds = useMemo(() => new Set(selectedMap.keys()), [selectedMap]);
@@ -234,10 +238,18 @@ export default function ConciliacaoCartaoPage() {
             <p className="text-sm text-gray-500">Títulos agrupados por data de vencimento</p>
           </div>
         </div>
-        <Button variant="outline" onClick={loadData} disabled={loading} className="gap-2">
-          {loading ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {tipo === 'pagar' && (
+            <Button onClick={() => setQuickCreateOpen(true)} className="gap-2">
+              <Plus size={16} />
+              Nova conta
+            </Button>
+          )}
+          <Button variant="outline" onClick={loadData} disabled={loading} className="gap-2">
+            {loading ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Toggle Receber / Pagar */}
@@ -403,6 +415,24 @@ export default function ConciliacaoCartaoPage() {
         totalSaldo={baixaModalTotal}
         onConfirm={handleBaixaConfirm}
       />
+
+      {/* Quick Create Conta a Pagar */}
+      <SideSheet
+        isOpen={quickCreateOpen}
+        onClose={() => setQuickCreateOpen(false)}
+        title="Nova conta a pagar"
+        description="A forma de pagamento é fixada em Cartão de Crédito."
+        widthClassName="w-[min(640px,92vw)]"
+      >
+        <QuickCreateContaPagarPanel
+          formaPagamento={formaPagamento || 'Cartão de crédito'}
+          onSaveSuccess={() => {
+            setQuickCreateOpen(false);
+            void loadData();
+          }}
+          onClose={() => setQuickCreateOpen(false)}
+        />
+      </SideSheet>
     </div>
   );
 }
