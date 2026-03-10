@@ -41,11 +41,13 @@ export async function createParcelamentoFromVenda(params: {
   pedidoId: string;
   condicao: string;
   baseDateISO: string;
+  formaPagamento?: string | null;
 }): Promise<ParcelamentoCreateResult> {
   return callRpc<ParcelamentoCreateResult>('financeiro_parcelamento_from_venda_create', {
     p_pedido_id: params.pedidoId,
     p_condicao: params.condicao ?? null,
     p_base_date: params.baseDateISO ?? null,
+    p_forma_pagamento: params.formaPagamento ?? null,
   });
 }
 
@@ -91,6 +93,7 @@ export async function createParcelamentoContasAReceber(params: {
   observacoes?: string | null;
   origemTipo?: string | null;
   origemId?: string | null;
+  formaPagamento?: string | null;
 }): Promise<ParcelamentoCreateResult> {
   return callRpc<ParcelamentoCreateResult>('financeiro_parcelamento_create_contas_a_receber', {
     p_cliente_id: params.clienteId,
@@ -102,6 +105,7 @@ export async function createParcelamentoContasAReceber(params: {
     p_observacoes: params.observacoes ?? null,
     p_origem_tipo: params.origemTipo ?? null,
     p_origem_id: params.origemId ?? null,
+    p_forma_pagamento: params.formaPagamento ?? null,
   });
 }
 

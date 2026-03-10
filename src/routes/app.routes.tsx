@@ -33,6 +33,7 @@ const CobrancasBancariasPage = lazyImport(() => import("../pages/financeiro/Cobr
 const ExtratoPage = lazyImport(() => import("../pages/financeiro/ExtratoPage"));
 const RelatoriosFinanceiroPage = lazyImport(() => import("../pages/financeiro/RelatoriosFinanceiroPage"));
 const DreFinanceiroPage = lazyImport(() => import("../pages/financeiro/DreFinanceiroPage"));
+const ConciliacaoCartaoPage = lazyImport(() => import("../pages/financeiro/ConciliacaoCartaoPage"));
 const RelatoriosHubPage = lazyImport(() => import("../pages/relatorios/RelatoriosHubPage"));
 const CepSearchPage = lazyImport(() => import("../pages/tools/CepSearchPage"));
 const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"));
@@ -495,6 +496,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "relatorios_financeiro", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><DreFinanceiroPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/conciliacao-cartao",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_receber", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ConciliacaoCartaoPage /></Suspense>
                 </RequirePermission>
               ),
             },
