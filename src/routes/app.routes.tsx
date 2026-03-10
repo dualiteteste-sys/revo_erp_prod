@@ -502,7 +502,7 @@ export const appRoutes: RouteObject[] = [
             {
               path: "financeiro/conciliacao-cartao",
               element: (
-                <RequirePermission permission={{ domain: "contas_a_receber", action: "view" }}>
+                <RequirePermission permission={{ domain: "contas_a_pagar", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><ConciliacaoCartaoPage /></Suspense>
                 </RequirePermission>
               ),
