@@ -41,11 +41,13 @@ export async function createParcelamentoFromVenda(params: {
   pedidoId: string;
   condicao: string;
   baseDateISO: string;
+  formaPagamento?: string | null;
 }): Promise<ParcelamentoCreateResult> {
   return callRpc<ParcelamentoCreateResult>('financeiro_parcelamento_from_venda_create', {
     p_pedido_id: params.pedidoId,
     p_condicao: params.condicao ?? null,
     p_base_date: params.baseDateISO ?? null,
+    p_forma_pagamento: params.formaPagamento ?? null,
   });
 }
 
@@ -91,6 +93,7 @@ export async function createParcelamentoContasAReceber(params: {
   observacoes?: string | null;
   origemTipo?: string | null;
   origemId?: string | null;
+  formaPagamento?: string | null;
 }): Promise<ParcelamentoCreateResult> {
   return callRpc<ParcelamentoCreateResult>('financeiro_parcelamento_create_contas_a_receber', {
     p_cliente_id: params.clienteId,
@@ -102,6 +105,42 @@ export async function createParcelamentoContasAReceber(params: {
     p_observacoes: params.observacoes ?? null,
     p_origem_tipo: params.origemTipo ?? null,
     p_origem_id: params.origemId ?? null,
+    p_forma_pagamento: params.formaPagamento ?? null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Parcelamento — propagação de alterações
+// ---------------------------------------------------------------------------
+
+export type ParcelamentoForConta = {
+  parcelamento_id: string;
+  numero_parcela: number;
+  total_parcelas: number;
+};
+
+export type ParcelamentoApplyUpdateResult = {
+  ok: boolean;
+  updated_accounts: number;
+};
+
+export async function getParcelamentoForConta(params: {
+  contaPagarId?: string;
+  contaReceberId?: string;
+}): Promise<ParcelamentoForConta | null> {
+  return callRpc<ParcelamentoForConta | null>('financeiro_parcelamento_get_for_conta', {
+    p_conta_pagar_id: params.contaPagarId ?? null,
+    p_conta_receber_id: params.contaReceberId ?? null,
+  });
+}
+
+export async function applyParcelamentoUpdate(params: {
+  parcelamentoId: string;
+  patch: Record<string, unknown>;
+}): Promise<ParcelamentoApplyUpdateResult> {
+  return callRpc<ParcelamentoApplyUpdateResult>('financeiro_parcelamento_apply_update', {
+    p_parcelamento_id: params.parcelamentoId,
+    p_patch: params.patch,
   });
 }
 

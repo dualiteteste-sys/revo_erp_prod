@@ -23,6 +23,7 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
 import { createParcelamentoFromVenda } from '@/services/financeiroParcelamento';
+import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { getUnitPrice, listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
@@ -966,13 +967,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         total={Number(previewTotalGeral || 0)}
         defaultCondicao={formData.condicao_pagamento || '1x'}
         defaultBaseDateISO={String(formData.data_emissao || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
+        defaultFormaPagamento={(formData as any).forma_pagamento || null}
         confirmText="Gerar títulos"
-        onConfirm={async ({ condicao, baseDateISO }) => {
+        onConfirm={async ({ condicao, baseDateISO, formaPagamento }) => {
           if (!formData.id) throw new Error('Pedido inválido.');
           const res = await createParcelamentoFromVenda({
             pedidoId: String(formData.id),
             condicao,
             baseDateISO,
+            formaPagamento,
           });
           if (!res?.ok) throw new Error('Não foi possível gerar os títulos.');
           const firstId = res.contas_ids?.[0] || null;
@@ -1139,6 +1142,16 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+            <MeioPagamentoDropdown
+              tipo="recebimento"
+              value={(formData as any).forma_pagamento || null}
+              onChange={(v) => handleHeaderChange('forma_pagamento' as any, v)}
+              disabled={isLocked}
+              placeholder="Selecione..."
+            />
           </div>
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Tabela de preço</label>
