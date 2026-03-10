@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
@@ -290,10 +290,10 @@ export default function ConciliacaoCartaoPage() {
           onChange={(e) => setEndDate(e.target.value)}
         />
         {selectedIds.size > 0 && (
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-3 flex items-end">
             <Button onClick={openBaixaSelecionados} className="w-full gap-2">
               <CheckSquare size={16} />
-              Baixar {selectedIds.size} selecionado(s)
+              Baixar selecionados
             </Button>
           </div>
         )}
@@ -340,6 +340,39 @@ export default function ConciliacaoCartaoPage() {
           statusFilter={statusFilter}
         />
       ))}
+
+      {/* Selection Totalizer Bar — sticky bottom */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Selecionados</p>
+                <p className="text-lg font-bold text-gray-900">{selectedIds.size} título{selectedIds.size !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="h-8 w-px bg-gray-200" />
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total selecionado</p>
+                <p className="text-lg font-bold text-blue-700">{brl.format(selectedTotal)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-gray-600"
+              >
+                Limpar seleção
+              </Button>
+              <Button onClick={openBaixaSelecionados} className="gap-2">
+                <CheckSquare size={16} />
+                Baixar {selectedIds.size} selecionado(s)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Baixa Modal */}
       <BaixaEmLoteModal

@@ -1179,6 +1179,45 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'financeiro',
   },
   {
+    match: '/app/financeiro/conciliacao-cartao',
+    title: 'Guia Rápido de Conciliação de Cartão',
+    whatIs:
+      'Conciliação de Cartão permite conferir e baixar em lote as contas de cartão de crédito agrupadas por data de vencimento. Você seleciona os títulos, compara o total com a fatura da operadora e faz a baixa com um clique — sem abrir conta por conta.',
+    steps: [
+      'Escolha a aba: "Contas a Pagar" (faturas de cartão corporativo/fornecedores) ou "Contas a Receber" (vendas no cartão).',
+      'Selecione a forma de pagamento no filtro (padrão: Cartão de crédito). Use "Status" para ver pendentes, pagos ou todos.',
+      'Use os filtros de data ("De" / "Até") para isolar o período da fatura que você quer conferir.',
+      'Os títulos aparecem agrupados por data de vencimento. Clique no grupo para expandir e ver os detalhes.',
+      'Marque os títulos que correspondem à fatura. A barra no rodapé mostra a quantidade e o valor total — confira com o valor da fatura.',
+      'Se o total bater: clique em "Baixar selecionados". Escolha a conta corrente e a data de pagamento e confirme.',
+      'Para baixar um dia inteiro de uma vez: clique em "Baixar dia" no cabeçalho do grupo.',
+    ],
+    dependsOn: [
+      'Contas a pagar/receber com "Forma de Pagamento" = Cartão de crédito',
+      'Tesouraria (conta corrente cadastrada)',
+      'Permissão: Contas a Pagar ou Contas a Receber (view/update)',
+    ],
+    connectsWith: ['Contas a Pagar', 'Contas a Receber', 'Tesouraria (movimentações)', 'Pedido de Venda (gera contas a receber com forma de pagamento)'],
+    fillPerfectly: [
+      'Sempre preencha "Forma de Pagamento" ao criar contas — sem isso o título não aparece aqui.',
+      'Confira o total selecionado com a fatura da operadora antes de baixar.',
+      'Use "Baixar dia" quando todo o dia bater com a fatura (mais rápido).',
+      'Prefira selecionar individualmente quando há divergência para identificar o título faltante.',
+    ],
+    commonMistakes: [
+      'Criar contas a pagar sem preencher "Forma de Pagamento" e depois não encontrá-las na conciliação.',
+      'Baixar sem conferir o total com a fatura e descobrir divergência depois.',
+      'Confundir "Contas a Pagar" (fatura do cartão corporativo) com "Contas a Receber" (vendas no cartão).',
+      'Esquecer de filtrar o período correto da fatura e baixar títulos de meses diferentes.',
+    ],
+    links: [
+      { label: 'Abrir Contas a Pagar', href: '/app/financeiro/contas-a-pagar', kind: 'internal' },
+      { label: 'Abrir Contas a Receber', href: '/app/financeiro/contas-a-receber', kind: 'internal' },
+      { label: 'Abrir Tesouraria', href: '/app/financeiro/tesouraria', kind: 'internal' },
+    ],
+    roadmapKey: 'financeiro',
+  },
+  {
     match: '/app/servicos/os',
     title: 'Guia Rápido de Ordem de Serviço',
     whatIs:
