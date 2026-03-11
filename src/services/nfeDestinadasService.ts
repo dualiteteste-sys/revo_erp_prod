@@ -167,11 +167,22 @@ export async function focusManifestarEvento(params: {
 export async function uploadCertToFocusNfe(password: string): Promise<{
   ok: boolean;
   error?: string;
+  detail?: string;
+  message?: string;
   cert_info?: { cnpj: string | null; valid_until: string };
 }> {
   const { data, error } = await supabase.functions.invoke('focusnfe-cert-upload', {
     body: { password },
   });
-  if (error) throw error;
-  return data as { ok: boolean; error?: string; cert_info?: { cnpj: string | null; valid_until: string } };
+  if (error) {
+    // Try to extract structured error from edge function response body
+    try {
+      const body = await (error as any)?.context?.json?.();
+      if (body?.detail || body?.error) {
+        return { ok: false, error: body.error, detail: body.detail };
+      }
+    } catch { /* ignore parse failures */ }
+    throw error;
+  }
+  return data as { ok: boolean; error?: string; detail?: string; message?: string; cert_info?: { cnpj: string | null; valid_until: string } };
 }
