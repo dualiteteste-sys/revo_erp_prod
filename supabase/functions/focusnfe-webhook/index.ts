@@ -63,6 +63,86 @@ function extractMeta(payload: any): { eventType: string | null; focusRef: string
 }
 
 /**
+ * Process NFS-e webhook event:
+ * - Look up NFS-e emissão by ref (emissao_id)
+ * - Update status + RPS URL
+ */
+async function processNfseEvent(
+  admin: ReturnType<typeof createClient>,
+  meta: { eventType: string | null; focusRef: string | null },
+  payload: any,
+  requestId: string,
+): Promise<{ processed: boolean; empresa_id: string | null }> {
+  const ref = meta.focusRef;
+  if (!ref) return { processed: false, empresa_id: null };
+
+  const { data: nfse } = await admin
+    .from("fiscal_nfse_emissoes")
+    .select("id, empresa_id, status")
+    .eq("id", ref)
+    .maybeSingle();
+
+  if (!nfse) return { processed: false, empresa_id: null };
+
+  const empresaId = nfse.empresa_id;
+  const focusStatus = payload?.status || meta.eventType || "";
+
+  // Log
+  await admin.from("fiscal_nfe_provider_logs").insert({
+    empresa_id: empresaId,
+    emissao_id: nfse.id,
+    provider: "focusnfe",
+    level: "info",
+    message: `Webhook NFS-e: ${focusStatus}`,
+    payload: { event_type: meta.eventType, focus_status: focusStatus, request_id: requestId },
+  });
+
+  if (["autorizada", "cancelada"].includes(nfse.status)) {
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  if (focusStatus === "autorizado") {
+    const numero = payload?.numero_rps ? parseInt(payload.numero_rps) : (payload?.numero ? parseInt(payload.numero) : null);
+    const codigoVerificacao = payload?.codigo_verificacao || null;
+    const pdfUrl = payload?.caminho_pdf || payload?.url || null;
+    const xmlUrl = payload?.caminho_xml || null;
+
+    await admin.from("fiscal_nfse_emissoes").update({
+      status: "autorizada",
+      numero,
+      codigo_verificacao: codigoVerificacao,
+      pdf_url: pdfUrl,
+      xml_url: xmlUrl,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", nfse.id);
+
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  if (focusStatus === "erro_autorizacao" || focusStatus === "rejeitado") {
+    const errorMsg = payload?.mensagem || payload?.erros?.join("; ") || "";
+    await admin.from("fiscal_nfse_emissoes").update({
+      status: "rejeitada",
+      last_error: errorMsg,
+      updated_at: new Date().toISOString(),
+    }).eq("id", nfse.id);
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  if (focusStatus === "cancelado") {
+    await admin.from("fiscal_nfse_emissoes").update({
+      status: "cancelada",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", nfse.id);
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  return { processed: true, empresa_id: empresaId };
+}
+
+/**
  * Process the Focus NFe webhook event inline:
  * - Look up the emissão by ref (emissao_id)
  * - Update status + DANFE/XML URLs
@@ -83,7 +163,10 @@ async function processEvent(
     .eq("id", ref)
     .maybeSingle();
 
-  if (!emissao) return { processed: false, empresa_id: null };
+  if (!emissao) {
+    // Fallback: try NFS-e table
+    return processNfseEvent(admin, meta, payload, requestId);
+  }
 
   const empresaId = emissao.empresa_id;
   const focusStatus = payload?.status || meta.eventType || "";

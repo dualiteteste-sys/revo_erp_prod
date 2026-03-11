@@ -29,7 +29,7 @@ import {
   getNfeDestinadasSummary,
   getNfeDestinadasSyncStatus,
   manifestarNfeDestinadasRpc,
-  sefazManifestarEvento,
+  focusManifestarEvento,
   gerarContaPagarFromNfeDestinadaRpc,
   syncNfeDestinadasManual,
   type NfeDestinadaRow,
@@ -38,12 +38,12 @@ import {
   type NfeDestinadaStatus,
 } from '@/services/nfeDestinadasService';
 
-// Map local status → SEFAZ event code
-const STATUS_TO_EVENT: Record<string, '210210' | '210200' | '210220' | '210240'> = {
-  ciencia: '210210',
-  confirmada: '210200',
-  desconhecida: '210220',
-  nao_realizada: '210240',
+// Map local status → Focus NFe manifestation tipo
+const STATUS_TO_FOCUS_TIPO: Record<string, 'ciencia' | 'confirmacao' | 'desconhecimento' | 'nao_realizada'> = {
+  ciencia: 'ciencia',
+  confirmada: 'confirmacao',
+  desconhecida: 'desconhecimento',
+  nao_realizada: 'nao_realizada',
 };
 
 // ============================================================
@@ -196,7 +196,7 @@ export default function NfeRecebidasPage() {
     }
   };
 
-  // Manifestation — uses SEFAZ edge function for real events, RPC for local-only (ignorada)
+  // Manifestation — uses Focus NFe edge function for real events, RPC for local-only (ignorada)
   const handleManifestar = async (status: NfeDestinadaStatus) => {
     const ids = Array.from(selected);
     if (ids.length === 0) {
@@ -211,12 +211,12 @@ export default function NfeRecebidasPage() {
 
     setManifestando(true);
     try {
-      const tpEvento = STATUS_TO_EVENT[status];
-      if (tpEvento) {
-        // SEFAZ manifestation via edge function
-        const result = await sefazManifestarEvento({ nfeDestinadaIds: ids, tpEvento });
+      const focusTipo = STATUS_TO_FOCUS_TIPO[status];
+      if (focusTipo) {
+        // Focus NFe manifestation via edge function
+        const result = await focusManifestarEvento({ nfeDestinadaIds: ids, tipo: focusTipo });
         if (!result.ok) {
-          addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+          addToast(result.error || 'Erro ao manifestar via Focus NFe.', 'error');
         } else {
           const msg = result.success_count === 1
             ? `1 NF-e manifestada como "${STATUS_CONFIG[status].label}".`
@@ -248,13 +248,13 @@ export default function NfeRecebidasPage() {
     }
     setManifestando(true);
     try {
-      const result = await sefazManifestarEvento({
+      const result = await focusManifestarEvento({
         nfeDestinadaIds: ids,
-        tpEvento: '210240',
+        tipo: 'nao_realizada',
         justificativa: justificativaText.trim(),
       });
       if (!result.ok) {
-        addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+        addToast(result.error || 'Erro ao manifestar via Focus NFe.', 'error');
       } else {
         addToast(
           `${result.success_count} NF-e(s) marcadas como "Não Realizada".`,
@@ -442,7 +442,7 @@ export default function NfeRecebidasPage() {
                         <div>
                           <FileDown size={32} className="mx-auto mb-2 text-gray-300" />
                           <p>Nenhuma NF-e recebida encontrada.</p>
-                          <p className="text-xs mt-1">Clique em "Sincronizar" para consultar a SEFAZ.</p>
+                          <p className="text-xs mt-1">Clique em "Sincronizar" para buscar novas NF-e via Focus NFe.</p>
                         </div>
                       )}
                     </td>
@@ -544,15 +544,15 @@ export default function NfeRecebidasPage() {
         {detailRow && <NfeDetalhe row={detailRow} onAction={async (status, justificativa) => {
           setManifestando(true);
           try {
-            const tpEvento = STATUS_TO_EVENT[status];
-            if (tpEvento) {
-              const result = await sefazManifestarEvento({
+            const focusTipo = STATUS_TO_FOCUS_TIPO[status];
+            if (focusTipo) {
+              const result = await focusManifestarEvento({
                 nfeDestinadaIds: [detailRow.id],
-                tpEvento,
+                tipo: focusTipo,
                 justificativa,
               });
               if (!result.ok) {
-                addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+                addToast(result.error || 'Erro ao manifestar via Focus NFe.', 'error');
                 return;
               }
               addToast(`NF-e manifestada como "${STATUS_CONFIG[status as NfeDestinadaStatus]?.label || status}".`, 'success');

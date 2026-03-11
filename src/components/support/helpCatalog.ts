@@ -1374,8 +1374,8 @@ export const HELP_CATALOG: HelpEntry[] = [
     whatIs:
       'Consulta automática de notas fiscais emitidas contra o CNPJ da sua empresa (NF-e de fornecedores). Permite manifestar (confirmar, desconhecer, etc.) e integrar com contas a pagar e estoque.',
     steps: [
-      'Configure o certificado A1 com senha em Configurações NF-e (obrigatório para consultar a SEFAZ).',
-      'Clique em “Sincronizar” para buscar novas NF-e na SEFAZ (ou aguarde a sincronização automática a cada hora).',
+      'Configure o certificado A1 com senha em Configurações NF-e e registre a empresa na Focus NFe.',
+      'Clique em “Sincronizar” para buscar novas NF-e via Focus NFe (ou aguarde a sincronização automática).',
       'Revise as notas listadas: confira emitente, valor e data.',
       'Selecione uma ou mais notas e clique em “Manifestar” → escolha a ação (Ciência, Confirmar, Desconhecer, Não Realizada).',
       'Após confirmar uma NF-e, o XML completo fica disponível. Use os toggles de integração para gerar conta a pagar ou dar entrada no estoque.',
@@ -1392,6 +1392,39 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Deixar notas “Pendentes” por mais de 10 dias — perde o prazo de ciência.',
       'Confirmar sem conferir valor/emitente — confirmar é irreversível.',
       'Esquecer de gerar conta a pagar após confirmar — a NF-e existe mas a obrigação financeira fica fora do controle.',
+    ],
+    roadmapKey: 'fiscal',
+  },
+  {
+    match: '/app/fiscal/nfse',
+    title: 'Guia Rápido — NFS-e (Nota Fiscal de Serviço Eletrônica)',
+    whatIs:
+      'A NFS-e é o documento fiscal eletrônico para prestação de serviços. Aqui você cria rascunhos, preenche dados do serviço (discriminação, ISS, item LC 116) e envia para autorização na prefeitura via Focus NFe.',
+    steps: [
+      'Configure o emitente com inscrição municipal em Fiscal → Configurações NF-e (obrigatório para emitir NFS-e).',
+      'Clique em "Novo rascunho" e selecione o tomador (cliente), ambiente e natureza da operação.',
+      'Preencha a discriminação do serviço, valor, alíquota ISS e item da lista de serviço (LC 116).',
+      'Revise os dados e clique em "Salvar rascunho".',
+      'Para enviar, clique em "Enviar" — o status muda: Rascunho → Processando → Autorizada ou Rejeitada.',
+      'Após autorização: baixe o PDF e XML pelos botões de ação. O código de verificação pode ser copiado.',
+    ],
+    dependsOn: ['Empresa ativa com inscrição municipal', 'Emitente configurado (Configurações NF-e)', 'Empresa registrada na Focus NFe'],
+    connectsWith: ['Configurações NF-e', 'Cadastro de Clientes (Pessoas)', 'Financeiro (Contas a Receber)'],
+    fillPerfectly: [
+      'Discriminação do serviço clara e objetiva (reduz rejeição pela prefeitura).',
+      'Item da lista de serviço (LC 116) correto para o tipo de serviço prestado.',
+      'Código IBGE do município de prestação correto.',
+      'Alíquota ISS conforme legislação do município.',
+    ],
+    commonMistakes: [
+      'Emitir sem inscrição municipal cadastrada — a prefeitura rejeita.',
+      'Item LC 116 incorreto — causa rejeição ou tributação errada.',
+      'Discriminação vaga (ex.: "serviços diversos") — pode ser recusada.',
+      'Confundir homologação (teste) com produção (válido fiscalmente).',
+    ],
+    links: [
+      { label: 'Abrir NFS-e', href: '/app/fiscal/nfse', kind: 'internal' as const },
+      { label: 'Configurações NF-e', href: '/app/fiscal/nfe/configuracoes', kind: 'internal' as const },
     ],
     roadmapKey: 'fiscal',
   },
