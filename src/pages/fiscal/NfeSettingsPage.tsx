@@ -15,13 +15,16 @@ import {
   getFiscalFeatureFlags,
   getFiscalNfeEmissaoConfig,
   getFiscalNfeEmitente,
+  getFocusNfeEmpresaStatus,
   listFiscalNfeNumeracoes,
+  registerFocusNfeEmpresa,
   setFiscalNfeEmissaoEnabled,
   upsertFiscalNfeEmissaoConfig,
   upsertFiscalNfeEmitente,
   upsertFiscalNfeNumeracao,
 } from '@/services/fiscalNfeSettings';
-import { validateCertificate } from '@/services/nfeDestinadasService';
+import type { FocusNfeEmpresaStatus } from '@/services/fiscalNfeSettings';
+import { uploadCertToFocusNfe } from '@/services/nfeDestinadasService';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -100,6 +103,8 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [numeracoes, setNumeracoes] = useState<NfeNumeracao[]>([]);
   const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
   const [newSerie, setNewSerie] = useState<string>('');
+  const [focusStatus, setFocusStatus] = useState<FocusNfeEmpresaStatus | null>(null);
+  const [registering, setRegistering] = useState(false);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -109,12 +114,15 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     if (!empresaId) return;
     setLoading(true);
     try {
-      const [flags, cfgFocusRow, emitRow, numsRows] = await Promise.all([
+      const [flags, cfgFocusRow, emitRow, numsRows, focusSt] = await Promise.all([
         getFiscalFeatureFlags(),
         getFiscalNfeEmissaoConfig('FOCUSNFE'),
         getFiscalNfeEmitente(),
         listFiscalNfeNumeracoes(),
+        getFocusNfeEmpresaStatus().catch(() => null),
       ]);
+
+      setFocusStatus(focusSt ?? null);
 
       setNfeEnabled(!!flags?.nfe_emissao_enabled);
       setConfig(
@@ -395,10 +403,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     }
     setValidatingCert(true);
     try {
-      const result = await validateCertificate(certPassword.trim());
+      const result = await uploadCertToFocusNfe(certPassword.trim());
       if (result.ok && result.cert_info) {
         addToast(
-          `Certificado validado! CNPJ: ${result.cert_info.cnpj || '—'}, válido até ${new Date(result.cert_info.valid_until).toLocaleDateString('pt-BR')}.`,
+          `Certificado enviado para Focus NFe! CNPJ: ${result.cert_info.cnpj || '—'}, válido até ${new Date(result.cert_info.valid_until).toLocaleDateString('pt-BR')}.`,
           'success',
         );
         setCertPassword('');
@@ -407,14 +415,35 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
         const msg = result.error === 'WRONG_PASSWORD'
           ? 'Senha incorreta para o certificado.'
           : result.error === 'CERTIFICATE_EXPIRED'
-          ? `Certificado expirado. ${result.detail || ''}`
-          : result.error || 'Falha na validação do certificado.';
+          ? 'Certificado expirado.'
+          : result.error || 'Falha ao enviar certificado para Focus NFe.';
         addToast(msg, 'error');
       }
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao validar certificado.', 'error');
+      addToast(e?.message || 'Erro ao enviar certificado para Focus NFe.', 'error');
     } finally {
       setValidatingCert(false);
+    }
+  };
+
+  const handleRegisterFocusNfe = async () => {
+    if (!canAdmin) {
+      addToast('Sem permissão. Apenas admin/owner.', 'error');
+      return;
+    }
+    setRegistering(true);
+    try {
+      const res = await registerFocusNfeEmpresa();
+      if (res.ok) {
+        addToast('Empresa registrada na Focus NFe!', 'success');
+        await fetchData();
+      } else {
+        addToast(res.error || 'Erro ao registrar empresa na Focus NFe.', 'error');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar empresa na Focus NFe.', 'error');
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -445,6 +474,68 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Focus NFe Status Card */}
+          <GlassCard className="p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-blue-600" />
+                  <h2 className="text-lg font-bold text-slate-900">Status Focus NFe</h2>
+                </div>
+                <p className="text-sm text-slate-600 mt-1">
+                  Registro da empresa e certificado na plataforma Focus NFe.
+                </p>
+              </div>
+              <Button onClick={handleRegisterFocusNfe} disabled={registering || !canAdmin}>
+                {registering ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                <span className="ml-2">{focusStatus?.focusnfe_registrada ? 'Atualizar registro' : 'Registrar empresa'}</span>
+              </Button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={`rounded-xl border p-4 ${focusStatus?.focusnfe_registrada ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                <p className="text-xs font-semibold text-slate-600">Registro</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {focusStatus?.focusnfe_registrada ? (
+                    <><CheckCircle2 size={16} className="text-emerald-600" /><span className="text-sm font-semibold text-emerald-800">Registrada</span></>
+                  ) : (
+                    <><ShieldAlert size={16} className="text-amber-600" /><span className="text-sm font-semibold text-amber-800">Não registrada</span></>
+                  )}
+                </div>
+                {focusStatus?.focusnfe_registrada_em && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    em {new Date(focusStatus.focusnfe_registrada_em).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
+              </div>
+              <div className={`rounded-xl border p-4 ${focusStatus?.certificado_validade ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                <p className="text-xs font-semibold text-slate-600">Certificado A1</p>
+                {focusStatus?.certificado_validade ? (
+                  <>
+                    <p className="text-sm font-semibold text-emerald-800 mt-1">
+                      Válido até {new Date(focusStatus.certificado_validade).toLocaleDateString('pt-BR')}
+                    </p>
+                    {focusStatus.certificado_cnpj && (
+                      <p className="text-xs text-slate-500 mt-0.5">CNPJ: {focusStatus.certificado_cnpj}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-1">Não configurado</p>
+                )}
+              </div>
+              <div className="rounded-xl border bg-gray-50 border-gray-200 p-4">
+                <p className="text-xs font-semibold text-slate-600">Ambiente</p>
+                <p className="text-sm font-semibold text-slate-800 mt-1">
+                  {config?.ambiente === 'producao' ? 'Produção' : 'Homologação'}
+                </p>
+              </div>
+            </div>
+            {focusStatus?.focusnfe_ultimo_erro && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                Último erro: {focusStatus.focusnfe_ultimo_erro}
+              </div>
+            )}
+          </GlassCard>
+
           <GlassCard className="p-6">
             <div className="flex items-start justify-between gap-6">
               <div>
@@ -751,13 +842,13 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                         disabled={!canAdmin || validatingCert || !certPassword.trim()}
                       >
                         {validatingCert ? <Loader2 className="animate-spin" size={16} /> : <ShieldAlert size={16} />}
-                        <span className="ml-2">{emitente.certificado_senha_encrypted ? 'Revalidar' : 'Validar e salvar senha'}</span>
+                        <span className="ml-2">{emitente.certificado_senha_encrypted ? 'Reenviar para Focus NFe' : 'Enviar para Focus NFe'}</span>
                       </Button>
                     </div>
                   )}
 
                   <div className="text-xs text-slate-600">
-                    A senha é criptografada (AES-GCM) e armazenada de forma segura. Necessária para consulta automática de NF-e destinadas (Manifestação do Destinatário).
+                    O certificado e a senha são enviados para a Focus NFe, que gerencia a comunicação com a SEFAZ. A senha também é criptografada (AES-GCM) localmente como backup.
                   </div>
                 </div>
               </div>
