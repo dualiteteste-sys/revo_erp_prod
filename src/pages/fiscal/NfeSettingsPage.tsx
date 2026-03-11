@@ -7,7 +7,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin } from 'lucide-react';
+import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin, ShieldAlert, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { cnpjMask, cepMask } from '@/lib/masks';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
@@ -21,6 +21,7 @@ import {
   upsertFiscalNfeEmitente,
   upsertFiscalNfeNumeracao,
 } from '@/services/fiscalNfeSettings';
+import { validateCertificate } from '@/services/nfeDestinadasService';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -53,6 +54,9 @@ type NfeEmitente = {
   telefone: string | null;
   email: string | null;
   certificado_storage_path: string | null;
+  certificado_validade: string | null;
+  certificado_cnpj: string | null;
+  certificado_senha_encrypted: string | null;
 };
 
 type NfeNumeracao = {
@@ -86,6 +90,9 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [savingNumeracao, setSavingNumeracao] = useState(false);
   const [uploadingCert, setUploadingCert] = useState(false);
   const [deletingCert, setDeletingCert] = useState(false);
+  const [certPassword, setCertPassword] = useState('');
+  const [showCertPassword, setShowCertPassword] = useState(false);
+  const [validatingCert, setValidatingCert] = useState(false);
 
   const [nfeEnabled, setNfeEnabled] = useState(false);
   const [config, setConfig] = useState<NfeConfig | null>(null);
@@ -145,6 +152,9 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               telefone: emitRow.telefone ?? null,
               email: emitRow.email ?? null,
               certificado_storage_path: emitRow.certificado_storage_path ?? null,
+              certificado_validade: emitRow.certificado_validade ?? null,
+              certificado_cnpj: emitRow.certificado_cnpj ?? null,
+              certificado_senha_encrypted: emitRow.certificado_senha_encrypted ?? null,
             }
           : {
               empresa_id: empresaId,
@@ -166,6 +176,9 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               telefone: null,
               email: null,
               certificado_storage_path: null,
+              certificado_validade: null,
+              certificado_cnpj: null,
+              certificado_senha_encrypted: null,
             }
       );
 
@@ -371,6 +384,37 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       addToast(e?.message || 'Erro ao remover certificado.', 'error');
     } finally {
       setDeletingCert(false);
+    }
+  };
+
+  const handleValidateCert = async () => {
+    if (!empresaId || !emitente?.certificado_storage_path || !certPassword.trim()) return;
+    if (!canAdmin) {
+      addToast('Sem permissão. Apenas admin/owner.', 'error');
+      return;
+    }
+    setValidatingCert(true);
+    try {
+      const result = await validateCertificate(certPassword.trim());
+      if (result.ok && result.cert_info) {
+        addToast(
+          `Certificado validado! CNPJ: ${result.cert_info.cnpj || '—'}, válido até ${new Date(result.cert_info.valid_until).toLocaleDateString('pt-BR')}.`,
+          'success',
+        );
+        setCertPassword('');
+        await fetchData();
+      } else {
+        const msg = result.error === 'WRONG_PASSWORD'
+          ? 'Senha incorreta para o certificado.'
+          : result.error === 'CERTIFICATE_EXPIRED'
+          ? `Certificado expirado. ${result.detail || ''}`
+          : result.error || 'Falha na validação do certificado.';
+        addToast(msg, 'error');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao validar certificado.', 'error');
+    } finally {
+      setValidatingCert(false);
     }
   };
 
@@ -613,13 +657,13 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
 
             <div className="mt-6">
               <div className="md:col-span-3">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-sm font-semibold text-slate-800">Certificado A1 (PFX/P12)</div>
                       <div className="text-xs text-slate-600 mt-1">
                         {emitente?.certificado_storage_path ? (
-                          <span className="font-mono">{emitente.certificado_storage_path}</span>
+                          <span className="font-mono">{emitente.certificado_storage_path.split('/').pop()}</span>
                         ) : (
                           <span>Nenhum certificado enviado.</span>
                         )}
@@ -652,8 +696,68 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-slate-600">
-                    A senha do certificado <span className="font-semibold">não</span> é salva no banco. Ela será usada somente na etapa de emissão (NFE-05).
+
+                  {/* Certificate metadata (shown after validation) */}
+                  {emitente?.certificado_validade && (
+                    <div className="flex items-center gap-4 text-xs bg-white rounded-lg border border-slate-200 p-3">
+                      <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                      <div className="flex flex-wrap gap-x-6 gap-y-1">
+                        <span><strong>CNPJ:</strong> {emitente.certificado_cnpj || '—'}</span>
+                        <span>
+                          <strong>Validade:</strong>{' '}
+                          {new Date(emitente.certificado_validade).toLocaleDateString('pt-BR')}
+                          {new Date(emitente.certificado_validade) < new Date() && (
+                            <span className="ml-1 text-red-600 font-semibold">(Expirado)</span>
+                          )}
+                        </span>
+                        <span>
+                          <strong>Senha:</strong>{' '}
+                          {emitente.certificado_senha_encrypted
+                            ? <span className="text-emerald-700">Salva (criptografada)</span>
+                            : <span className="text-amber-600">Não configurada</span>}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Password input + validate button (shown when cert is uploaded but not validated, or to re-validate) */}
+                  {emitente?.certificado_storage_path && (
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 max-w-xs">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Senha do certificado
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showCertPassword ? 'text' : 'password'}
+                            value={certPassword}
+                            onChange={(e) => setCertPassword(e.target.value)}
+                            disabled={!canAdmin || validatingCert}
+                            className="w-full p-2.5 pr-10 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Digite a senha do PFX"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCertPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                            tabIndex={-1}
+                          >
+                            {showCertPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => void handleValidateCert()}
+                        disabled={!canAdmin || validatingCert || !certPassword.trim()}
+                      >
+                        {validatingCert ? <Loader2 className="animate-spin" size={16} /> : <ShieldAlert size={16} />}
+                        <span className="ml-2">{emitente.certificado_senha_encrypted ? 'Revalidar' : 'Validar e salvar senha'}</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-slate-600">
+                    A senha é criptografada (AES-GCM) e armazenada de forma segura. Necessária para consulta automática de NF-e destinadas (Manifestação do Destinatário).
                   </div>
                 </div>
               </div>

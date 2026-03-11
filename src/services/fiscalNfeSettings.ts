@@ -60,6 +60,9 @@ export type FiscalNfeEmitente = {
   telefone: string | null;
   email: string | null;
   certificado_storage_path: string | null;
+  certificado_validade: string | null;
+  certificado_cnpj: string | null;
+  certificado_senha_encrypted: string | null;
 };
 
 export async function getFiscalNfeEmitente() {
