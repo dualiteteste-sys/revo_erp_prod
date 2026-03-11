@@ -29,6 +29,7 @@ import {
   buildRecepcaoEventoSoap,
   parseRecepcaoEventoResponse,
   brazilIsoNow,
+  fetchWithRetry,
   type Ambiente,
 } from "../_shared/sefaz-soap.ts";
 
@@ -254,8 +255,7 @@ Deno.serve(async (req) => {
       log(`Sending ${signedEventos.length} events to SEFAZ ${ambiente}...`);
       const startMs = Date.now();
 
-      const response = await fetch(endpoint, {
-        // @ts-ignore — client option for Deno
+      const response = await fetchWithRetry(endpoint, {
         client: httpClient,
         method: "POST",
         headers: {
@@ -263,7 +263,7 @@ Deno.serve(async (req) => {
           "SOAPAction": "",
         },
         body: soapXml,
-      });
+      }, { log });
 
       const elapsed = Date.now() - startMs;
       const responseText = await response.text();

@@ -23,6 +23,7 @@ import {
   ufToCode,
   parseDistDFeResponse,
   parseResNFe,
+  fetchWithRetry,
   type Ambiente,
 } from "../_shared/sefaz-soap.ts";
 
@@ -227,8 +228,7 @@ async function processSingleEmpresa(
       const soapXml = buildDistNSUSoap({ ambiente: tpAmb as "1" | "2", cUF, cnpj, ultNSU });
 
       const startMs = Date.now();
-      const response = await fetch(endpoint, {
-        // @ts-ignore — client option for Deno
+      const response = await fetchWithRetry(endpoint, {
         client: httpClient,
         method: "POST",
         headers: {
@@ -236,7 +236,7 @@ async function processSingleEmpresa(
           "SOAPAction": "",
         },
         body: soapXml,
-      });
+      }, { log });
       const elapsed = Date.now() - startMs;
       const responseText = await response.text();
 
