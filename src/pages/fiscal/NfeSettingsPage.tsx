@@ -404,19 +404,22 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     setValidatingCert(true);
     try {
       const result = await uploadCertToFocusNfe(certPassword.trim());
-      if (result.ok && result.cert_info) {
+      if (result.ok) {
+        const certMsg = result.cert_info?.valid_until
+          ? `CNPJ: ${result.cert_info.cnpj || '—'}, válido até ${new Date(result.cert_info.valid_until).toLocaleDateString('pt-BR')}.`
+          : '';
         addToast(
-          `Certificado enviado para Focus NFe! CNPJ: ${result.cert_info.cnpj || '—'}, válido até ${new Date(result.cert_info.valid_until).toLocaleDateString('pt-BR')}.`,
+          result.message || `Certificado salvo com sucesso. ${certMsg}`.trim(),
           'success',
         );
         setCertPassword('');
         await fetchData();
       } else {
         const msg = result.error === 'WRONG_PASSWORD'
-          ? 'Senha incorreta para o certificado.'
+          ? 'Senha incorreta para o certificado digital.'
           : result.error === 'CERTIFICATE_EXPIRED'
-          ? 'Certificado expirado.'
-          : result.error || 'Falha ao enviar certificado para Focus NFe.';
+          ? 'Certificado digital expirado. Renove junto à certificadora.'
+          : result.detail || result.error || 'Falha ao enviar certificado para Focus NFe.';
         addToast(msg, 'error');
       }
     } catch (e: any) {
@@ -435,10 +438,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     try {
       const res = await registerFocusNfeEmpresa();
       if (res.ok) {
-        addToast('Empresa registrada na Focus NFe!', 'success');
+        addToast(res.message || 'Empresa registrada na Focus NFe!', 'success');
         await fetchData();
       } else {
-        addToast(res.error || 'Erro ao registrar empresa na Focus NFe.', 'error');
+        addToast(res.detail || res.error || 'Erro ao registrar empresa na Focus NFe.', 'error');
       }
     } catch (e: any) {
       addToast(e?.message || 'Erro ao registrar empresa na Focus NFe.', 'error');

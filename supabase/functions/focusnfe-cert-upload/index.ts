@@ -12,6 +12,16 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+/**
+ * Get the Focus NFe revenda (reseller) token.
+ * The /v2/empresas PUT endpoint requires a reseller token to upload certs.
+ * Falls back to null if not configured.
+ */
+function getRevendaToken(): string | null {
+  const token = (Deno.env.get("FOCUSNFE_REVENDA_TOKEN") ?? "").trim();
+  return token || null;
+}
+
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -35,7 +45,7 @@ Deno.serve(async (req) => {
 
   const { password } = body;
   if (!password || typeof password !== "string" || !password.trim()) {
-    return json(400, { ok: false, error: "MISSING_PASSWORD" }, cors);
+    return json(400, { ok: false, error: "MISSING_PASSWORD", detail: "Informe a senha do certificado." }, cors);
   }
 
   const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -68,7 +78,7 @@ Deno.serve(async (req) => {
       .eq("empresa_id", empresaId)
       .single();
     if (!emitente) {
-      return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
+      return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED", detail: "Preencha os dados do emitente antes de enviar o certificado." }, cors);
     }
     if (!emitente.certificado_storage_path) {
       return json(422, { ok: false, error: "NO_CERTIFICATE", detail: "Faça upload do certificado PFX primeiro." }, cors);
@@ -79,52 +89,13 @@ Deno.serve(async (req) => {
       .from("nfe_certificados")
       .download(emitente.certificado_storage_path);
     if (dlErr || !pfxData) {
-      return json(500, { ok: false, error: "CERT_DOWNLOAD_FAILED", detail: dlErr?.message }, cors);
+      return json(500, { ok: false, error: "CERT_DOWNLOAD_FAILED", detail: "Erro ao baixar certificado do storage." }, cors);
     }
 
     const arrayBuffer = await pfxData.arrayBuffer();
     const pfxBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-    // Determine ambiente
-    const { data: config } = await admin
-      .from("fiscal_nfe_emissao_config")
-      .select("ambiente")
-      .eq("empresa_id", empresaId)
-      .eq("provider_slug", "FOCUSNFE")
-      .maybeSingle();
-    const ambiente = config?.ambiente || "homologacao";
-    const apiToken = getFocusApiToken(ambiente);
-    if (!apiToken) {
-      return json(500, { ok: false, error: "MISSING_API_TOKEN" }, cors);
-    }
-
-    const cnpj = (emitente.cnpj || "").replace(/\D/g, "");
-    const baseUrl = getFocusBaseUrl(ambiente);
-
-    // Upload certificate to Focus NFe via empresa update
-    const { response, data } = await focusFetch(
-      `${baseUrl}/v2/empresas/${cnpj}`,
-      {
-        method: "PUT",
-        token: apiToken,
-        body: JSON.stringify({
-          arquivo_certificado_digital: pfxBase64,
-          senha_certificado_digital: password.trim(),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const errorMsg = data?.mensagem || data?.message || `HTTP ${response.status}`;
-      const isWrongPassword = /senha|password|pkcs|decrypt/i.test(errorMsg);
-      return json(422, {
-        ok: false,
-        error: isWrongPassword ? "WRONG_PASSWORD" : "CERT_UPLOAD_FAILED",
-        detail: errorMsg,
-      }, cors);
-    }
-
-    // Encrypt and store password locally as backup
+    // Encrypt and store password locally
     const masterKey = Deno.env.get("CERT_ENCRYPTION_KEY") || "";
     let encryptedPassword: string | null = null;
     if (masterKey) {
@@ -135,19 +106,85 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Extract cert info from Focus NFe response if available
-    const certInfo = {
-      cnpj: data?.cnpj_certificado || cnpj,
-      valid_until: data?.data_expiracao_certificado || null,
-    };
+    // Determine ambiente
+    const { data: config } = await admin
+      .from("fiscal_nfe_emissao_config")
+      .select("ambiente")
+      .eq("empresa_id", empresaId)
+      .eq("provider_slug", "FOCUSNFE")
+      .maybeSingle();
+    const ambiente = config?.ambiente || "homologacao";
 
-    // Update emitente with cert info
+    const cnpj = (emitente.cnpj || "").replace(/\D/g, "");
+    const revendaToken = getRevendaToken();
+
+    // ── Strategy 1: Reseller token available → upload cert via Focus NFe API ──
+    if (revendaToken) {
+      const revendaBaseUrl = "https://api.focusnfe.com.br"; // reseller API is production-only
+
+      const { response, data } = await focusFetch(
+        `${revendaBaseUrl}/v2/empresas/${cnpj}`,
+        {
+          method: "PUT",
+          token: revendaToken,
+          body: JSON.stringify({
+            arquivo_certificado_base64: pfxBase64,
+            senha_certificado: password.trim(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorMsg = data?.mensagem || data?.message || `HTTP ${response.status}`;
+        const isWrongPassword = /senha|password|pkcs|decrypt/i.test(errorMsg);
+        return json(422, {
+          ok: false,
+          error: isWrongPassword ? "WRONG_PASSWORD" : "CERT_UPLOAD_FAILED",
+          detail: isWrongPassword
+            ? "Senha incorreta para o certificado digital."
+            : `Erro ao enviar certificado para Focus NFe: ${errorMsg}`,
+        }, cors);
+      }
+
+      // Extract cert info from Focus NFe response
+      const certInfo = {
+        cnpj: data?.cnpj_certificado || cnpj,
+        valid_until: data?.data_expiracao_certificado || null,
+      };
+
+      // Update emitente with cert info
+      await admin.from("fiscal_nfe_emitente").update({
+        certificado_senha_encrypted: encryptedPassword,
+        certificado_validade: certInfo.valid_until || null,
+        certificado_cnpj: certInfo.cnpj || null,
+        focusnfe_registrada: true,
+        focusnfe_registrada_em: new Date().toISOString(),
+        focusnfe_ultimo_erro: null,
+      }).eq("empresa_id", empresaId);
+
+      // Log
+      await admin.from("fiscal_nfe_provider_logs").insert({
+        empresa_id: empresaId,
+        provider: "focusnfe",
+        level: "info",
+        message: `Certificado enviado para Focus NFe via API revenda (${ambiente})`,
+        payload: { cnpj, request_id: requestId },
+      }).catch(() => {});
+
+      return json(200, {
+        ok: true,
+        cert_info: certInfo,
+        message: "Certificado enviado para Focus NFe com sucesso.",
+      }, cors);
+    }
+
+    // ── Strategy 2: No reseller token → store password locally ──
+    // The cert will be included automatically when emitting NF-e via focusnfe-emit
+    // which uses the emission token (per-company) and sends the cert in the payload.
+
+    // Update emitente with encrypted password
     await admin.from("fiscal_nfe_emitente").update({
       certificado_senha_encrypted: encryptedPassword,
-      certificado_validade: certInfo.valid_until || null,
-      certificado_cnpj: certInfo.cnpj || null,
-      focusnfe_registrada: true,
-      focusnfe_registrada_em: new Date().toISOString(),
       focusnfe_ultimo_erro: null,
     }).eq("empresa_id", empresaId);
 
@@ -156,16 +193,16 @@ Deno.serve(async (req) => {
       empresa_id: empresaId,
       provider: "focusnfe",
       level: "info",
-      message: `Certificate uploaded to Focus NFe (${ambiente})`,
+      message: `Senha do certificado salva localmente (${ambiente})`,
       payload: { cnpj, request_id: requestId },
     }).catch(() => {});
 
     return json(200, {
       ok: true,
-      cert_info: certInfo,
-      message: "Certificado enviado para Focus NFe com sucesso.",
+      cert_info: { cnpj, valid_until: null },
+      message: "Senha do certificado salva com sucesso. O certificado será enviado automaticamente na emissão.",
     }, cors);
   } catch (err: any) {
-    return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message }, cors);
+    return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message || "Erro interno ao processar certificado." }, cors);
   }
 });

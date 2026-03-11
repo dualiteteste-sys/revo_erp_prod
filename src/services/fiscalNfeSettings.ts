@@ -108,12 +108,19 @@ export async function getFocusNfeEmpresaStatus() {
   return callRpc<FocusNfeEmpresaStatus | null>('fiscal_nfe_emitente_focusnfe_status');
 }
 
-export async function registerFocusNfeEmpresa(): Promise<{ ok: boolean; error?: string }> {
+export async function registerFocusNfeEmpresa(): Promise<{ ok: boolean; error?: string; detail?: string; message?: string }> {
   const { data, error } = await supabase.functions.invoke('focusnfe-empresa', { body: {} });
   if (error) {
+    // Try to extract structured error from edge function response body
+    try {
+      const body = await (error as any)?.context?.json?.();
+      if (body?.detail || body?.error) {
+        return { ok: false, error: body.error, detail: body.detail };
+      }
+    } catch { /* ignore parse failures */ }
     const msg = (error as any)?.message || String(error);
     return { ok: false, error: msg };
   }
-  return data as { ok: boolean; error?: string };
+  return data as { ok: boolean; error?: string; detail?: string; message?: string };
 }
 
