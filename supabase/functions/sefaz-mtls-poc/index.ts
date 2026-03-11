@@ -137,6 +137,7 @@ Deno.serve(async (req) => {
       caCerts: [],     // Use default CA bundle
       certChain: pem.certPem,
       privateKey: pem.keyPem,
+      http2: false, // SEFAZ requires HTTP/1.1
     });
 
     // ---- Build SOAP request ----
