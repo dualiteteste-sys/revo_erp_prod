@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 
 export type FiscalFeatureFlags = {
   empresa_id: string;
@@ -91,5 +92,28 @@ export async function upsertFiscalNfeNumeracao(input: { serie: number; proximo_n
     p_proximo_numero: input.proximo_numero,
     p_ativo: !!input.ativo,
   });
+}
+
+// ── Focus NFe Empresa Registration ──────────────────────────
+
+export type FocusNfeEmpresaStatus = {
+  focusnfe_registrada: boolean;
+  focusnfe_registrada_em: string | null;
+  focusnfe_ultimo_erro: string | null;
+  certificado_validade: string | null;
+  certificado_cnpj: string | null;
+};
+
+export async function getFocusNfeEmpresaStatus() {
+  return callRpc<FocusNfeEmpresaStatus | null>('fiscal_nfe_emitente_focusnfe_status');
+}
+
+export async function registerFocusNfeEmpresa(): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-empresa', { body: {} });
+  if (error) {
+    const msg = (error as any)?.message || String(error);
+    return { ok: false, error: msg };
+  }
+  return data as { ok: boolean; error?: string };
 }
 

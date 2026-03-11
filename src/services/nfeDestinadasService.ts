@@ -69,20 +69,23 @@ export type NfeDestinadaSyncStatus = {
   synced: boolean;
 };
 
-export type CertValidateResult = {
+export type FocusManifestarResult = {
   ok: boolean;
   error?: string;
-  detail?: string;
-  cert_info?: {
-    cnpj: string | null;
-    valid_from: string;
-    valid_until: string;
-    subject: string;
-  };
+  message?: string;
+  success_count?: number;
+  fail_count?: number;
+  results?: Array<{
+    nfe_destinada_id: string;
+    chave_acesso: string;
+    status: string;
+    success: boolean;
+    error?: string;
+  }>;
 };
 
 // ============================================================
-// API calls
+// API calls — RPCs
 // ============================================================
 
 export async function listNfeDestinadasRpc(params: {
@@ -125,37 +128,6 @@ export async function manifestarNfeDestinadasRpc(
   });
 }
 
-export type SefazManifestarResult = {
-  ok: boolean;
-  error?: string;
-  cStat?: string;
-  xMotivo?: string;
-  success_count?: number;
-  fail_count?: number;
-  skipped_count?: number;
-  results?: Array<{
-    nfe_destinada_id: string;
-    chave_acesso: string;
-    cStat: string;
-    xMotivo: string;
-    protocolo: string | null;
-    success: boolean;
-  }>;
-};
-
-/** Send manifestação event to SEFAZ via edge function */
-export async function sefazManifestarEvento(params: {
-  nfeDestinadaIds: string[];
-  tpEvento: '210210' | '210200' | '210220' | '210240';
-  justificativa?: string;
-}): Promise<SefazManifestarResult> {
-  const { data, error } = await supabase.functions.invoke('sefaz-recepcao-evento', {
-    body: params,
-  });
-  if (error) throw error;
-  return data as SefazManifestarResult;
-}
-
 /** Generate conta a pagar from confirmed NF-e destinada */
 export async function gerarContaPagarFromNfeDestinadaRpc(
   nfeDestinadaId: string,
@@ -167,23 +139,39 @@ export async function gerarContaPagarFromNfeDestinadaRpc(
   });
 }
 
-/** Trigger manual sync via edge function */
+// ============================================================
+// Focus NFe edge function calls
+// ============================================================
+
+/** Trigger manual sync via Focus NFe MDe API */
 export async function syncNfeDestinadasManual(): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke('sefaz-distribuicao-dfe', { body: {} });
+  const { data, error } = await supabase.functions.invoke('focusnfe-mde-sync', { body: {} });
   if (error) throw error;
   return data;
 }
 
-/** Validate certificate and store encrypted password */
-export async function validateCertificate(password: string): Promise<CertValidateResult> {
-  const { data, error } = await supabase.functions.invoke('sefaz-cert-validate', { body: { password } });
+/** Send manifestação event via Focus NFe MDe API */
+export async function focusManifestarEvento(params: {
+  nfeDestinadaIds: string[];
+  tipo: 'ciencia' | 'confirmacao' | 'desconhecimento' | 'nao_realizada';
+  justificativa?: string;
+}): Promise<FocusManifestarResult> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-mde-manifestar', {
+    body: params,
+  });
   if (error) throw error;
-  return data as CertValidateResult;
+  return data as FocusManifestarResult;
 }
 
-/** Test mTLS connectivity with SEFAZ (PoC) */
-export async function testSefazMtls(): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke('sefaz-mtls-poc', { body: {} });
+/** Upload certificate to Focus NFe via edge function */
+export async function uploadCertToFocusNfe(password: string): Promise<{
+  ok: boolean;
+  error?: string;
+  cert_info?: { cnpj: string | null; valid_until: string };
+}> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-cert-upload', {
+    body: { password },
+  });
   if (error) throw error;
-  return data;
+  return data as { ok: boolean; error?: string; cert_info?: { cnpj: string | null; valid_until: string } };
 }
