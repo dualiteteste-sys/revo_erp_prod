@@ -18,6 +18,52 @@ export const SEFAZ_ENDPOINTS = {
 
 export type Ambiente = "producao" | "homologacao";
 
+// ============================================================
+// Retry helper for transient SEFAZ errors (connection reset, timeout)
+// ============================================================
+const TRANSIENT_PATTERNS = [
+  "Connection reset by peer",
+  "connection error",
+  "os error 104",
+  "os error 111",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "timed out",
+  "broken pipe",
+];
+
+function isTransientError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return TRANSIENT_PATTERNS.some((p) => msg.includes(p));
+}
+
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit & { client?: unknown },
+  opts?: { maxRetries?: number; baseDelayMs?: number; log?: (msg: string) => void },
+): Promise<Response> {
+  const maxRetries = opts?.maxRetries ?? 3;
+  const baseDelay = opts?.baseDelayMs ?? 1000;
+  const log = opts?.log ?? (() => {});
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // @ts-ignore — client option for Deno
+      const response = await fetch(url, init);
+      return response;
+    } catch (err) {
+      if (attempt < maxRetries && isTransientError(err)) {
+        const delay = baseDelay * Math.pow(2, attempt); // 1s, 2s, 4s
+        log(`SEFAZ transient error (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms: ${err instanceof Error ? err.message : err}`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("fetchWithRetry: unreachable");
+}
+
 // UF → cUF code mapping (IBGE)
 const UF_CODES: Record<string, string> = {
   AC: "12", AL: "27", AP: "16", AM: "13", BA: "29", CE: "23",
