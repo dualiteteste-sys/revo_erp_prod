@@ -125,6 +125,48 @@ export async function manifestarNfeDestinadasRpc(
   });
 }
 
+export type SefazManifestarResult = {
+  ok: boolean;
+  error?: string;
+  cStat?: string;
+  xMotivo?: string;
+  success_count?: number;
+  fail_count?: number;
+  skipped_count?: number;
+  results?: Array<{
+    nfe_destinada_id: string;
+    chave_acesso: string;
+    cStat: string;
+    xMotivo: string;
+    protocolo: string | null;
+    success: boolean;
+  }>;
+};
+
+/** Send manifestação event to SEFAZ via edge function */
+export async function sefazManifestarEvento(params: {
+  nfeDestinadaIds: string[];
+  tpEvento: '210210' | '210200' | '210220' | '210240';
+  justificativa?: string;
+}): Promise<SefazManifestarResult> {
+  const { data, error } = await supabase.functions.invoke('sefaz-recepcao-evento', {
+    body: params,
+  });
+  if (error) throw error;
+  return data as SefazManifestarResult;
+}
+
+/** Generate conta a pagar from confirmed NF-e destinada */
+export async function gerarContaPagarFromNfeDestinadaRpc(
+  nfeDestinadaId: string,
+  dataVencimento?: string,
+): Promise<string> {
+  return callRpc<string>('fiscal_nfe_destinada_gerar_conta_pagar', {
+    p_nfe_destinada_id: nfeDestinadaId,
+    p_data_vencimento: dataVencimento || null,
+  });
+}
+
 /** Trigger manual sync via edge function */
 export async function syncNfeDestinadasManual(): Promise<unknown> {
   const { data, error } = await supabase.functions.invoke('sefaz-distribuicao-dfe', { body: {} });

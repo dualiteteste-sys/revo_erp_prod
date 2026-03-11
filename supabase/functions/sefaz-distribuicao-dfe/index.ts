@@ -257,9 +257,6 @@ async function processSingleEmpresa(
         if (doc.schema.includes("resNFe") || doc.schema.includes("procNFe")) {
           const nfe = parseResNFe(doc.xml);
           if (nfe) {
-            // Set empresa context for RPC
-            await svc.rpc("set_empresa_id_header", { p_empresa_id: empresaId }).catch(() => {});
-
             // Upsert via direct insert (service role bypasses RLS)
             const { error: upsErr } = await svc
               .from("fiscal_nfe_destinadas")

@@ -12,6 +12,8 @@ import {
   XCircle,
   HelpCircle,
   Ban,
+  DollarSign,
+  ExternalLink,
 } from 'lucide-react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
@@ -27,12 +29,22 @@ import {
   getNfeDestinadasSummary,
   getNfeDestinadasSyncStatus,
   manifestarNfeDestinadasRpc,
+  sefazManifestarEvento,
+  gerarContaPagarFromNfeDestinadaRpc,
   syncNfeDestinadasManual,
   type NfeDestinadaRow,
   type NfeDestinadaSummary,
   type NfeDestinadaSyncStatus,
   type NfeDestinadaStatus,
 } from '@/services/nfeDestinadasService';
+
+// Map local status → SEFAZ event code
+const STATUS_TO_EVENT: Record<string, '210210' | '210200' | '210220' | '210240'> = {
+  ciencia: '210210',
+  confirmada: '210200',
+  desconhecida: '210220',
+  nao_realizada: '210240',
+};
 
 // ============================================================
 // Status helpers
@@ -184,7 +196,7 @@ export default function NfeRecebidasPage() {
     }
   };
 
-  // Manifestation
+  // Manifestation — uses SEFAZ edge function for real events, RPC for local-only (ignorada)
   const handleManifestar = async (status: NfeDestinadaStatus) => {
     const ids = Array.from(selected);
     if (ids.length === 0) {
@@ -199,8 +211,26 @@ export default function NfeRecebidasPage() {
 
     setManifestando(true);
     try {
-      const result = await manifestarNfeDestinadasRpc(ids, status);
-      addToast(`${result.updated} NF-e(s) atualizadas para "${STATUS_CONFIG[status].label}".`, 'success');
+      const tpEvento = STATUS_TO_EVENT[status];
+      if (tpEvento) {
+        // SEFAZ manifestation via edge function
+        const result = await sefazManifestarEvento({ nfeDestinadaIds: ids, tpEvento });
+        if (!result.ok) {
+          addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+        } else {
+          const msg = result.success_count === 1
+            ? `1 NF-e manifestada como "${STATUS_CONFIG[status].label}".`
+            : `${result.success_count} NF-e(s) manifestadas como "${STATUS_CONFIG[status].label}".`;
+          addToast(
+            result.fail_count ? `${msg} ${result.fail_count} falharam.` : msg,
+            result.fail_count ? 'warning' : 'success',
+          );
+        }
+      } else {
+        // Local-only action (ignorada)
+        const result = await manifestarNfeDestinadasRpc(ids, status);
+        addToast(`${result.updated} NF-e(s) atualizadas para "${STATUS_CONFIG[status].label}".`, 'success');
+      }
       setSelected(new Set());
       await fetchData();
     } catch (e: any) {
@@ -218,8 +248,19 @@ export default function NfeRecebidasPage() {
     }
     setManifestando(true);
     try {
-      const result = await manifestarNfeDestinadasRpc(ids, 'nao_realizada', justificativaText.trim());
-      addToast(`${result.updated} NF-e(s) marcadas como "Não Realizada".`, 'success');
+      const result = await sefazManifestarEvento({
+        nfeDestinadaIds: ids,
+        tpEvento: '210240',
+        justificativa: justificativaText.trim(),
+      });
+      if (!result.ok) {
+        addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+      } else {
+        addToast(
+          `${result.success_count} NF-e(s) marcadas como "Não Realizada".`,
+          result.fail_count ? 'warning' : 'success',
+        );
+      }
       setSelected(new Set());
       setShowJustificativa(false);
       setJustificativaText('');
@@ -503,12 +544,40 @@ export default function NfeRecebidasPage() {
         {detailRow && <NfeDetalhe row={detailRow} onAction={async (status, justificativa) => {
           setManifestando(true);
           try {
-            await manifestarNfeDestinadasRpc([detailRow.id], status, justificativa);
-            addToast(`NF-e atualizada para "${STATUS_CONFIG[status as NfeDestinadaStatus]?.label || status}".`, 'success');
+            const tpEvento = STATUS_TO_EVENT[status];
+            if (tpEvento) {
+              const result = await sefazManifestarEvento({
+                nfeDestinadaIds: [detailRow.id],
+                tpEvento,
+                justificativa,
+              });
+              if (!result.ok) {
+                addToast(result.xMotivo || result.error || 'Erro na SEFAZ.', 'error');
+                return;
+              }
+              addToast(`NF-e manifestada como "${STATUS_CONFIG[status as NfeDestinadaStatus]?.label || status}".`, 'success');
+            } else {
+              await manifestarNfeDestinadasRpc([detailRow.id], status, justificativa);
+              addToast(`NF-e atualizada para "${STATUS_CONFIG[status as NfeDestinadaStatus]?.label || status}".`, 'success');
+            }
             setDetailRow(null);
             await fetchData();
           } catch (e: any) {
             addToast(e?.message || 'Erro ao manifestar.', 'error');
+          } finally {
+            setManifestando(false);
+          }
+        }} onGerarContaPagar={async () => {
+          if (!detailRow) return;
+          setManifestando(true);
+          try {
+            await gerarContaPagarFromNfeDestinadaRpc(detailRow.id);
+            addToast('Conta a pagar gerada com sucesso.', 'success');
+            await fetchData();
+            // Refresh detail row
+            setDetailRow((prev) => prev ? { ...prev, conta_pagar_id: 'generated' } : null);
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao gerar conta a pagar.', 'error');
           } finally {
             setManifestando(false);
           }
@@ -556,10 +625,12 @@ export default function NfeRecebidasPage() {
 function NfeDetalhe({
   row,
   onAction,
+  onGerarContaPagar,
   disabled,
 }: {
   row: NfeDestinadaRow;
   onAction: (status: string, justificativa?: string) => Promise<void>;
+  onGerarContaPagar: () => Promise<void>;
   disabled: boolean;
 }) {
   const [justText, setJustText] = useState('');
@@ -614,6 +685,32 @@ function NfeDetalhe({
         <div className="grid grid-cols-2 gap-4">
           <Field label="Fornecedor vinculado" value={row.fornecedor_nome} />
           <Field label="Conta a pagar" value={row.conta_pagar_id ? 'Vinculada' : 'Não vinculada'} />
+        </div>
+      )}
+
+      {/* Integration actions (confirmed or ciencia NF-e) */}
+      {(row.status === 'confirmada' || row.status === 'ciencia') && (
+        <div className="border-t border-gray-200 pt-4 space-y-3">
+          <div className="text-xs font-semibold text-gray-500 mb-2">Integrações</div>
+          {row.conta_pagar_id ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+              <CheckCircle2 size={16} />
+              <span className="font-medium">Conta a pagar já gerada</span>
+              <a href="/app/financeiro/contas-a-pagar" className="ml-auto text-emerald-600 hover:text-emerald-800 flex items-center gap-1 text-xs">
+                Ver <ExternalLink size={12} />
+              </a>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={disabled}
+              onClick={() => void onGerarContaPagar()}
+              className="gap-2 w-full justify-center"
+            >
+              <DollarSign size={14} />
+              Gerar Conta a Pagar
+            </Button>
+          )}
         </div>
       )}
 

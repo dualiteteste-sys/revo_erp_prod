@@ -231,6 +231,98 @@ function escapeRegex(s: string): string {
 }
 
 // ============================================================
+// RecepcaoEvento SOAP
+// ============================================================
+
+/** Event type descriptions (ASCII, no accents — SEFAZ requirement) */
+export const EVENT_DESCRIPTIONS: Record<string, string> = {
+  "210210": "Ciencia da Operacao",
+  "210200": "Confirmacao da Operacao",
+  "210220": "Desconhecimento da Operacao",
+  "210240": "Operacao nao Realizada",
+};
+
+/** Map tpEvento → local status value */
+export const EVENT_TO_STATUS: Record<string, string> = {
+  "210210": "ciencia",
+  "210200": "confirmada",
+  "210220": "desconhecida",
+  "210240": "nao_realizada",
+};
+
+/**
+ * Build RecepcaoEvento SOAP envelope containing pre-signed eventos.
+ */
+export function buildRecepcaoEventoSoap(params: {
+  signedEventos: string[];
+  idLote: string;
+}): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <nfeRecepcaoEvento xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">
+      <nfeDadosMsg>
+        <envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">
+          <idLote>${params.idLote}</idLote>
+          ${params.signedEventos.join("")}
+        </envEvento>
+      </nfeDadosMsg>
+    </nfeRecepcaoEvento>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+export type RecepcaoEventoResult = {
+  chNFe: string;
+  tpEvento: string;
+  cStat: string;
+  xMotivo: string;
+  nProt: string | null;
+  dhRegEvento: string | null;
+};
+
+export type RecepcaoEventoResponse = {
+  cStat: string;   // lote-level: "128" = processed
+  xMotivo: string;
+  results: RecepcaoEventoResult[];
+};
+
+/**
+ * Parse SEFAZ RecepcaoEvento response XML.
+ */
+export function parseRecepcaoEventoResponse(responseXml: string): RecepcaoEventoResponse {
+  // Lote-level status (first cStat in document, before any retEvento)
+  const cStat = xmlTagValue(responseXml, "cStat") || "";
+  const xMotivo = xmlTagValue(responseXml, "xMotivo") || "";
+
+  const results: RecepcaoEventoResult[] = [];
+  const retEventos = xmlTagAll(responseXml, "retEvento");
+
+  for (const retEvento of retEventos) {
+    results.push({
+      chNFe: xmlTagValue(retEvento, "chNFe") || "",
+      tpEvento: xmlTagValue(retEvento, "tpEvento") || "",
+      cStat: xmlTagValue(retEvento, "cStat") || "",
+      xMotivo: xmlTagValue(retEvento, "xMotivo") || "",
+      nProt: xmlTagValue(retEvento, "nProt"),
+      dhRegEvento: xmlTagValue(retEvento, "dhRegEvento"),
+    });
+  }
+
+  return { cStat, xMotivo, results };
+}
+
+/**
+ * Get current datetime in Brazil/Brasília timezone (UTC-3) in ISO format.
+ * Format: "2026-03-11T14:30:00-03:00"
+ */
+export function brazilIsoNow(): string {
+  const now = new Date();
+  const brTime = new Date(now.getTime() - 3 * 3600_000);
+  return brTime.toISOString().slice(0, 19) + "-03:00";
+}
+
+// ============================================================
 // resNFe XML → structured data
 // ============================================================
 
