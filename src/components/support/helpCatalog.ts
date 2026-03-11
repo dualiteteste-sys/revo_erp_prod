@@ -1368,6 +1368,33 @@ export const HELP_CATALOG: HelpEntry[] = [
     commonMistakes: ['Tentar emitir sem configurar emitente/série.', 'Ignorar rejeição e “tentar de novo” sem corrigir.'],
     roadmapKey: 'fiscal',
   },
+  {
+    match: '/app/fiscal/nfe-recebidas',
+    title: 'Guia Rápido de NF-e Recebidas (Manifestação do Destinatário)',
+    whatIs:
+      'Consulta automática de notas fiscais emitidas contra o CNPJ da sua empresa (NF-e de fornecedores). Permite manifestar (confirmar, desconhecer, etc.) e integrar com contas a pagar e estoque.',
+    steps: [
+      'Configure o certificado A1 com senha em Configurações NF-e (obrigatório para consultar a SEFAZ).',
+      'Clique em “Sincronizar” para buscar novas NF-e na SEFAZ (ou aguarde a sincronização automática a cada hora).',
+      'Revise as notas listadas: confira emitente, valor e data.',
+      'Selecione uma ou mais notas e clique em “Manifestar” → escolha a ação (Ciência, Confirmar, Desconhecer, Não Realizada).',
+      'Após confirmar uma NF-e, o XML completo fica disponível. Use os toggles de integração para gerar conta a pagar ou dar entrada no estoque.',
+    ],
+    dependsOn: ['Certificado A1 configurado e validado (Configurações NF-e)', 'Permissão: Fiscal (view)'],
+    connectsWith: ['Configurações NF-e', 'Contas a Pagar', 'Estoque (recebimento)', 'Fornecedores'],
+    fillPerfectly: [
+      'Manifestar “Ciência” dentro de 10 dias da emissão para poder baixar o XML.',
+      'Manifestar conclusivamente (Confirmar/Desconhecer/Não Realizada) dentro de 180 dias.',
+      'Vincular fornecedor para facilitar rastreamento e geração de contas a pagar.',
+    ],
+    commonMistakes: [
+      'Não configurar a senha do certificado — a sincronização não funciona sem ela.',
+      'Deixar notas “Pendentes” por mais de 10 dias — perde o prazo de ciência.',
+      'Confirmar sem conferir valor/emitente — confirmar é irreversível.',
+      'Esquecer de gerar conta a pagar após confirmar — a NF-e existe mas a obrigação financeira fica fora do controle.',
+    ],
+    roadmapKey: 'fiscal',
+  },
 
   // Financeiro (centros de custo e cobranças)
   {

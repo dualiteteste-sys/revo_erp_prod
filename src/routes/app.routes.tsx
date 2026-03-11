@@ -80,6 +80,7 @@ const BillingCancelLanding = () => {
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
 const NfeSettingsPage = lazyImport(() => import("../pages/fiscal/NfeSettingsPage"));
+const NfeRecebidasPage = lazyImport(() => import("../pages/fiscal/NfeRecebidasPage"));
 
 // RH Pages
 const CargosPage = lazyImport(() => import("../pages/rh/CargosPage"));
@@ -433,6 +434,7 @@ export const appRoutes: RouteObject[] = [
             // Fiscal (NF-e)
             { path: "fiscal/nfe", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeEmissoesPage /></Suspense></RequirePermission> },
             { path: "fiscal/nfe/configuracoes", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense></RequirePermission> },
+            { path: "fiscal/nfe-recebidas", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeRecebidasPage /></Suspense></RequirePermission> },
 
             // Financeiro
             {
