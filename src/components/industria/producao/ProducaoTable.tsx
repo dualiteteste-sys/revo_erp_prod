@@ -26,6 +26,18 @@ const statusColors: Record<string, string> = {
   cancelada: 'bg-red-100 text-red-800',
 };
 
+const faturamentoColors: Record<string, string> = {
+  nao_faturado: 'bg-gray-100 text-gray-500',
+  parcialmente_faturado: 'bg-amber-100 text-amber-800',
+  faturado: 'bg-emerald-100 text-emerald-800',
+};
+
+const faturamentoLabels: Record<string, string> = {
+  nao_faturado: 'Pendente',
+  parcialmente_faturado: 'Parcial',
+  faturado: 'Faturado',
+};
+
 const formatStatus = (status: string) => {
   return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
@@ -40,6 +52,7 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
     { id: 'percentual', defaultWidth: 100, minWidth: 90 },
     { id: 'previsao', defaultWidth: 170, minWidth: 150 },
     { id: 'status', defaultWidth: 180, minWidth: 160 },
+    { id: 'faturamento', defaultWidth: 130, minWidth: 110 },
     { id: 'acoes', defaultWidth: 160, minWidth: 140 },
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:producao', columns });
@@ -57,6 +70,7 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
         { id: 'percentual', type: 'number', getValue: (o) => o.percentual_concluido ?? 0 },
         { id: 'previsao', type: 'date', getValue: (o) => o.data_prevista_entrega ?? null },
         { id: 'status', type: 'string', getValue: (o) => formatStatus(String(o.status ?? '')) },
+        { id: 'faturamento', type: 'string', getValue: (o) => o.status_faturamento ?? 'nao_faturado' },
       ] as const
     );
   }, [orders, sort]);
@@ -115,6 +129,13 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
             <ResizableSortableTh
               columnId="status"
               label="Status"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="faturamento"
+              label="Faturamento"
               sort={sort as any}
               onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
               onResizeStart={startResize as any}
@@ -189,6 +210,11 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
                   {formatStatus(order.status)}
                 </span>
               </td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${faturamentoColors[order.status_faturamento] || 'bg-gray-100 text-gray-500'}`}>
+                  {faturamentoLabels[order.status_faturamento] || 'Pendente'}
+                </span>
+              </td>
               <td className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-2">
                   <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors" title="Editar / Visualizar">
@@ -205,7 +231,7 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
           ))}
           {sortedOrders.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-6 py-12 text-center text-gray-500">Nenhuma ordem de produção encontrada.</td>
+              <td colSpan={9} className="px-6 py-12 text-center text-gray-500">Nenhuma ordem de produção encontrada.</td>
             </tr>
           )}
         </tbody>

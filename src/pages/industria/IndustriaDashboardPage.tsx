@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { getDashboardStats, DashboardStats, listOrdens, type OrdemIndustria } from '@/services/industria';
-import { AlertCircle, CheckCircle, Factory, RefreshCw, Activity, Eye, ShieldAlert } from 'lucide-react';
+import { AlertCircle, CheckCircle, Factory, Receipt, RefreshCw, Activity, Eye, ShieldAlert } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import ReactECharts from 'echarts-for-react';
@@ -13,6 +13,8 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { useAuth } from '@/contexts/AuthProvider';
+import { getFaturamentoKpis, type FaturamentoKpis } from '@/services/industriaProducao';
+import FaturarSemProducaoModal from '@/components/industria/producao/FaturarSemProducaoModal';
 
 export default function IndustriaDashboardPage() {
   const navigate = useNavigate();
@@ -26,6 +28,8 @@ export default function IndustriaDashboardPage() {
   const [benefOrders, setBenefOrders] = useState<OrdemIndustria[]>([]);
   const [benefLoading, setBenefLoading] = useState(false);
   const [benefError, setBenefError] = useState<string | null>(null);
+  const [fatKpis, setFatKpis] = useState<FaturamentoKpis | null>(null);
+  const [showFaturarSemOp, setShowFaturarSemOp] = useState(false);
   const [atrasosSort, setAtrasosSort] = useState<SortState<'tipo' | 'ordem' | 'cliente' | 'prev' | 'status'>>({ column: 'prev', direction: 'asc' });
   const [benefSort, setBenefSort] = useState<SortState<'itens' | 'caixas' | 'op' | 'cliente' | 'nfCliente' | 'nf' | 'pedido' | 'entrada' | 'saldo'>>({ column: 'saldo', direction: 'desc' });
 
@@ -46,6 +50,7 @@ export default function IndustriaDashboardPage() {
     setBenefOrders([]);
     setBenefError(null);
     setBenefLoading(false);
+    setFatKpis(null);
 
     if (!activeEmpresaId) {
       setLoading(false);
@@ -145,6 +150,16 @@ export default function IndustriaDashboardPage() {
     }
   }, [activeEmpresaId]);
 
+  const fetchFatKpis = useCallback(async () => {
+    if (!activeEmpresaId) { setFatKpis(null); return; }
+    try {
+      const data = await getFaturamentoKpis();
+      setFatKpis(data);
+    } catch (err: any) {
+      logger.error('[Indústria][Dashboard] Erro ao carregar KPIs de faturamento', err);
+    }
+  }, [activeEmpresaId]);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -156,6 +171,10 @@ export default function IndustriaDashboardPage() {
   useEffect(() => {
     fetchProdOrdens();
   }, [fetchProdOrdens]);
+
+  useEffect(() => {
+    fetchFatKpis();
+  }, [fetchFatKpis]);
 
   // Cálculos seguros com Nullish Coalescing (??) para evitar crash
   const totalProducao = stats?.total_producao ?? 0;
@@ -442,14 +461,42 @@ export default function IndustriaDashboardPage() {
           color="bg-green-100 text-green-600" 
           subtext={`${totalConcluidas} ordens finalizadas`}
         />
-        <KPICard 
-          title="QA / Inspeções Pendentes" 
-          value={qaPendente} 
-          icon={ShieldAlert} 
-          color="bg-amber-100 text-amber-700" 
+        <KPICard
+          title="QA / Inspeções Pendentes"
+          value={qaPendente}
+          icon={ShieldAlert}
+          color="bg-amber-100 text-amber-700"
           subtext="Ordens aguardando inspeção"
         />
+        {fatKpis && (
+          <KPICard
+            title="Pendente de Faturamento"
+            value={fatKpis.pendente_faturamento}
+            icon={Receipt}
+            color="bg-emerald-100 text-emerald-700"
+            subtext={fatKpis.valor_pendente > 0
+              ? `~R$ ${fatKpis.valor_pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} estimado`
+              : `${fatKpis.faturadas} já faturada(s)`}
+          />
+        )}
       </div>
+
+      <GlassCard className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-800">Atalhos de Faturamento</h3>
+            <p className="text-sm text-gray-500">Produção completa <strong>não</strong> é obrigatória para faturar. Emita NF-e a qualquer momento.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFaturarSemOp(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Receipt size={18} className="mr-2" />
+            Faturar Sem Produção
+          </button>
+        </div>
+      </GlassCard>
 
       <GlassCard className="p-4">
         <div className="flex items-center justify-between mb-4">
@@ -671,6 +718,10 @@ export default function IndustriaDashboardPage() {
         </div>
       </GlassCard>
 
+      <FaturarSemProducaoModal
+        isOpen={showFaturarSemOp}
+        onClose={() => setShowFaturarSemOp(false)}
+      />
     </div>
   );
 }
