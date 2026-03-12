@@ -4,6 +4,7 @@ import { getProducts } from './products';
 import { OrdemComponente, OrdemEntrega } from './industria';
 
 export type StatusProducao = 'rascunho' | 'planejada' | 'em_programacao' | 'em_producao' | 'em_inspecao' | 'concluida' | 'cancelada';
+export type StatusFaturamento = 'nao_faturado' | 'parcialmente_faturado' | 'faturado';
 
 export type OrdemProducao = {
   id: string;
@@ -16,6 +17,8 @@ export type OrdemProducao = {
   data_prevista_entrega?: string;
   total_entregue: number;
   percentual_concluido: number;
+  status_faturamento: StatusFaturamento;
+  pedido_venda_id?: string | null;
 };
 
 export type OrdemProducaoDetails = {
@@ -41,6 +44,8 @@ export type OrdemProducaoDetails = {
   lote_producao?: string;
   reserva_modo?: 'ao_liberar' | 'ao_planejar' | 'sem_reserva';
   tolerancia_overrun_percent?: number;
+  status_faturamento: StatusFaturamento;
+  pedido_venda_id?: string | null;
   created_at: string;
   updated_at: string;
   componentes: OrdemComponente[];
@@ -1073,4 +1078,52 @@ export async function pcpApsSequenciarTodosCts(params: {
     p_data_final: params.dataFinal,
     p_apply: params.apply ?? true,
   });
+}
+
+// ── Faturamento Direto ─────────────────────────────────
+
+export type FaturarOpResult = {
+  pedido_id: string;
+  emissao_id: string;
+};
+
+export type FaturamentoKpis = {
+  total_ordens: number;
+  pendente_faturamento: number;
+  faturadas: number;
+  valor_pendente: number;
+};
+
+export async function faturarOrdemProducao(
+  ordemId: string,
+  clienteId: string,
+  precoUnitario?: number,
+  natureza?: string,
+): Promise<FaturarOpResult> {
+  return callRpc<FaturarOpResult>('industria_faturar_op', {
+    p_ordem_id: ordemId,
+    p_cliente_id: clienteId,
+    p_preco_unitario: precoUnitario ?? null,
+    p_natureza: natureza || null,
+  });
+}
+
+export async function faturarSemProducao(params: {
+  clienteId: string;
+  produtoId: string;
+  quantidade: number;
+  precoUnitario: number;
+  natureza?: string;
+}): Promise<FaturarOpResult> {
+  return callRpc<FaturarOpResult>('industria_faturar_sem_producao', {
+    p_cliente_id: params.clienteId,
+    p_produto_id: params.produtoId,
+    p_quantidade: params.quantidade,
+    p_preco_unitario: params.precoUnitario,
+    p_natureza: params.natureza || null,
+  });
+}
+
+export async function getFaturamentoKpis(): Promise<FaturamentoKpis> {
+  return callRpc<FaturamentoKpis>('industria_kpis_faturamento');
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Receipt, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
 import {
   OrdemProducaoDetails,
   OrdemProducaoPayload,
@@ -12,8 +12,10 @@ import {
   deleteOrdemProducao,
   cloneOrdemProducao,
   fecharOrdemProducao,
-  resetOrdemProducao
+  resetOrdemProducao,
+  StatusFaturamento
 } from '@/services/industriaProducao';
+import FaturamentoRapidoModal from './FaturamentoRapidoModal';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
@@ -73,6 +75,7 @@ export default function ProducaoFormPanel({
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showLiberarModal, setShowLiberarModal] = useState(false);
+  const [showFaturamentoModal, setShowFaturamentoModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
@@ -519,11 +522,22 @@ export default function ProducaoFormPanel({
             </h2>
             <p className="text-sm text-gray-500">Industrialização</p>
           </div>
-          {formData.status && (
-            <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'} `}>
-              {formData.status.replace(/_/g, ' ')}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {formData.status && (
+              <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'} `}>
+                {formData.status.replace(/_/g, ' ')}
+              </span>
+            )}
+            {formData.id && (formData as any).status_faturamento && (formData as any).status_faturamento !== 'nao_faturado' && (
+              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                (formData as any).status_faturamento === 'faturado'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {(formData as any).status_faturamento === 'faturado' ? 'Faturado' : 'Parcial'}
+              </span>
+            )}
+          </div>
         </div>
         <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
           <button
@@ -1032,6 +1046,18 @@ export default function ProducaoFormPanel({
             </button>
           )}
 
+          {formData.id && canEdit && formData.produto_final_id && formData.status !== 'cancelada' && (formData as any).status_faturamento !== 'faturado' && (
+            <button
+              onClick={() => setShowFaturamentoModal(true)}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
+              title="Gerar NF-e a partir desta OP (produção completa não é obrigatória)"
+            >
+              <Receipt size={20} className="mr-2" />
+              Faturar
+            </button>
+          )}
+
           {formData.id && (formData.status === 'em_producao' || (formData.status as any) === 'parcialmente_concluida') && (
             <button
               onClick={() => setShowClosureModal(true)}
@@ -1157,6 +1183,22 @@ export default function ProducaoFormPanel({
         </div>
       </div>
     </Modal>
+
+    {formData.id && formData.numero && formData.produto_nome && (
+      <FaturamentoRapidoModal
+        isOpen={showFaturamentoModal}
+        onClose={() => setShowFaturamentoModal(false)}
+        ordemId={formData.id}
+        ordemNumero={formData.numero}
+        produtoNome={formData.produto_nome}
+        quantidade={formData.quantidade_planejada || 0}
+        unidade={formData.unidade || 'un'}
+        onSuccess={() => {
+          loadDetails(formData.id);
+          onSaveSuccess();
+        }}
+      />
+    )}
     </>
   );
 }
