@@ -17,6 +17,8 @@ export type StatusOrdem = 'rascunho' | 'planejada' | 'em_programacao' | 'em_prod
 
 export type TipoOrdemIndustria = 'industrializacao' | 'beneficiamento';
 
+export type StatusFaturamentoOB = 'nao_faturado' | 'parcialmente_faturado' | 'faturado';
+
 export type OrdemIndustria = {
   id: string;
   numero: number;
@@ -33,6 +35,8 @@ export type OrdemIndustria = {
   qtde_caixas?: number | null;
   numero_nf?: string | null;
   pedido_numero?: string | null;
+  status_faturamento?: StatusFaturamentoOB;
+  pedido_venda_id?: string | null;
 };
 
 export type OrdemComponente = {
@@ -102,6 +106,8 @@ export type OrdemIndustriaDetails = {
   observacoes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  status_faturamento?: StatusFaturamentoOB;
+  pedido_venda_id?: string | null;
   componentes?: OrdemComponente[];
   entregas?: OrdemEntrega[];
 };
@@ -215,5 +221,23 @@ export async function gerarExecucaoOrdem(ordemId: string, roteiroId?: string | n
   return callRpc<GerarExecucaoResult>('industria_ordem_gerar_execucao', {
     p_ordem_id: ordemId,
     p_roteiro_id: roteiroId ?? null,
+  });
+}
+
+// ─── Faturamento direto OB ───
+
+export type FaturarObResult = { pedido_id: string; emissao_id: string };
+
+export async function faturarOrdemBeneficiamento(
+  ordemId: string,
+  clienteId: string,
+  precoUnitario?: number,
+  natureza?: string,
+): Promise<FaturarObResult> {
+  return callRpc<FaturarObResult>('industria_faturar_ob', {
+    p_ordem_id: ordemId,
+    p_cliente_id: clienteId,
+    p_preco_unitario: precoUnitario ?? null,
+    p_natureza: natureza ?? null,
   });
 }
