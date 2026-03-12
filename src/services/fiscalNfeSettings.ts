@@ -100,6 +100,7 @@ export type FocusNfeEmpresaStatus = {
   focusnfe_registrada: boolean;
   focusnfe_registrada_em: string | null;
   focusnfe_ultimo_erro: string | null;
+  has_cert: boolean;
   certificado_validade: string | null;
   certificado_cnpj: string | null;
 };
