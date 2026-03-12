@@ -188,13 +188,13 @@ async function syncEmpresa(
   });
 
   // Log
-  await admin.from("fiscal_nfe_provider_logs").insert({
+  try { await admin.from("fiscal_nfe_provider_logs").insert({
     empresa_id: empresaId,
     provider: "focusnfe",
     level: "info",
     message: `MDe sync: fetched ${nfes.length}, upserted ${upserted}`,
     payload: { versao, maxVersao, request_id: requestId },
-  }).catch(() => {});
+  }); } catch { /* ignore log failures */ }
 
   return { fetched: nfes.length, upserted };
 }
