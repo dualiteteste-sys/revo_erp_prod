@@ -103,14 +103,14 @@ Deno.serve(async (req) => {
     );
 
     // Log
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       emissao_id,
       provider: "focusnfe",
       level: response.ok ? "info" : "error",
       message: `NF-e cancel: ${response.status}`,
       payload: { ref, status: response.status, body: data, request_id: requestId },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
     if (response.ok) {
       const focusStatus = data?.status || "";

@@ -229,14 +229,14 @@ Deno.serve(async (req) => {
       focus_response: focusData,
     }, cors);
   } catch (err: any) {
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       emissao_id,
       provider: "focusnfe",
       level: "error",
       message: `Status poll error: ${err?.message || String(err)}`,
       payload: { stack: err?.stack, request_id: requestId },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
     return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message }, cors);
   }
