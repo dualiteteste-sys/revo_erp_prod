@@ -195,13 +195,13 @@ Deno.serve(async (req) => {
         focusnfe_ultimo_erro: null,
       }).eq("empresa_id", empresaId);
 
-      await admin.from("fiscal_nfe_provider_logs").insert({
+      try { await admin.from("fiscal_nfe_provider_logs").insert({
         empresa_id: empresaId,
         provider: "focusnfe",
         level: "info",
         message: `Empresa registrada via API revenda (${ambiente})`,
         payload: { cnpj, request_id: requestId },
-      }).catch(() => {});
+      }); } catch { /* ignore log failures */ }
 
       return json(200, {
         ok: true,
@@ -240,13 +240,13 @@ Deno.serve(async (req) => {
       focusnfe_ultimo_erro: null,
     }).eq("empresa_id", empresaId);
 
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       provider: "focusnfe",
       level: "info",
       message: `Conexão validada com Focus NFe (${ambiente}) — empresa já registrada no painel`,
       payload: { cnpj, request_id: requestId, test_status: testResp.status },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
     return json(200, {
       ok: true,

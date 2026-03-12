@@ -300,14 +300,14 @@ Deno.serve(async (req) => {
       .single();
     if (emitErr || !emitente) {
       // Log the actual error so we can diagnose "row not found" vs "query failed"
-      await admin.from("fiscal_nfe_provider_logs").insert({
+      try { await admin.from("fiscal_nfe_provider_logs").insert({
         empresa_id: empresaId,
         emissao_id,
         provider: "focusnfe",
         level: "error",
         message: `EMITENTE_NOT_CONFIGURED: ${emitErr?.message || "row not found"}`,
         payload: { error_code: emitErr?.code, hint: emitErr?.hint, request_id: requestId },
-      }).catch(() => {});
+      }); } catch { /* ignore log failures */ }
       return json(422, {
         ok: false,
         error: "EMITENTE_NOT_CONFIGURED",
@@ -567,20 +567,20 @@ Deno.serve(async (req) => {
     }
   } catch (err: any) {
     // Unexpected error
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       emissao_id,
       provider: "focusnfe",
       level: "error",
       message: `Unexpected error: ${err?.message || String(err)}`,
       payload: { stack: err?.stack, request_id: requestId },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
-    await admin.from("fiscal_nfe_emissoes").update({
+    try { await admin.from("fiscal_nfe_emissoes").update({
       status: "erro",
       last_error: err?.message || "Unexpected error",
       updated_at: new Date().toISOString(),
-    }).eq("id", emissao_id).catch(() => {});
+    }).eq("id", emissao_id); } catch { /* ignore */ }
 
     return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message }, cors);
   }

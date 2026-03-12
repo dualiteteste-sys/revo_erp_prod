@@ -163,13 +163,13 @@ Deno.serve(async (req) => {
       }).eq("empresa_id", empresaId);
 
       // Log
-      await admin.from("fiscal_nfe_provider_logs").insert({
+      try { await admin.from("fiscal_nfe_provider_logs").insert({
         empresa_id: empresaId,
         provider: "focusnfe",
         level: "info",
         message: `Certificado enviado para Focus NFe via API revenda (${ambiente})`,
         payload: { cnpj, request_id: requestId },
-      }).catch(() => {});
+      }); } catch { /* ignore log failures */ }
 
       return json(200, {
         ok: true,
@@ -189,13 +189,13 @@ Deno.serve(async (req) => {
     }).eq("empresa_id", empresaId);
 
     // Log
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       provider: "focusnfe",
       level: "info",
       message: `Senha do certificado salva localmente (${ambiente})`,
       payload: { cnpj, request_id: requestId },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
     return json(200, {
       ok: true,

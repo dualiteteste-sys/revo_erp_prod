@@ -208,13 +208,13 @@ Deno.serve(async (req) => {
     }
 
     // Log
-    await admin.from("fiscal_nfe_provider_logs").insert({
+    try { await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       provider: "focusnfe",
       level: failCount > 0 ? "warn" : "info",
       message: `MDe manifestation: ${successCount} ok, ${failCount} failed (tipo: ${tipo})`,
       payload: { tipo, total: nfes.length, request_id: requestId },
-    }).catch(() => {});
+    }); } catch { /* ignore log failures */ }
 
     return json(200, {
       ok: true,

@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
       level: "info",
       message: `Submitting NFS-e to Focus (${ambiente})`,
       payload: { url, ref, request_id: requestId },
-    }).catch(() => {});
+    }).then(null, () => {});
 
     // Call Focus NFe
     const { response, data } = await focusFetch(url, {
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
       level: response.ok ? "info" : "error",
       message: `Focus NFS-e response: ${response.status}`,
       payload: { status: response.status, body: data, request_id: requestId },
-    }).catch(() => {});
+    }).then(null, () => {});
 
     if (response.ok) {
       const focusStatus = data?.status || "";
@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
       status: "erro",
       last_error: err?.message || "Unexpected error",
       updated_at: new Date().toISOString(),
-    }).eq("id", nfse_id).catch(() => {});
+    }).eq("id", nfse_id).then(null, () => {});
 
     return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message }, cors);
   }
