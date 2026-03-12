@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Receipt, Save, TriangleAlert, XCircle } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
+import FaturamentoOBModal from './FaturamentoOBModal';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -82,6 +83,7 @@ export default function OrdemFormPanel({
   const highlightTimerRef = useRef<number | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
+  const [showFaturamentoModal, setShowFaturamentoModal] = useState(false);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
@@ -668,11 +670,19 @@ export default function OrdemFormPanel({
             </h2>
             <p className="text-sm text-gray-500">{formData.tipo_ordem === 'industrializacao' ? 'Industrialização' : 'Beneficiamento'}</p>
           </div>
-          {formData.status && (
-            <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-              {formData.status.replace(/_/g, ' ')}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {formData.status && (
+              <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                {formData.status.replace(/_/g, ' ')}
+              </span>
+            )}
+            {formData.id && formData.status_faturamento === 'faturado' && (
+              <span className="px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800">Faturado</span>
+            )}
+            {formData.id && formData.status_faturamento === 'parcialmente_faturado' && (
+              <span className="px-3 py-1 rounded-full text-sm font-bold bg-amber-100 text-amber-800">Parcial</span>
+            )}
+          </div>
         </div>
         <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
           <button
@@ -1167,6 +1177,17 @@ export default function OrdemFormPanel({
           Fechar
         </button>
         <div className="flex gap-3">
+          {formData.id && formData.produto_final_id && formData.status !== 'cancelada' && formData.status_faturamento !== 'faturado' && canEdit && (
+            <button
+              type="button"
+              onClick={() => setShowFaturamentoModal(true)}
+              className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold py-2 px-4 rounded-lg hover:bg-emerald-100"
+              title="Gerar NF-e rascunho a partir desta ordem"
+            >
+              <Receipt size={18} />
+              Faturar
+            </button>
+          )}
           {formData.id && isHeaderLocked && canEdit && (
             <button
               type="button"
@@ -1359,6 +1380,25 @@ export default function OrdemFormPanel({
           })();
         }}
       />
+      {formData.id && (
+        <FaturamentoOBModal
+          isOpen={showFaturamentoModal}
+          onClose={() => setShowFaturamentoModal(false)}
+          ordemId={formData.id}
+          ordemNumero={formData.numero || 0}
+          produtoNome={formData.produto_nome || ''}
+          quantidade={formData.quantidade_planejada || 0}
+          unidade={formData.unidade || ''}
+          clienteId={formData.cliente_id || null}
+          clienteNome={formData.cliente_nome || ''}
+          onSuccess={() => {
+            onSaveSuccess();
+            if (formData.id) {
+              loadDetails(formData.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
