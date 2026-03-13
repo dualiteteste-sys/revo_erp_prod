@@ -65,13 +65,40 @@ function mapCrt(crt: number): string {
   return String(crt || 1);
 }
 
+// Forma de pagamento mapping
+const FORMA_PAGAMENTO_MAP: Record<string, string> = {
+  dinheiro: "01",
+  cheque: "02",
+  cartao_credito: "03",
+  cartao_debito: "04",
+  credito_loja: "05",
+  vale_alimentacao: "10",
+  vale_refeicao: "11",
+  vale_presente: "12",
+  vale_combustivel: "13",
+  boleto: "15",
+  deposito: "16",
+  pix: "17",
+  transferencia: "18",
+  sem_pagamento: "90",
+  outros: "99",
+};
+
+function mapFormaPagamento(forma: string | null | undefined): string {
+  if (!forma) return "99";
+  return FORMA_PAGAMENTO_MAP[forma.toLowerCase()] || forma.replace(/\D/g, "") || "99";
+}
+
 function buildFocusPayload(
   emitente: any,
   dest: any,
   emissao: any,
   itens: any[],
+  transportadora?: any,
 ): Record<string, any> {
   const now = new Date().toISOString();
+  const crt = emitente.crt || 1;
+  const isRegimeNormal = crt === 3;
 
   const payload: Record<string, any> = {
     // Emitente
@@ -87,7 +114,7 @@ function buildFocusPayload(
     uf_emitente: emitente.endereco_uf || "",
     cep_emitente: (emitente.endereco_cep || "").replace(/\D/g, ""),
     codigo_municipio_emitente: emitente.endereco_municipio_codigo || "",
-    regime_tributario_emitente: mapCrt(emitente.crt),
+    regime_tributario_emitente: mapCrt(crt),
 
     // Destinatario
     nome_destinatario: dest.nome || dest.razao_social || "",
@@ -106,12 +133,12 @@ function buildFocusPayload(
     natureza_operacao: emissao.natureza_operacao || "Venda de mercadoria",
     data_emissao: now,
     tipo_documento: "1", // 1 = saida
-    finalidade_emissao: "1", // 1 = normal
+    finalidade_emissao: emissao.finalidade_emissao || "1",
     local_destino: "1", // 1 = operacao interna
     presenca_comprador: "9", // 9 = nao se aplica (online)
 
     // Frete
-    modalidade_frete: "9", // 9 = sem frete
+    modalidade_frete: emissao.modalidade_frete || "9",
     valor_frete: emissao.total_frete || 0,
 
     // Totais
@@ -121,12 +148,16 @@ function buildFocusPayload(
 
     // Forma de pagamento
     formas_pagamento: [{
-      forma_pagamento: "99", // 99 = outros
+      forma_pagamento: mapFormaPagamento(emissao.forma_pagamento),
       valor_pagamento: emissao.valor_total || emissao.total_nfe || 0,
     }],
 
     // Items
     items: itens.map((item, idx) => {
+      const impostos = item.impostos && typeof item.impostos === "object" && Object.keys(item.impostos).length > 0
+        ? item.impostos
+        : null;
+
       const itemPayload: Record<string, any> = {
         numero_item: String(idx + 1),
         codigo_produto: item.produto_id || String(idx + 1),
@@ -139,7 +170,7 @@ function buildFocusPayload(
         valor_unitario_tributavel: String(item.valor_unitario || 0),
         codigo_ncm: (item.ncm || "00000000").replace(/\D/g, ""),
         valor_bruto: String((item.quantidade || 0) * (item.valor_unitario || 0)),
-        icms_origem: "0", // 0 = nacional
+        icms_origem: impostos?.icms?.origem || "0",
       };
 
       // CFOP
@@ -152,21 +183,73 @@ function buildFocusPayload(
         itemPayload.valor_desconto = String(item.valor_desconto);
       }
 
-      // Tributacao: Simples Nacional usa CSOSN, Regime Normal usa CST
-      if (item.csosn) {
-        itemPayload.icms_situacao_tributaria = item.csosn;
-      } else if (item.cst) {
-        itemPayload.icms_situacao_tributaria = item.cst;
+      // --- ICMS (from impostos JSONB or fallback) ---
+      if (impostos?.icms) {
+        const icms = impostos.icms;
+        if (isRegimeNormal && icms.cst) {
+          itemPayload.icms_situacao_tributaria = icms.cst;
+          if (icms.base_calculo != null) itemPayload.icms_base_calculo = String(icms.base_calculo);
+          if (icms.aliquota != null && icms.aliquota > 0) itemPayload.icms_aliquota = String(icms.aliquota);
+          if (icms.valor != null && icms.valor > 0) itemPayload.icms_valor = String(icms.valor);
+        } else if (icms.csosn) {
+          itemPayload.icms_situacao_tributaria = icms.csosn;
+        } else {
+          itemPayload.icms_situacao_tributaria = icms.cst || "102";
+        }
       } else {
-        // Fallback Simples Nacional: 102 = tributada sem ST
-        itemPayload.icms_situacao_tributaria = "102";
+        // Legacy fallback
+        if (item.csosn) {
+          itemPayload.icms_situacao_tributaria = item.csosn;
+        } else if (item.cst) {
+          itemPayload.icms_situacao_tributaria = item.cst;
+        } else {
+          itemPayload.icms_situacao_tributaria = "102";
+        }
       }
 
-      // PIS/COFINS: para SN geralmente 99
-      itemPayload.pis_situacao_tributaria = "99";
-      itemPayload.pis_aliquota_porcentual = "0";
-      itemPayload.cofins_situacao_tributaria = "99";
-      itemPayload.cofins_aliquota_porcentual = "0";
+      // --- PIS (from impostos JSONB or fallback) ---
+      if (impostos?.pis) {
+        const pis = impostos.pis;
+        itemPayload.pis_situacao_tributaria = pis.cst || "99";
+        if (pis.base_calculo != null) itemPayload.pis_base_calculo = String(pis.base_calculo);
+        if (pis.aliquota != null && pis.aliquota > 0) itemPayload.pis_aliquota_porcentual = String(pis.aliquota);
+        if (pis.valor != null && pis.valor > 0) itemPayload.pis_valor = String(pis.valor);
+      } else {
+        itemPayload.pis_situacao_tributaria = "99";
+        itemPayload.pis_aliquota_porcentual = "0";
+      }
+
+      // --- COFINS (from impostos JSONB or fallback) ---
+      if (impostos?.cofins) {
+        const cofins = impostos.cofins;
+        itemPayload.cofins_situacao_tributaria = cofins.cst || "99";
+        if (cofins.base_calculo != null) itemPayload.cofins_base_calculo = String(cofins.base_calculo);
+        if (cofins.aliquota != null && cofins.aliquota > 0) itemPayload.cofins_aliquota_porcentual = String(cofins.aliquota);
+        if (cofins.valor != null && cofins.valor > 0) itemPayload.cofins_valor = String(cofins.valor);
+      } else {
+        itemPayload.cofins_situacao_tributaria = "99";
+        itemPayload.cofins_aliquota_porcentual = "0";
+      }
+
+      // --- IPI (from impostos JSONB, optional) ---
+      if (impostos?.ipi && impostos.ipi.cst) {
+        const ipi = impostos.ipi;
+        itemPayload.ipi_situacao_tributaria = ipi.cst;
+        if (ipi.base_calculo != null) itemPayload.ipi_base_calculo = String(ipi.base_calculo);
+        if (ipi.aliquota != null && ipi.aliquota > 0) itemPayload.ipi_aliquota = String(ipi.aliquota);
+        if (ipi.valor != null && ipi.valor > 0) itemPayload.ipi_valor = String(ipi.valor);
+      }
+
+      // --- xPed / nItemPed / infAdProd (Fase 7) ---
+      if (item.numero_pedido_cliente) {
+        itemPayload.numero_pedido = item.numero_pedido_cliente;
+      }
+      if (item.numero_item_pedido) {
+        itemPayload.numero_item_pedido = String(item.numero_item_pedido);
+      }
+      if (item.informacoes_adicionais) {
+        itemPayload.informacoes_adicionais_item = item.informacoes_adicionais;
+      }
 
       return itemPayload;
     }),
@@ -181,21 +264,17 @@ function buildFocusPayload(
   if (cpfCnpj.length === 14) {
     payload.cnpj_destinatario = cpfCnpj;
     if (ieValue && contribuinte !== "2" && dest.isento_ie !== true) {
-      // IE preenchida → sempre contribuinte ICMS (indicador "1"), independente do campo contribuinte_icms.
-      // Ter IE cadastrada implica ser contribuinte por definição.
       payload.indicador_inscricao_estadual_destinatario = "1";
       payload.inscricao_estadual_destinatario = ieValue;
     } else if (contribuinte === "2" || dest.isento_ie === true) {
-      // Isento de inscrição estadual
       payload.indicador_inscricao_estadual_destinatario = "2";
       payload.inscricao_estadual_destinatario = "ISENTO";
     } else {
-      // Não contribuinte (sem IE, sem indicação de contribuinte)
       payload.indicador_inscricao_estadual_destinatario = "9";
     }
   } else if (cpfCnpj.length === 11) {
     payload.cpf_destinatario = cpfCnpj;
-    payload.indicador_inscricao_estadual_destinatario = "9"; // nao contribuinte
+    payload.indicador_inscricao_estadual_destinatario = "9";
   }
 
   // Consumidor final: CPF → sempre consumidor final (B2C); CNPJ → B2B por padrão
@@ -210,8 +289,41 @@ function buildFocusPayload(
     payload.local_destino = "2"; // interestadual
   }
 
-  if (emissao.total_frete && emissao.total_frete > 0) {
-    payload.modalidade_frete = "1"; // 1 = emitente
+  // Modalidade frete (from emissao or fallback)
+  if (emissao.total_frete && emissao.total_frete > 0 && payload.modalidade_frete === "9") {
+    payload.modalidade_frete = "1"; // 1 = emitente (CIF)
+  }
+
+  // --- Transportadora (Fase 5) ---
+  if (transportadora) {
+    if (transportadora.documento) {
+      const docClean = (transportadora.documento || "").replace(/\D/g, "");
+      if (docClean.length === 14) {
+        payload.cnpj_transportador = docClean;
+      } else if (docClean.length === 11) {
+        payload.cpf_transportador = docClean;
+      }
+    }
+    if (transportadora.nome) payload.nome_transportador = transportadora.nome;
+    if (transportadora.ie_rg) payload.inscricao_estadual_transportador = transportadora.ie_rg;
+    if (transportadora.endereco_logradouro) {
+      payload.endereco_transportador = [
+        transportadora.endereco_logradouro,
+        transportadora.endereco_numero,
+      ].filter(Boolean).join(", ");
+    }
+    if (transportadora.endereco_cidade) payload.municipio_transportador = transportadora.endereco_cidade;
+    if (transportadora.endereco_uf) payload.uf_transportador = transportadora.endereco_uf;
+  }
+
+  // --- Duplicatas / Cobrança (Fase 4) ---
+  const duplicatas = Array.isArray(emissao.duplicatas) ? emissao.duplicatas : [];
+  if (duplicatas.length > 0) {
+    payload.duplicatas = duplicatas.map((d: any) => ({
+      numero: d.numero || "001",
+      data_vencimento: d.data_vencimento,
+      valor: String(d.valor || 0),
+    }));
   }
 
   return payload;
@@ -433,6 +545,40 @@ Deno.serve(async (req) => {
       return json(422, { ok: false, error: "NO_ITEMS" }, cors);
     }
 
+    // 4b. Read transportadora (if linked)
+    let transportadora: any = null;
+    if (emissao.transportadora_id) {
+      const { data: transp } = await admin
+        .from("logistica_transportadoras")
+        .select("*, pessoa:pessoas(nome, doc_unico, email, telefone)")
+        .eq("id", emissao.transportadora_id)
+        .eq("empresa_id", empresaId)
+        .maybeSingle();
+      if (transp) {
+        transportadora = {
+          ...transp,
+          nome: transp.pessoa?.nome || transp.razao_social || "",
+          documento: transp.documento || transp.pessoa?.doc_unico || "",
+        };
+      }
+    }
+
+    // 4c. Read natureza de operação (for finalidade_emissao)
+    if (emissao.natureza_operacao_id) {
+      const { data: natOp } = await admin
+        .from("fiscal_naturezas_operacao")
+        .select("finalidade_emissao, observacoes_padrao")
+        .eq("id", emissao.natureza_operacao_id)
+        .eq("empresa_id", empresaId)
+        .maybeSingle();
+      if (natOp) {
+        emissao.finalidade_emissao = natOp.finalidade_emissao || "1";
+        if (natOp.observacoes_padrao) {
+          emissao.informacoes_complementares = natOp.observacoes_padrao;
+        }
+      }
+    }
+
     // 5. Determine ambiente
     const ambiente = emissao.ambiente || "homologacao";
     const apiToken = await getCompanyApiToken(admin, empresaId, ambiente);
@@ -441,7 +587,7 @@ Deno.serve(async (req) => {
     }
 
     // 6. Build Focus NFe payload
-    const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens);
+    const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens, transportadora);
 
     // 7. Generate idempotency ref (use emissao UUID)
     const ref = emissao_id;
