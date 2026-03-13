@@ -33,6 +33,18 @@ function getFocusApiToken(ambiente: string): string {
   return (Deno.env.get("FOCUSNFE_API_TOKEN_HML") ?? "").trim();
 }
 
+async function getCompanyApiToken(admin: any, empresaId: string, ambiente: string): Promise<string> {
+  const { data } = await admin
+    .from("fiscal_nfe_emitente")
+    .select("focusnfe_token_producao, focusnfe_token_homologacao")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+  const companyToken = ambiente === "producao"
+    ? data?.focusnfe_token_producao
+    : data?.focusnfe_token_homologacao;
+  return (companyToken || "").trim() || getFocusApiToken(ambiente);
+}
+
 function getFocusBaseUrl(ambiente: string): string {
   if (ambiente === "producao") {
     return "https://api.focusnfe.com.br";
@@ -423,7 +435,7 @@ Deno.serve(async (req) => {
 
     // 5. Determine ambiente
     const ambiente = emissao.ambiente || "homologacao";
-    const apiToken = getFocusApiToken(ambiente);
+    const apiToken = await getCompanyApiToken(admin, empresaId, ambiente);
     if (!apiToken) {
       return json(500, { ok: false, error: "MISSING_API_TOKEN", detail: `Token for ${ambiente} not configured` }, cors);
     }

@@ -2,8 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { getRequestId } from "../_shared/request.ts";
 import {
-  getFocusApiToken,
   getFocusBaseUrl,
+  getCompanyApiToken,
   focusFetch,
   json,
 } from "../_shared/focusnfe-api.ts";
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       .eq("provider_slug", "FOCUSNFE")
       .maybeSingle();
     const ambiente = config?.ambiente || "homologacao";
-    const apiToken = getFocusApiToken(ambiente);
+    const apiToken = await getCompanyApiToken(admin, empresaId, ambiente);
     if (!apiToken) return json(500, { ok: false, error: "MISSING_API_TOKEN" }, cors);
 
     // Load NF-e destinadas

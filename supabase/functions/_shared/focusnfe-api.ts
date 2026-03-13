@@ -29,6 +29,28 @@ export function json(status: number, body: unknown, headers: Record<string, stri
 }
 
 /**
+ * Get per-company Focus NFe API token if available, falling back to global.
+ * Reads focusnfe_token_producao / focusnfe_token_homologacao from fiscal_nfe_emitente.
+ */
+export async function getCompanyApiToken(
+  admin: any,
+  empresaId: string,
+  ambiente: string,
+): Promise<string> {
+  const { data } = await admin
+    .from("fiscal_nfe_emitente")
+    .select("focusnfe_token_producao, focusnfe_token_homologacao")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  const companyToken = ambiente === "producao"
+    ? data?.focusnfe_token_producao
+    : data?.focusnfe_token_homologacao;
+
+  return (companyToken || "").trim() || getFocusApiToken(ambiente);
+}
+
+/**
  * Calls Focus NFe API with retry on transient errors.
  */
 export async function focusFetch(
