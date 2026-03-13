@@ -6,6 +6,7 @@ import { menuConfig, MenuItem } from '@/config/menuConfig';
 import {
     Sheet,
     SheetContent,
+    SheetDescription,
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
@@ -52,6 +53,8 @@ export function MobileAppsGrid({
                 side="bottom"
                 className="h-[92vh] rounded-t-[32px] p-0 border-0 bg-gray-50 dark:bg-slate-950 flex flex-col"
             >
+                <SheetTitle className="sr-only">Aplicativos</SheetTitle>
+                <SheetDescription className="sr-only">Grade de aplicativos do sistema</SheetDescription>
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 pt-6 pb-2">
                     {activeFolder ? (

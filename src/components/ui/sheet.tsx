@@ -118,6 +118,7 @@ const SheetContent = React.forwardRef<
         <SheetPortal>
             <SheetOverlay />
             <SheetPrimitive.Content
+                aria-describedby={undefined}
                 ref={(node) => {
                     localRef.current = node as unknown as HTMLElement | null
                     if (typeof ref === "function") ref(node)
