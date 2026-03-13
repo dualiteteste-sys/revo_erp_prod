@@ -32,6 +32,7 @@ begin
     from public.fiscal_nfe_emissoes e
     where e.id = p_emissao_id;
   else
+    perform public.require_permission_for_current_user('fiscal', 'update');
     v_emp := public.current_empresa_id();
     if v_emp is null then return; end if;
   end if;
