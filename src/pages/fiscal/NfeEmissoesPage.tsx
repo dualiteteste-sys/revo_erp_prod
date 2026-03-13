@@ -10,6 +10,7 @@ import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { AlertTriangle, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import NaturezaOperacaoAutocomplete from '@/components/common/NaturezaOperacaoAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
@@ -26,6 +27,7 @@ import {
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
 import { getRejectionInfo, parseRejectionCode } from '@/lib/fiscal/nfe-rejection-catalog';
+import type { NaturezaOperacaoSearchHit } from '@/services/fiscalNaturezasOperacao';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -44,6 +46,7 @@ type NfeEmissao = {
   total_impostos?: number | null;
   total_nfe?: number | null;
   natureza_operacao?: string | null;
+  natureza_operacao_id?: string | null;
   ambiente: AmbienteNfe;
   payload: any;
   last_error: string | null;
@@ -191,6 +194,10 @@ export default function NfeEmissoesPage() {
   const [formAmbiente, setFormAmbiente] = useState<AmbienteNfe>('homologacao');
   const [formFrete, setFormFrete] = useState<string>('');
   const [formNaturezaOperacao, setFormNaturezaOperacao] = useState<string>('');
+  const [formNaturezaOperacaoId, setFormNaturezaOperacaoId] = useState<string | null>(null);
+  const [formNaturezaOperacaoName, setFormNaturezaOperacaoName] = useState<string | undefined>(undefined);
+  const [formFormaPagamento, setFormFormaPagamento] = useState<string>('');
+  const [formModalidadeFrete, setFormModalidadeFrete] = useState<string>('9');
   const [formDestinatarioId, setFormDestinatarioId] = useState<string | null>(null);
   const [formDestinatarioName, setFormDestinatarioName] = useState<string | undefined>(undefined);
   const [items, setItems] = useState<NfeItemForm[]>([]);
@@ -227,6 +234,7 @@ export default function NfeEmissoesPage() {
         total_impostos: r.total_impostos ?? null,
         total_nfe: r.total_nfe ?? null,
         natureza_operacao: r.natureza_operacao ?? null,
+        natureza_operacao_id: r.natureza_operacao_id ?? null,
         ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
         payload: r.payload ?? {},
         last_error: r.last_error ?? null,
@@ -337,6 +345,10 @@ export default function NfeEmissoesPage() {
     setFormAmbiente('homologacao');
     setFormFrete('');
     setFormNaturezaOperacao('');
+    setFormNaturezaOperacaoId(null);
+    setFormNaturezaOperacaoName(undefined);
+    setFormFormaPagamento('');
+    setFormModalidadeFrete('9');
     setFormDestinatarioId(null);
     setFormDestinatarioName(undefined);
     setItems([]);
@@ -350,6 +362,10 @@ export default function NfeEmissoesPage() {
     setFormAmbiente(row.ambiente || 'homologacao');
     setFormFrete(row.total_frete != null ? String(row.total_frete) : '');
     setFormNaturezaOperacao((row.natureza_operacao ?? '').toString());
+    setFormNaturezaOperacaoId(row.natureza_operacao_id ?? null);
+    setFormNaturezaOperacaoName(row.natureza_operacao ?? undefined);
+    setFormFormaPagamento((row as any).forma_pagamento ?? '');
+    setFormModalidadeFrete((row as any).modalidade_frete ?? '9');
     setFormDestinatarioId(row.destinatario_pessoa_id ?? null);
     setFormDestinatarioName(row.destinatario_nome ?? undefined);
     setProductToAddId(null);
@@ -494,7 +510,10 @@ export default function NfeEmissoesPage() {
       destinatarioPessoaId: formDestinatarioId ?? '',
       ambiente: formAmbiente,
       naturezaOperacao: formNaturezaOperacao?.trim() || '',
+      naturezaOperacaoId: formNaturezaOperacaoId ?? undefined,
       totalFrete: frete,
+      formaPagamento: formFormaPagamento || undefined,
+      modalidadeFrete: formModalidadeFrete || '9',
       payload: payloadJson,
       items: items.map((it) => ({
         produto_id: it.produto_id,
@@ -967,11 +986,30 @@ export default function NfeEmissoesPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Natureza da operação</label>
-              <input
-                value={formNaturezaOperacao}
-                onChange={(e) => setFormNaturezaOperacao(e.target.value)}
-                placeholder="Ex.: Venda de mercadoria"
-                className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              <NaturezaOperacaoAutocomplete
+                value={formNaturezaOperacaoId}
+                initialName={formNaturezaOperacaoName}
+                onChange={(id, hit) => {
+                  setFormNaturezaOperacaoId(id);
+                  if (hit) {
+                    setFormNaturezaOperacao(hit.descricao);
+                    setFormNaturezaOperacaoName(hit.descricao);
+                    // Auto-apply CFOP from natureza to all items
+                    if (hit.cfop_dentro_uf || hit.cfop_fora_uf) {
+                      const cfop = hit.cfop_dentro_uf || hit.cfop_fora_uf || '';
+                      setItems(prev => prev.map(it => ({
+                        ...it,
+                        cfop: cfop,
+                        cst: hit.icms_cst || it.cst,
+                        csosn: hit.icms_csosn || it.csosn,
+                      })));
+                    }
+                  } else {
+                    setFormNaturezaOperacao('');
+                    setFormNaturezaOperacaoName(undefined);
+                  }
+                }}
+                placeholder="Buscar natureza..."
               />
             </div>
             <div>
@@ -982,6 +1020,35 @@ export default function NfeEmissoesPage() {
                 placeholder="Ex.: 25,00"
                 className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Forma de pagamento</label>
+              <Select value={formFormaPagamento} onChange={(e) => setFormFormaPagamento(e.target.value)}>
+                <option value="">Selecione...</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="cheque">Cheque</option>
+                <option value="cartao_credito">Cartão de Crédito</option>
+                <option value="cartao_debito">Cartão de Débito</option>
+                <option value="boleto">Boleto</option>
+                <option value="pix">PIX</option>
+                <option value="deposito">Depósito</option>
+                <option value="transferencia">Transferência</option>
+                <option value="sem_pagamento">Sem Pagamento</option>
+                <option value="outros">Outros</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Modalidade frete</label>
+              <Select value={formModalidadeFrete} onChange={(e) => setFormModalidadeFrete(e.target.value)}>
+                <option value="9">9 — Sem frete</option>
+                <option value="0">0 — Emitente (CIF)</option>
+                <option value="1">1 — Destinatário (FOB)</option>
+                <option value="2">2 — Terceiros</option>
+                <option value="3">3 — Próprio remetente</option>
+                <option value="4">4 — Próprio destinatário</option>
+              </Select>
             </div>
             <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="text-xs text-slate-600 font-semibold">Totais (prévia)</div>
