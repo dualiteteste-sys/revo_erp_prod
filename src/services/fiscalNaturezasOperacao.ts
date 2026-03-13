@@ -7,6 +7,8 @@ export type NaturezaOperacaoRow = {
   descricao: string;
   cfop_dentro_uf: string | null;
   cfop_fora_uf: string | null;
+  cfop_secundario_dentro_uf: string | null;
+  cfop_secundario_fora_uf: string | null;
   icms_cst: string | null;
   icms_csosn: string | null;
   icms_aliquota: number;
@@ -35,6 +37,8 @@ export type NaturezaOperacaoSearchHit = {
   descricao: string;
   cfop_dentro_uf: string | null;
   cfop_fora_uf: string | null;
+  cfop_secundario_dentro_uf: string | null;
+  cfop_secundario_fora_uf: string | null;
   icms_cst: string | null;
   icms_csosn: string | null;
   icms_aliquota: number;

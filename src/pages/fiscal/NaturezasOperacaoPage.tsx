@@ -46,6 +46,8 @@ type FormData = {
   descricao: string;
   cfop_dentro_uf: string;
   cfop_fora_uf: string;
+  cfop_secundario_dentro_uf: string;
+  cfop_secundario_fora_uf: string;
   icms_cst: string;
   icms_csosn: string;
   icms_aliquota: string;
@@ -70,6 +72,8 @@ const EMPTY_FORM: FormData = {
   descricao: '',
   cfop_dentro_uf: '',
   cfop_fora_uf: '',
+  cfop_secundario_dentro_uf: '',
+  cfop_secundario_fora_uf: '',
   icms_cst: '',
   icms_csosn: '',
   icms_aliquota: '0',
@@ -96,6 +100,8 @@ function rowToForm(r: NaturezaOperacaoRow): FormData {
     descricao: r.descricao,
     cfop_dentro_uf: r.cfop_dentro_uf ?? '',
     cfop_fora_uf: r.cfop_fora_uf ?? '',
+    cfop_secundario_dentro_uf: r.cfop_secundario_dentro_uf ?? '',
+    cfop_secundario_fora_uf: r.cfop_secundario_fora_uf ?? '',
     icms_cst: r.icms_cst ?? '',
     icms_csosn: r.icms_csosn ?? '',
     icms_aliquota: String(r.icms_aliquota),
@@ -186,6 +192,10 @@ const NaturezasOperacaoPage: React.FC = () => {
     const cfopF = (form.cfop_fora_uf || '').replace(/\D/g, '');
     if (cfopD && cfopD.length !== 4) errs.push('CFOP dentro UF deve ter 4 dígitos.');
     if (cfopF && cfopF.length !== 4) errs.push('CFOP fora UF deve ter 4 dígitos.');
+    const cfop2D = (form.cfop_secundario_dentro_uf || '').replace(/\D/g, '');
+    const cfop2F = (form.cfop_secundario_fora_uf || '').replace(/\D/g, '');
+    if (cfop2D && cfop2D.length !== 4) errs.push('2º CFOP dentro UF deve ter 4 dígitos.');
+    if (cfop2F && cfop2F.length !== 4) errs.push('2º CFOP fora UF deve ter 4 dígitos.');
     return errs;
   };
 
@@ -204,6 +214,8 @@ const NaturezasOperacaoPage: React.FC = () => {
         descricao: form.descricao.trim(),
         cfop_dentro_uf: form.cfop_dentro_uf.trim() || null,
         cfop_fora_uf: form.cfop_fora_uf.trim() || null,
+        cfop_secundario_dentro_uf: form.cfop_secundario_dentro_uf.trim() || null,
+        cfop_secundario_fora_uf: form.cfop_secundario_fora_uf.trim() || null,
         icms_cst: form.icms_cst.trim() || null,
         icms_csosn: form.icms_csosn.trim() || null,
         icms_aliquota: Number(form.icms_aliquota) || 0,
@@ -304,8 +316,8 @@ const NaturezasOperacaoPage: React.FC = () => {
             <tr className="border-b border-slate-200 text-left">
               <th className="px-4 py-3 font-semibold text-slate-600">Código</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Descrição</th>
-              <th className="px-4 py-3 font-semibold text-slate-600 text-center">CFOP (Dentro)</th>
-              <th className="px-4 py-3 font-semibold text-slate-600 text-center">CFOP (Fora)</th>
+              <th className="px-4 py-3 font-semibold text-slate-600 text-center">CFOP</th>
+              <th className="px-4 py-3 font-semibold text-slate-600 text-center">2º CFOP</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-center">Finalidade</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-center">Tipo</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-center">Regime</th>
@@ -336,8 +348,14 @@ const NaturezasOperacaoPage: React.FC = () => {
                 >
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">{row.codigo}</td>
                   <td className="px-4 py-3 text-slate-800">{row.descricao}</td>
-                  <td className="px-4 py-3 text-center font-mono">{row.cfop_dentro_uf || '—'}</td>
-                  <td className="px-4 py-3 text-center font-mono">{row.cfop_fora_uf || '—'}</td>
+                  <td className="px-4 py-3 text-center font-mono text-xs">
+                    {row.cfop_dentro_uf || '—'} / {row.cfop_fora_uf || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center font-mono text-xs">
+                    {row.cfop_secundario_dentro_uf
+                      ? `${row.cfop_secundario_dentro_uf} / ${row.cfop_secundario_fora_uf || '—'}`
+                      : '—'}
+                  </td>
                   <td className="px-4 py-3 text-center text-xs">
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                       {FINALIDADE_LABELS[row.finalidade_emissao] || row.finalidade_emissao}
@@ -467,6 +485,29 @@ const NaturezasOperacaoPage: React.FC = () => {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">2º CFOP Dentro UF <span className="font-normal text-slate-400">(opcional)</span></label>
+                <input
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
+                  value={form.cfop_secundario_dentro_uf}
+                  onChange={(e) => setForm(f => ({ ...f, cfop_secundario_dentro_uf: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  placeholder="Ex: 5902"
+                  maxLength={4}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">2º CFOP Fora UF <span className="font-normal text-slate-400">(opcional)</span></label>
+                <input
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
+                  value={form.cfop_secundario_fora_uf}
+                  onChange={(e) => setForm(f => ({ ...f, cfop_secundario_fora_uf: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  placeholder="Ex: 6902"
+                  maxLength={4}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">O 2º CFOP é usado quando a mesma nota tem itens com CFOPs diferentes (ex: Retorno 5124 + Remessa 5902).</p>
           </fieldset>
 
           {/* ICMS */}
