@@ -152,6 +152,7 @@ export default function NaturezaOperacaoAutocomplete({
                 </div>
                 <div className="flex gap-3 mt-0.5 text-xs text-slate-500">
                   {h.cfop_dentro_uf && <span>CFOP: {h.cfop_dentro_uf}/{h.cfop_fora_uf || '—'}</span>}
+                  {h.cfop_secundario_dentro_uf && <span>2º: {h.cfop_secundario_dentro_uf}/{h.cfop_secundario_fora_uf || '—'}</span>}
                   {(h.icms_cst || h.icms_csosn) && (
                     <span>ICMS: {h.icms_cst ? `CST ${h.icms_cst}` : `CSOSN ${h.icms_csosn}`}</span>
                   )}
