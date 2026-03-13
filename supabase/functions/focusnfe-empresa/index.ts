@@ -16,9 +16,12 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
  * Get the Focus NFe revenda (reseller) token.
  * The /v2/empresas endpoint requires a reseller token (production only).
  * Falls back to null if not configured.
+ * v2: per-company tokens support
  */
 function getRevendaToken(): string | null {
-  const token = (Deno.env.get("FOCUSNFE_REVENDA_TOKEN") ?? "").trim();
+  const raw = Deno.env.get("FOCUSNFE_REVENDA_TOKEN");
+  console.log(`[focusnfe-empresa] FOCUSNFE_REVENDA_TOKEN env present: ${raw !== undefined}, length: ${(raw ?? '').length}`);
+  const token = (raw ?? "").trim();
   return token || null;
 }
 
@@ -188,24 +191,37 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Success via reseller API
-      await admin.from("fiscal_nfe_emitente").update({
+      // Success via reseller API — save per-company tokens if returned
+      const tokenProd = result?.token_producao || result?.token_producao_cnpj || null;
+      const tokenHml = result?.token_homologacao || result?.token_homologacao_cnpj || null;
+
+      const updatePayload: Record<string, any> = {
         focusnfe_registrada: true,
         focusnfe_registrada_em: new Date().toISOString(),
         focusnfe_ultimo_erro: null,
-      }).eq("empresa_id", empresaId);
+      };
+      if (tokenProd) updatePayload.focusnfe_token_producao = tokenProd;
+      if (tokenHml) updatePayload.focusnfe_token_homologacao = tokenHml;
+
+      await admin.from("fiscal_nfe_emitente").update(updatePayload).eq("empresa_id", empresaId);
 
       try { await admin.from("fiscal_nfe_provider_logs").insert({
         empresa_id: empresaId,
         provider: "focusnfe",
         level: "info",
         message: `Empresa registrada via API revenda (${ambiente})`,
-        payload: { cnpj, request_id: requestId },
+        payload: {
+          cnpj, request_id: requestId,
+          has_token_prod: !!tokenProd, has_token_hml: !!tokenHml,
+          response_keys: Object.keys(result || {}),
+        },
       }); } catch { /* ignore log failures */ }
 
       return json(200, {
         ok: true,
         message: "Empresa registrada na Focus NFe com sucesso.",
+        tokens_saved: { producao: !!tokenProd, homologacao: !!tokenHml },
+        response_keys: Object.keys(result || {}),
       }, cors);
     }
 
