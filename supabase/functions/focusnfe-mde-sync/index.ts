@@ -2,8 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { getRequestId } from "../_shared/request.ts";
 import {
-  getFocusApiToken,
   getFocusBaseUrl,
+  getCompanyApiToken,
   focusFetch,
   json,
 } from "../_shared/focusnfe-api.ts";
@@ -117,7 +117,9 @@ async function syncEmpresa(
     .eq("provider_slug", "FOCUSNFE")
     .maybeSingle();
   const ambiente = config?.ambiente || "homologacao";
-  const apiToken = getFocusApiToken(ambiente);
+
+  // Per-company token with global fallback
+  const apiToken = await getCompanyApiToken(admin, empresaId, ambiente);
   if (!apiToken) throw new Error("MISSING_API_TOKEN");
 
   // Get sync cursor
