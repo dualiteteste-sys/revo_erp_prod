@@ -115,6 +115,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'NF-e', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'NFS-e', icon: FileText, href: '/app/fiscal/nfse' },
       { name: 'NF-e Recebidas', icon: FileDown, href: '/app/fiscal/nfe-recebidas' },
+      { name: 'Naturezas de Operação', icon: BookOpen, href: '/app/fiscal/naturezas-operacao' },
       { name: 'Configurações NF-e', icon: Settings, href: '/app/fiscal/nfe/configuracoes' },
     ],
   },

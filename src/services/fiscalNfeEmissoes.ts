@@ -13,6 +13,7 @@ export type NfeEmissaoRow = {
   destinatario_nome: string | null;
   ambiente: AmbienteNfe;
   natureza_operacao: string | null;
+  natureza_operacao_id: string | null;
   valor_total: number | null;
   total_produtos: number | null;
   total_descontos: number | null;
@@ -87,8 +88,13 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
   destinatarioPessoaId: string;
   ambiente: AmbienteNfe;
   naturezaOperacao: string;
+  naturezaOperacaoId?: string;
   totalFrete: number;
   payload: any;
+  formaPagamento?: string;
+  condicaoPagamentoId?: string;
+  transportadoraId?: string;
+  modalidadeFrete?: string;
   items: Array<{
     produto_id: string | null;
     descricao: string;
@@ -100,6 +106,9 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
     cfop: string | null;
     cst: string | null;
     csosn: string | null;
+    numero_pedido_cliente?: string | null;
+    numero_item_pedido?: number | null;
+    informacoes_adicionais?: string | null;
   }>;
 }) {
   return callRpc<string>('fiscal_nfe_emissao_draft_upsert', {
@@ -110,6 +119,11 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
     p_total_frete: input.totalFrete,
     p_payload: input.payload ?? {},
     p_items: input.items ?? [],
+    p_natureza_operacao_id: input.naturezaOperacaoId ?? null,
+    p_forma_pagamento: input.formaPagamento ?? null,
+    p_condicao_pagamento_id: input.condicaoPagamentoId ?? null,
+    p_transportadora_id: input.transportadoraId ?? null,
+    p_modalidade_frete: input.modalidadeFrete ?? '9',
   });
 }
 
@@ -154,6 +168,13 @@ export async function fiscalNfeSubmit(emissaoId: string): Promise<NfeSubmitResul
   }
 
   return data as NfeSubmitResult;
+}
+
+export async function fiscalNfeCalcularImpostos(emissaoId: string) {
+  return callRpc<{ ok: boolean; items_calculated: number; cfop_applied: string | null; is_intrastate: boolean }>(
+    'fiscal_nfe_calcular_impostos',
+    { p_emissao_id: emissaoId },
+  );
 }
 
 export async function fiscalNfeGerarDePedido(pedidoId: string, ambiente?: AmbienteNfe): Promise<string> {

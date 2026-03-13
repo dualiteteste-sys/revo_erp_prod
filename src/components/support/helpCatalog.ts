@@ -1396,6 +1396,42 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'fiscal',
   },
   {
+    match: '/app/fiscal/naturezas-operacao',
+    title: 'Guia Rápido — Naturezas de Operação',
+    whatIs:
+      'A Natureza de Operação é um template fiscal que define automaticamente o CFOP (intra/inter UF), CST/CSOSN de ICMS, PIS, COFINS, IPI, finalidade da emissão e comportamento (gerar financeiro, movimentar estoque). Ao selecionar uma natureza na NF-e, todos os campos fiscais dos itens são preenchidos automaticamente.',
+    steps: [
+      'Acesse Fiscal → Naturezas de Operação.',
+      'Clique "Nova natureza" para criar. Informe código (ex: VENDA), descrição (texto que vai no XML), e os CFOPs dentro/fora da UF.',
+      'Configure ICMS (CST para regime normal, CSOSN para Simples Nacional, alíquota e redução de base).',
+      'Configure PIS/COFINS (CST e alíquota). Para isento/outros, use CST 99 com alíquota 0.',
+      'Configure IPI se aplicável (CST e alíquota). Deixe em branco se não tributa IPI.',
+      'Marque as flags: "Gera financeiro" (cria contas a receber), "Movimenta estoque" (baixa itens).',
+      'Selecione a finalidade (Normal, Complementar, Ajuste, Devolução) e o regime aplicável.',
+      'Ao criar rascunho de NF-e, selecione a natureza no autocomplete — CFOP, CST e alíquotas são aplicados automaticamente a todos os itens.',
+    ],
+    dependsOn: ['Empresa ativa', 'Permissão: Vendas (view/manage)'],
+    connectsWith: ['Emissão de NF-e', 'Configurações NF-e', 'Cadastro de Produtos'],
+    fillPerfectly: [
+      'Sempre preencha os dois CFOPs (dentro e fora UF) — o sistema escolhe automaticamente pela UF do destinatário.',
+      'Use CST 00 para ICMS tributado integralmente no regime normal.',
+      'Use CSOSN 102 para Simples Nacional sem permissão de crédito.',
+      'Para operações isentas de ICMS, use CST 40 ou CSOSN 300.',
+      'Desmarque "Gera financeiro" em remessas e transferências.',
+    ],
+    commonMistakes: [
+      'Deixar CFOP em branco — a NF-e será rejeitada pela SEFAZ.',
+      'Confundir CST (regime normal) com CSOSN (Simples Nacional) — use o campo correto para seu regime.',
+      'Esquecer de preencher CFOP fora UF — vendas interestaduais usam 6xxx.',
+      'Marcar "Gera financeiro" em remessas (não gera duplicata para remessas).',
+    ],
+    links: [
+      { label: 'Naturezas de Operação', href: '/app/fiscal/naturezas-operacao', kind: 'internal' as const },
+      { label: 'Emissão de NF-e', href: '/app/fiscal/nfe', kind: 'internal' as const },
+    ],
+    roadmapKey: 'fiscal',
+  },
+  {
     match: '/app/fiscal/nfse',
     title: 'Guia Rápido — NFS-e (Nota Fiscal de Serviço Eletrônica)',
     whatIs:
