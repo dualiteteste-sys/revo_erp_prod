@@ -95,6 +95,10 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
   condicaoPagamentoId?: string;
   transportadoraId?: string;
   modalidadeFrete?: string;
+  pesoBruto?: number;
+  pesoLiquido?: number;
+  quantidadeVolumes?: number;
+  especieVolumes?: string;
   items: Array<{
     produto_id: string | null;
     descricao: string;
@@ -124,6 +128,10 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
     p_condicao_pagamento_id: input.condicaoPagamentoId ?? null,
     p_transportadora_id: input.transportadoraId ?? null,
     p_modalidade_frete: input.modalidadeFrete ?? '9',
+    p_peso_bruto: input.pesoBruto ?? 0,
+    p_peso_liquido: input.pesoLiquido ?? 0,
+    p_quantidade_volumes: input.quantidadeVolumes ?? 0,
+    p_especie_volumes: input.especieVolumes ?? 'VOLUMES',
   });
 }
 

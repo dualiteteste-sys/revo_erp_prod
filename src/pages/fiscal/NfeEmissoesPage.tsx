@@ -74,6 +74,7 @@ type NfeItemForm = {
   cfop: string;
   cst: string;
   csosn: string;
+  informacoes_adicionais: string;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -212,6 +213,10 @@ export default function NfeEmissoesPage() {
   const [transportadoraHits, setTransportadoraHits] = useState<CarrierListItem[]>([]);
   const [transportadoraLoading, setTransportadoraLoading] = useState(false);
   const [duplicatasPreview, setDuplicatasPreview] = useState<DuplicataItem[]>([]);
+  const [formPesoBruto, setFormPesoBruto] = useState<string>('');
+  const [formPesoLiquido, setFormPesoLiquido] = useState<string>('');
+  const [formQtdVolumes, setFormQtdVolumes] = useState<string>('');
+  const [formEspecieVolumes, setFormEspecieVolumes] = useState<string>('VOLUMES');
   const [items, setItems] = useState<NfeItemForm[]>([]);
   const [productToAddId, setProductToAddId] = useState<string | null>(null);
   const [productToAddName, setProductToAddName] = useState<string | undefined>(undefined);
@@ -396,6 +401,10 @@ export default function NfeEmissoesPage() {
     setFormTransportadoraId(null);
     setFormTransportadoraNome('');
     setDuplicatasPreview([]);
+    setFormPesoBruto('');
+    setFormPesoLiquido('');
+    setFormQtdVolumes('');
+    setFormEspecieVolumes('VOLUMES');
     setItems([]);
     setProductToAddId(null);
     setProductToAddName(undefined);
@@ -418,6 +427,10 @@ export default function NfeEmissoesPage() {
     setFormTransportadoraId((row as any).transportadora_id ?? null);
     setFormTransportadoraNome((row as any).transportadora_nome ?? '');
     setDuplicatasPreview((row as any).duplicatas ?? []);
+    setFormPesoBruto((row as any).peso_bruto ? String((row as any).peso_bruto) : '');
+    setFormPesoLiquido((row as any).peso_liquido ? String((row as any).peso_liquido) : '');
+    setFormQtdVolumes((row as any).quantidade_volumes ? String((row as any).quantidade_volumes) : '');
+    setFormEspecieVolumes((row as any).especie_volumes || 'VOLUMES');
     setProductToAddId(null);
     setProductToAddName(undefined);
 
@@ -436,6 +449,7 @@ export default function NfeEmissoesPage() {
           cfop: (it.cfop ?? '').toString(),
           cst: (it.cst ?? '').toString(),
           csosn: (it.csosn ?? '').toString(),
+          informacoes_adicionais: (it.informacoes_adicionais ?? '').toString(),
         }))
       );
     } catch (e: any) {
@@ -566,6 +580,10 @@ export default function NfeEmissoesPage() {
       condicaoPagamentoId: formCondicaoPagamentoId ?? undefined,
       transportadoraId: formTransportadoraId ?? undefined,
       modalidadeFrete: formModalidadeFrete || '9',
+      pesoBruto: formPesoBruto ? Number(String(formPesoBruto).replace(',', '.')) || 0 : 0,
+      pesoLiquido: formPesoLiquido ? Number(String(formPesoLiquido).replace(',', '.')) || 0 : 0,
+      quantidadeVolumes: formQtdVolumes ? parseInt(formQtdVolumes, 10) || 0 : 0,
+      especieVolumes: formEspecieVolumes || 'VOLUMES',
       payload: payloadJson,
       items: items.map((it) => ({
         produto_id: it.produto_id,
@@ -578,6 +596,7 @@ export default function NfeEmissoesPage() {
         cfop: it.cfop || null,
         cst: it.cst || null,
         csosn: it.csosn || null,
+        informacoes_adicionais: it.informacoes_adicionais || null,
       })),
     });
 
@@ -621,6 +640,7 @@ export default function NfeEmissoesPage() {
         cfop: (fiscalDefaults?.cfop_padrao ?? '').toString(),
         cst: (fiscalDefaults?.cst_padrao ?? '').toString(),
         csosn: (fiscalDefaults?.csosn_padrao ?? '').toString(),
+        informacoes_adicionais: '',
       },
     ]);
     setProductToAddId(null);
@@ -1166,6 +1186,53 @@ export default function NfeEmissoesPage() {
                 )}
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Peso / Volumes</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Peso bruto (kg)</label>
+                  <input
+                    type="text"
+                    value={formPesoBruto}
+                    onChange={(e) => setFormPesoBruto(e.target.value)}
+                    placeholder="0,000"
+                    className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Peso líquido (kg)</label>
+                  <input
+                    type="text"
+                    value={formPesoLiquido}
+                    onChange={(e) => setFormPesoLiquido(e.target.value)}
+                    placeholder="0,000"
+                    className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Qtd volumes</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={formQtdVolumes}
+                    onChange={(e) => setFormQtdVolumes(e.target.value)}
+                    placeholder="0"
+                    className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Espécie</label>
+                  <input
+                    type="text"
+                    value={formEspecieVolumes}
+                    onChange={(e) => setFormEspecieVolumes(e.target.value.toUpperCase())}
+                    placeholder="VOLUMES"
+                    className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
             {duplicatasPreview.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <div className="text-xs text-amber-800 font-semibold mb-1">Duplicatas ({duplicatasPreview.length})</div>
@@ -1275,7 +1342,8 @@ export default function NfeEmissoesPage() {
                     items.map((it) => {
                       const totalLine = Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0));
                       return (
-                        <tr key={it.id} className="hover:bg-gray-50/40">
+                        <React.Fragment key={it.id}>
+                        <tr className="hover:bg-gray-50/40">
                           <td className="p-3">
                             <input
                               value={it.produto_nome}
@@ -1366,6 +1434,17 @@ export default function NfeEmissoesPage() {
                             </button>
                           </td>
                         </tr>
+                        <tr className="bg-slate-50/30">
+                          <td colSpan={11} className="px-3 pb-2 pt-0">
+                            <input
+                              value={it.informacoes_adicionais}
+                              onChange={(e) => updateItem(it.id, { informacoes_adicionais: e.target.value })}
+                              className="w-full border border-gray-100 rounded-lg px-3 py-1.5 text-xs text-slate-600 bg-white"
+                              placeholder="Informações adicionais do item (infAdProd) — ex: xPed, lote, validade..."
+                            />
+                          </td>
+                        </tr>
+                        </React.Fragment>
                       );
                     })
                   )}
