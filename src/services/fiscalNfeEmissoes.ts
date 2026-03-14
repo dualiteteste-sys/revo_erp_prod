@@ -127,6 +127,24 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
   });
 }
 
+export type DuplicataItem = {
+  numero: string;
+  data_vencimento: string;
+  valor: number;
+};
+
+export type GerarDuplicatasResult = {
+  ok: boolean;
+  duplicatas: number;
+  installments: DuplicataItem[];
+};
+
+export async function fiscalNfeGerarDuplicatas(emissaoId: string): Promise<GerarDuplicatasResult> {
+  return callRpc<GerarDuplicatasResult>('fiscal_nfe_gerar_duplicatas', {
+    p_emissao_id: emissaoId,
+  });
+}
+
 export type NfeSubmitResult = {
   ok: boolean;
   status?: string;

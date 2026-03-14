@@ -94,6 +94,7 @@ const DialogContent = React.forwardRef<
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        aria-describedby={undefined}
         ref={(node) => {
           localRef.current = node as unknown as HTMLElement | null
           if (typeof ref === "function") ref(node)

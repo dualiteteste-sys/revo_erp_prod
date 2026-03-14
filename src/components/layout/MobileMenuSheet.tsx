@@ -6,6 +6,7 @@ import { menuConfig, MenuItem } from '@/config/menuConfig';
 import {
     Sheet,
     SheetContent,
+    SheetDescription,
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
@@ -106,6 +107,7 @@ export function MobileMenuSheet({
                 <SheetHeader className="p-4 pb-0">
                     <div className="flex items-center justify-between mb-4">
                         <SheetTitle className="text-lg font-semibold">Menu</SheetTitle>
+                        <SheetDescription className="sr-only">Menu de navegação principal</SheetDescription>
                     </div>
 
                     {/* Campo de busca */}
