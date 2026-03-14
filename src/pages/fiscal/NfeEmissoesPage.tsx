@@ -28,6 +28,9 @@ import {
 import { callRpc } from '@/lib/api';
 import { getRejectionInfo, parseRejectionCode } from '@/lib/fiscal/nfe-rejection-catalog';
 import type { NaturezaOperacaoSearchHit } from '@/services/fiscalNaturezasOperacao';
+import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
+import { getCarriers, type CarrierListItem } from '@/services/carriers';
+import { fiscalNfeGerarDuplicatas, type DuplicataItem } from '@/services/fiscalNfeEmissoes';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -200,6 +203,15 @@ export default function NfeEmissoesPage() {
   const [formModalidadeFrete, setFormModalidadeFrete] = useState<string>('9');
   const [formDestinatarioId, setFormDestinatarioId] = useState<string | null>(null);
   const [formDestinatarioName, setFormDestinatarioName] = useState<string | undefined>(undefined);
+  const [formCondicaoPagamentoId, setFormCondicaoPagamentoId] = useState<string | null>(null);
+  const [formCondicaoPagamentoNome, setFormCondicaoPagamentoNome] = useState<string>('');
+  const [condicaoHits, setCondicaoHits] = useState<CondicaoPagamento[]>([]);
+  const [condicaoLoading, setCondicaoLoading] = useState(false);
+  const [formTransportadoraId, setFormTransportadoraId] = useState<string | null>(null);
+  const [formTransportadoraNome, setFormTransportadoraNome] = useState<string>('');
+  const [transportadoraHits, setTransportadoraHits] = useState<CarrierListItem[]>([]);
+  const [transportadoraLoading, setTransportadoraLoading] = useState(false);
+  const [duplicatasPreview, setDuplicatasPreview] = useState<DuplicataItem[]>([]);
   const [items, setItems] = useState<NfeItemForm[]>([]);
   const [productToAddId, setProductToAddId] = useState<string | null>(null);
   const [productToAddName, setProductToAddName] = useState<string | undefined>(undefined);
@@ -290,6 +302,34 @@ export default function NfeEmissoesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, loading, location.search]);
 
+  // Carregar condições de pagamento e transportadoras quando o modal abre
+  useEffect(() => {
+    if (!isModalOpen || !empresaId) return;
+    let cancelled = false;
+
+    (async () => {
+      setCondicaoLoading(true);
+      try {
+        const data = await searchCondicoesPagamento({ tipo: 'receber', q: null, limit: 50 });
+        if (!cancelled) setCondicaoHits(data ?? []);
+      } catch { /* ignore */ } finally {
+        if (!cancelled) setCondicaoLoading(false);
+      }
+    })();
+
+    (async () => {
+      setTransportadoraLoading(true);
+      try {
+        const res = await getCarriers({ page: 1, pageSize: 50, searchTerm: '', filterStatus: 'ativa', sortBy: { column: 'nome', ascending: true } });
+        if (!cancelled) setTransportadoraHits(res.data ?? []);
+      } catch { /* ignore */ } finally {
+        if (!cancelled) setTransportadoraLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isModalOpen, empresaId]);
+
   const totals = useMemo(() => {
     const total = rows.length;
     const rascunhos = rows.filter((r) => r.status === 'rascunho').length;
@@ -351,6 +391,11 @@ export default function NfeEmissoesPage() {
     setFormModalidadeFrete('9');
     setFormDestinatarioId(null);
     setFormDestinatarioName(undefined);
+    setFormCondicaoPagamentoId(null);
+    setFormCondicaoPagamentoNome('');
+    setFormTransportadoraId(null);
+    setFormTransportadoraNome('');
+    setDuplicatasPreview([]);
     setItems([]);
     setProductToAddId(null);
     setProductToAddName(undefined);
@@ -368,6 +413,11 @@ export default function NfeEmissoesPage() {
     setFormModalidadeFrete((row as any).modalidade_frete ?? '9');
     setFormDestinatarioId(row.destinatario_pessoa_id ?? null);
     setFormDestinatarioName(row.destinatario_nome ?? undefined);
+    setFormCondicaoPagamentoId((row as any).condicao_pagamento_id ?? null);
+    setFormCondicaoPagamentoNome((row as any).condicao_pagamento_nome ?? '');
+    setFormTransportadoraId((row as any).transportadora_id ?? null);
+    setFormTransportadoraNome((row as any).transportadora_nome ?? '');
+    setDuplicatasPreview((row as any).duplicatas ?? []);
     setProductToAddId(null);
     setProductToAddName(undefined);
 
@@ -513,6 +563,8 @@ export default function NfeEmissoesPage() {
       naturezaOperacaoId: formNaturezaOperacaoId ?? undefined,
       totalFrete: frete,
       formaPagamento: formFormaPagamento || undefined,
+      condicaoPagamentoId: formCondicaoPagamentoId ?? undefined,
+      transportadoraId: formTransportadoraId ?? undefined,
       modalidadeFrete: formModalidadeFrete || '9',
       payload: payloadJson,
       items: items.map((it) => ({
@@ -593,7 +645,16 @@ export default function NfeEmissoesPage() {
 
     setSaving(true);
     try {
-      await persistDraft();
+      const emissaoId = await persistDraft();
+
+      // Auto-gerar duplicatas se condição de pagamento definida
+      if (formCondicaoPagamentoId) {
+        try {
+          await fiscalNfeGerarDuplicatas(emissaoId);
+        } catch {
+          // Não bloqueia o save se gerar duplicatas falhar
+        }
+      }
 
       addToast(editing?.id ? 'Rascunho atualizado.' : 'Rascunho criado.', 'success');
 
@@ -1050,6 +1111,74 @@ export default function NfeEmissoesPage() {
                 <option value="4">4 — Próprio destinatário</option>
               </Select>
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Condição de pagamento</label>
+              <div className="relative">
+                <Select
+                  value={formCondicaoPagamentoId ?? ''}
+                  onChange={async (e) => {
+                    const id = e.target.value || null;
+                    setFormCondicaoPagamentoId(id);
+                    const hit = condicaoHits.find((c) => c.id === id);
+                    setFormCondicaoPagamentoNome(hit?.nome ?? '');
+                  }}
+                >
+                  <option value="">Selecione...</option>
+                  {condicaoHits.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome} ({c.condicao})
+                    </option>
+                  ))}
+                </Select>
+                {condicaoLoading && (
+                  <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                    <Loader2 className="animate-spin text-slate-400" size={14} />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Gera duplicatas automaticamente ao salvar.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Transportadora</label>
+              <div className="relative">
+                <Select
+                  value={formTransportadoraId ?? ''}
+                  onChange={(e) => {
+                    const id = e.target.value || null;
+                    setFormTransportadoraId(id);
+                    const hit = transportadoraHits.find((t) => t.id === id);
+                    setFormTransportadoraNome(hit?.nome ?? '');
+                  }}
+                >
+                  <option value="">Nenhuma (sem transportadora)</option>
+                  {transportadoraHits.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}{t.documento ? ` — ${t.documento}` : ''}{t.cidade ? ` (${t.cidade}/${t.uf})` : ''}
+                    </option>
+                  ))}
+                </Select>
+                {transportadoraLoading && (
+                  <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                    <Loader2 className="animate-spin text-slate-400" size={14} />
+                  </div>
+                )}
+              </div>
+            </div>
+            {duplicatasPreview.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div className="text-xs text-amber-800 font-semibold mb-1">Duplicatas ({duplicatasPreview.length})</div>
+                <div className="space-y-0.5">
+                  {duplicatasPreview.map((d, i) => (
+                    <div key={i} className="text-xs text-amber-700 flex justify-between gap-2">
+                      <span>{d.numero} — {new Date(d.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                      <span className="font-semibold">{formatCurrency(d.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="text-xs text-slate-600 font-semibold">Totais (prévia)</div>
               <div className="mt-2 space-y-1 text-sm text-slate-800">
