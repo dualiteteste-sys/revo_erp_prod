@@ -18,9 +18,10 @@
 7. [ETAPA 5 — Faturamento da OB](#7-etapa-5--faturamento-da-ob)
 8. [ETAPA 6 — Revisao e Emissao da NF-e de Saida](#8-etapa-6--revisao-e-emissao-da-nf-e-de-saida)
 9. [ETAPA 7 — Pos-Emissao (DANFE, XML, Financeiro)](#9-etapa-7--pos-emissao-danfe-xml-financeiro)
-10. [Referencia: Mapa DANFE x Campos do Revo](#10-referencia-mapa-danfe-x-campos-do-revo)
-11. [Troubleshooting — Problemas Comuns](#11-troubleshooting--problemas-comuns)
-12. [Checklist Rapido de Validacao](#12-checklist-rapido-de-validacao)
+10. [Cenario Complementar: Retorno de Vasilhame](#10-cenario-complementar-retorno-de-vasilhame)
+11. [Referencia: Mapa DANFE x Campos do Revo](#11-referencia-mapa-danfe-x-campos-do-revo)
+12. [Troubleshooting — Problemas Comuns](#12-troubleshooting--problemas-comuns)
+13. [Checklist Rapido de Validacao](#13-checklist-rapido-de-validacao)
 
 ---
 
@@ -576,7 +577,90 @@ Verifique em: **Financeiro > Contas a Receber**
 
 ---
 
-## 10. Referencia: Mapa DANFE x Campos do Revo
+## 10. Cenario Complementar: Retorno de Vasilhame
+
+### O que e?
+
+Quando o cliente envia material para beneficiamento, muitas vezes ele vem em vasilhames (tambores, caixas metalicas, paletes, engradados). Esses vasilhames pertencem ao cliente e precisam ser devolvidos com NF-e propria, usando CFOPs especificos:
+
+| Operacao | CFOP Dentro UF | CFOP Fora UF | Quando usar |
+|----------|----------------|--------------|-------------|
+| Remessa de vasilhame | 5920 | 6920 | Voce envia vasilhame para o cliente |
+| Retorno de vasilhame | 5921 | 6921 | O cliente devolve vasilhame para voce |
+
+> **Nota:** Este fluxo e manual — nao ha automacao dedicada no sistema. Voce cria a NF-e diretamente no modulo Fiscal.
+
+### Configuracao (uma vez)
+
+1. Acesse **Fiscal > Naturezas de Operacao**
+2. Crie duas naturezas:
+
+   **Remessa de vasilhame:**
+   - Codigo: `REM_VASILH`
+   - Descricao: `Remessa de vasilhame`
+   - Tipo: Saida
+   - Finalidade: 1 — Normal
+   - CFOP Dentro UF: `5920` / Fora UF: `6920`
+   - ICMS CST: `41` (nao tributada) ou conforme orientacao contabil
+   - PIS CST: `99`, Aliquota: `0`
+   - COFINS CST: `99`, Aliquota: `0`
+   - Gera financeiro: **Nao** (desmarcado — vasilhame nao gera cobranca)
+   - Movimenta estoque: **Sim** (marcado — para controlar saldo de vasilhames)
+
+   **Retorno de vasilhame:**
+   - Codigo: `RET_VASILH`
+   - Descricao: `Retorno de vasilhame`
+   - Tipo: Entrada
+   - Finalidade: 1 — Normal
+   - CFOP Dentro UF: `5921` / Fora UF: `6921`
+   - Demais campos: mesma configuracao da remessa
+
+3. Cadastre os vasilhames como **produtos** no sistema:
+   - Menu: Cadastros > Produtos
+   - Nome: ex. "Tambor Metalico 200L", "Palete PBR"
+   - NCM: `7310.10.90` (recipientes metalicos) ou o NCM correto do vasilhame
+   - Unidade: UN
+   - Preco de venda: R$ 0,00 (vasilhame nao e vendido)
+
+### Passo a passo — Emitir NF-e de retorno de vasilhame
+
+1. Acesse **Fiscal > NF-e**
+2. Clique em **"+ Criar NF-e"**
+3. Preencha o rascunho:
+   - **Ambiente:** Producao (ou Homologacao para teste)
+   - **Natureza de Operacao:** busque "REM_VASILH" (Remessa de vasilhame)
+   - **Destinatario:** selecione o cliente dono dos vasilhames
+   - **Modalidade de Frete:** conforme combinado (CIF, FOB ou sem frete)
+4. Adicione os itens:
+   - Busque o produto vasilhame (ex: "Tambor Metalico 200L")
+   - Informe a quantidade
+   - Valor unitario: R$ 0,00 (ou o valor declarado para fins de seguro/transporte)
+   - O CFOP sera preenchido automaticamente pela natureza (5920 ou 6920)
+5. Na secao de peso e volumes:
+   - Informe o peso total dos vasilhames
+   - Informe a quantidade de volumes
+6. Clique em **"Salvar Rascunho"**
+7. Clique em **"Enviar para SEFAZ"**
+
+### Dica: Informacoes adicionais
+
+No campo de informacoes adicionais do item (infAdProd), inclua a referencia da NF-e original de entrada:
+
+```
+Retorno de vasilhame ref. NF-e 12345 serie 001 de 10/03/2026
+```
+
+Isso facilita a rastreabilidade e evita questionamentos do fisco.
+
+### Limitacoes atuais
+
+- **Sem controle automatico de saldo:** o sistema nao rastreia "quantos vasilhames o cliente X tem conosco". Esse controle precisa ser feito manualmente ou em planilha auxiliar.
+- **Sem gatilho automatico:** ao receber material do cliente, o sistema nao sugere automaticamente a emissao de NF-e de retorno de vasilhame.
+- **Sem vinculo com a OB:** a NF-e de vasilhame e independente da ordem de beneficiamento.
+
+---
+
+## 11. Referencia: Mapa DANFE x Campos do Revo
 
 Esta secao mapeia cada bloco da DANFE para o campo correspondente no Revo ERP. Use como referencia para conferir se os dados da nota estao corretos.
 
@@ -766,7 +850,7 @@ Esta secao mapeia cada bloco da DANFE para o campo correspondente no Revo ERP. U
 
 ---
 
-## 11. Troubleshooting — Problemas Comuns
+## 12. Troubleshooting — Problemas Comuns
 
 ### Erro: "DESTINATARIO_INCOMPLETO"
 
@@ -840,7 +924,7 @@ Esta secao mapeia cada bloco da DANFE para o campo correspondente no Revo ERP. U
 
 ---
 
-## 12. Checklist Rapido de Validacao
+## 13. Checklist Rapido de Validacao
 
 Use este checklist para validar o fluxo completo de ponta a ponta. Marque cada item conforme avanca:
 
