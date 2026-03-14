@@ -294,6 +294,22 @@ function buildFocusPayload(
     payload.modalidade_frete = "1"; // 1 = emitente (CIF)
   }
 
+  // --- Peso / Volumes ---
+  if (emissao.peso_bruto && emissao.peso_bruto > 0) {
+    payload.peso_bruto = String(emissao.peso_bruto);
+  }
+  if (emissao.peso_liquido && emissao.peso_liquido > 0) {
+    payload.peso_liquido = String(emissao.peso_liquido);
+  }
+  if (emissao.quantidade_volumes && emissao.quantidade_volumes > 0) {
+    payload.volumes = [{
+      quantidade: String(emissao.quantidade_volumes),
+      especie: emissao.especie_volumes || "VOLUMES",
+      peso_bruto: String(emissao.peso_bruto || 0),
+      peso_liquido: String(emissao.peso_liquido || 0),
+    }];
+  }
+
   // --- Transportadora (Fase 5) ---
   if (transportadora) {
     if (transportadora.documento) {
