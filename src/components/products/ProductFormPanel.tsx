@@ -10,6 +10,7 @@ import OthersTab from './form-tabs/OthersTab';
 import VariacoesTab from './form-tabs/VariacoesTab';
 import PrecosTab from './form-tabs/PrecosTab';
 import WooCommerceChannelTab from './form-tabs/WooCommerceChannelTab';
+import FiscalTab from './form-tabs/FiscalTab';
 import { normalizeProductPayload } from '@/services/products.normalize';
 import { validatePackaging } from '@/services/products.validate';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -28,7 +29,7 @@ interface ProductFormPanelProps {
   saveProduct: (formData: ProductFormData) => Promise<ProductFormData>;
 }
 
-const tabs = ['Dados Gerais', 'Canais / WooCommerce', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
+const tabs = ['Dados Gerais', 'Fiscal', 'Canais / WooCommerce', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
 
 const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
@@ -97,7 +98,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
 
   const visibleTabs = useMemo(() => {
     if (isService) {
-      return ['Dados Gerais', 'Outros']; // Services usually don't need Media, SEO, Additional Data in this context
+      return ['Dados Gerais', 'Fiscal', 'Outros'];
     }
     return tabs;
   }, [isService]);
@@ -159,6 +160,8 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
     switch (activeTab) {
       case 'Dados Gerais':
         return <DadosGeraisTab data={formData} onChange={handleFormChange} errors={errors} isService={isService} />;
+      case 'Fiscal':
+        return <FiscalTab data={formData} onChange={handleFormChange} />;
       case 'Variações':
         return <VariacoesTab produtoId={formData.id} produtoPaiId={formData.produto_pai_id} skuBase={formData.sku} />;
       case 'Canais / WooCommerce':
