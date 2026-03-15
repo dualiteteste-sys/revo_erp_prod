@@ -29,6 +29,17 @@ export type NfeEmissaoRow = {
   pedido_origem_id: string | null;
   danfe_url: string | null;
   xml_url: string | null;
+  forma_pagamento: string | null;
+  condicao_pagamento_id: string | null;
+  condicao_pagamento_nome: string | null;
+  transportadora_id: string | null;
+  transportadora_nome: string | null;
+  modalidade_frete: string | null;
+  duplicatas: any;
+  peso_bruto: number | null;
+  peso_liquido: number | null;
+  quantidade_volumes: number | null;
+  especie_volumes: string | null;
 };
 
 export type NfeItemRow = {
@@ -44,6 +55,10 @@ export type NfeItemRow = {
   cst: string | null;
   csosn: string | null;
   ordem: number;
+  informacoes_adicionais: string | null;
+  numero_pedido_cliente: string | null;
+  numero_item_pedido: number | null;
+  impostos: any;
 };
 
 export type NfeAuditRow = {
