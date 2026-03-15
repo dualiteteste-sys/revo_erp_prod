@@ -60,6 +60,17 @@ type NfeEmissao = {
   pedido_origem_id?: string | null;
   danfe_url?: string | null;
   xml_url?: string | null;
+  forma_pagamento?: string | null;
+  condicao_pagamento_id?: string | null;
+  condicao_pagamento_nome?: string | null;
+  transportadora_id?: string | null;
+  transportadora_nome?: string | null;
+  modalidade_frete?: string | null;
+  duplicatas?: any;
+  peso_bruto?: number | null;
+  peso_liquido?: number | null;
+  quantidade_volumes?: number | null;
+  especie_volumes?: string | null;
 };
 
 type NfeItemForm = {
@@ -418,19 +429,19 @@ export default function NfeEmissoesPage() {
     setFormNaturezaOperacao((row.natureza_operacao ?? '').toString());
     setFormNaturezaOperacaoId(row.natureza_operacao_id ?? null);
     setFormNaturezaOperacaoName(row.natureza_operacao ?? undefined);
-    setFormFormaPagamento((row as any).forma_pagamento ?? '');
-    setFormModalidadeFrete((row as any).modalidade_frete ?? '9');
+    setFormFormaPagamento(row.forma_pagamento ?? '');
+    setFormModalidadeFrete(row.modalidade_frete ?? '9');
     setFormDestinatarioId(row.destinatario_pessoa_id ?? null);
     setFormDestinatarioName(row.destinatario_nome ?? undefined);
-    setFormCondicaoPagamentoId((row as any).condicao_pagamento_id ?? null);
-    setFormCondicaoPagamentoNome((row as any).condicao_pagamento_nome ?? '');
-    setFormTransportadoraId((row as any).transportadora_id ?? null);
-    setFormTransportadoraNome((row as any).transportadora_nome ?? '');
-    setDuplicatasPreview((row as any).duplicatas ?? []);
-    setFormPesoBruto((row as any).peso_bruto ? String((row as any).peso_bruto) : '');
-    setFormPesoLiquido((row as any).peso_liquido ? String((row as any).peso_liquido) : '');
-    setFormQtdVolumes((row as any).quantidade_volumes ? String((row as any).quantidade_volumes) : '');
-    setFormEspecieVolumes((row as any).especie_volumes || 'VOLUMES');
+    setFormCondicaoPagamentoId(row.condicao_pagamento_id ?? null);
+    setFormCondicaoPagamentoNome(row.condicao_pagamento_nome ?? '');
+    setFormTransportadoraId(row.transportadora_id ?? null);
+    setFormTransportadoraNome(row.transportadora_nome ?? '');
+    setDuplicatasPreview(row.duplicatas ?? []);
+    setFormPesoBruto(row.peso_bruto ? String(row.peso_bruto) : '');
+    setFormPesoLiquido(row.peso_liquido ? String(row.peso_liquido) : '');
+    setFormQtdVolumes(row.quantidade_volumes ? String(row.quantidade_volumes) : '');
+    setFormEspecieVolumes(row.especie_volumes || 'VOLUMES');
     setProductToAddId(null);
     setProductToAddName(undefined);
 

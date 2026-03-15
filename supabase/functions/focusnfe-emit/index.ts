@@ -184,10 +184,12 @@ function buildFocusPayload(
       }
 
       // --- ICMS (from impostos JSONB or fallback) ---
+      // Normalize CST: strip leading zero for 3-digit codes (e.g. "090" → "90")
+      const normCst = (v: string) => v.replace(/^0(\d{2})$/, "$1");
       if (impostos?.icms) {
         const icms = impostos.icms;
         if (isRegimeNormal && icms.cst) {
-          itemPayload.icms_situacao_tributaria = icms.cst;
+          itemPayload.icms_situacao_tributaria = normCst(icms.cst);
           if (icms.base_calculo != null) itemPayload.icms_base_calculo = String(icms.base_calculo);
           if (icms.aliquota != null && icms.aliquota > 0) itemPayload.icms_aliquota = String(icms.aliquota);
           if (icms.valor != null && icms.valor > 0) itemPayload.icms_valor = String(icms.valor);
@@ -201,7 +203,7 @@ function buildFocusPayload(
         if (item.csosn) {
           itemPayload.icms_situacao_tributaria = item.csosn;
         } else if (item.cst) {
-          itemPayload.icms_situacao_tributaria = item.cst;
+          itemPayload.icms_situacao_tributaria = normCst(item.cst);
         } else {
           itemPayload.icms_situacao_tributaria = "102";
         }
