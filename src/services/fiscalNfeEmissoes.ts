@@ -59,6 +59,7 @@ export type NfeItemRow = {
   numero_pedido_cliente: string | null;
   numero_item_pedido: number | null;
   impostos: any;
+  codigo_beneficio_fiscal: string | null;
 };
 
 export type NfeAuditRow = {
@@ -128,6 +129,7 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
     numero_pedido_cliente?: string | null;
     numero_item_pedido?: number | null;
     informacoes_adicionais?: string | null;
+    codigo_beneficio_fiscal?: string | null;
   }>;
 }) {
   return callRpc<string>('fiscal_nfe_emissao_draft_upsert', {
