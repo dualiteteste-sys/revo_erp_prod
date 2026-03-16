@@ -29,7 +29,10 @@ export type NfeImportItem = {
   vprod: number;
   n_lote?: string | null;
   match_produto_id: string | null;
-  match_strategy: 'sku' | 'ean' | 'none';
+  match_produto_nome: string | null;
+  match_produto_sku: string | null;
+  match_produto_gtin: string | null;
+  match_strategy: 'depara' | 'sku' | 'ean' | 'none';
 };
 
 export type PreviewResult = {
@@ -64,5 +67,22 @@ export async function processBeneficiamentoImport(importId: string, matches: Mat
   return callRpc<void>('beneficiamento_process_from_import', {
     p_import_id: importId,
     p_matches: matches
+  });
+}
+
+export type DeparaItem = {
+  cprod_xml: string;
+  ean_xml?: string | null;
+  xprod_xml?: string | null;
+  produto_id: string;
+};
+
+export async function saveFornecedorDepara(
+  fornecedorCnpj: string,
+  items: DeparaItem[],
+): Promise<number> {
+  return callRpc<number>('produto_fornecedor_depara_save_batch', {
+    p_fornecedor_cnpj: fornecedorCnpj,
+    p_items: items,
   });
 }
