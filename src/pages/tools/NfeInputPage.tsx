@@ -17,7 +17,9 @@ import {
   previewBeneficiamento,
   NfeImportPayload,
   PreviewResult,
-  MatchItem
+  MatchItem,
+  saveFornecedorDepara,
+  type DeparaItem,
 } from '@/services/nfeInput';
 import {
   conferirItem,
@@ -40,6 +42,18 @@ import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 // Helper para acesso seguro a propriedades aninhadas
 const get = (obj: any, path: string, defaultValue: any = null) => {
   return path.split('.').reduce((acc, part) => acc && acc[part], obj) || defaultValue;
+};
+
+const isValidEan = (ean: string | null | undefined) =>
+  ean != null && ean.trim() !== '' && !['SEM GTIN', 'SEMGTIN', 'NAO INFORMADO', 'N/A', '0'].includes(ean.trim().toUpperCase());
+
+const formatEanDisplay = (ean: string | null | undefined) =>
+  !ean || !ean.trim() ? '-' : isValidEan(ean) ? ean.trim() : 'sem GTIN';
+
+const STRATEGY_LABELS: Record<string, { label: string; color: string }> = {
+  depara: { label: 'De-Para', color: 'bg-purple-100 text-purple-700' },
+  ean: { label: 'EAN', color: 'bg-green-100 text-green-700' },
+  sku: { label: 'SKU', color: 'bg-green-100 text-green-700' },
 };
 
 const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => (
@@ -76,6 +90,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [recebimentoId, setRecebimentoId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
   const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string, codigo?: string | null }>>({}); // item_id -> { id, name, codigo }
+  const [overriddenAutoMatches, setOverriddenAutoMatches] = useState<Set<string>>(new Set()); // item_ids where user wants to override auto-match
   const [lotesManual, setLotesManual] = useState<Record<string, string>>({}); // item_id -> lote
   const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
   const [matchSort, setMatchSort] = useState<SortState<'item' | 'qty' | 'vinculo' | 'status'>>({ column: 'status', direction: 'asc' });
@@ -206,6 +221,12 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
   }, [autoFinalizeMaterialCliente, embedded, navigate, recebimentoId, step]);
 
+  const isItemMatched = useCallback((it: any) => {
+    if (manualMatches[it.item_id]) return true;
+    if (overriddenAutoMatches.has(it.item_id)) return false;
+    return !!it.match_produto_id;
+  }, [manualMatches, overriddenAutoMatches]);
+
   const matchingSorted = useMemo(() => {
     const itens = previewData?.itens ?? [];
     return sortRows(
@@ -214,11 +235,11 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       [
         { id: 'item', type: 'string', getValue: (it: any) => it.xprod ?? '' },
         { id: 'qty', type: 'number', getValue: (it: any) => typeof it.qcom === 'number' ? it.qcom : Number(it.qcom) },
-        { id: 'vinculo', type: 'string', getValue: (it: any) => String(it.match_produto_id || manualMatches[it.item_id]?.name || '') },
-        { id: 'status', type: 'custom', getValue: (it: any) => (!!it.match_produto_id || !!manualMatches[it.item_id]) ? 1 : 0, compare: (a, b) => Number(a) - Number(b) },
+        { id: 'vinculo', type: 'string', getValue: (it: any) => String(it.match_produto_nome || manualMatches[it.item_id]?.name || '') },
+        { id: 'status', type: 'custom', getValue: (it: any) => isItemMatched(it) ? 1 : 0, compare: (a, b) => Number(a) - Number(b) },
       ] as const
     );
-  }, [manualMatches, matchSort, previewData?.itens]);
+  }, [manualMatches, matchSort, previewData?.itens, isItemMatched]);
 
   const conferenciaSorted = useMemo(() => {
     const itens = previewData?.itens ?? [];
@@ -502,7 +523,8 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       const matchByFiscalItemId: Record<string, string> = {};
       for (const it of previewData.itens || []) {
         const manual = manualMatches[it.item_id]?.id || null;
-        const auto = it.match_produto_id || null;
+        const autoOk = !overriddenAutoMatches.has(it.item_id);
+        const auto = autoOk ? (it.match_produto_id || null) : null;
         const resolved = manual || auto;
         if (resolved) matchByFiscalItemId[it.item_id] = resolved;
       }
@@ -548,6 +570,26 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
             updateRecebimentoItemLote(item.id, lotesManual[item.fiscal_nfe_item_id] || null)
           )
         );
+      }
+
+      // Persistir de-para (fornecedor → produto) para auto-match futuro
+      const emitenteCnpj = previewData?.import?.emitente_cnpj;
+      if (emitenteCnpj) {
+        const deparaItems: DeparaItem[] = (previewData.itens || [])
+          .filter((it) => matchByFiscalItemId[it.item_id] && it.cprod)
+          .map((it) => ({
+            cprod_xml: it.cprod!,
+            ean_xml: it.ean,
+            xprod_xml: it.xprod,
+            produto_id: matchByFiscalItemId[it.item_id],
+          }));
+        if (deparaItems.length > 0) {
+          try {
+            await saveFornecedorDepara(emitenteCnpj, deparaItems);
+          } catch {
+            // Non-critical: don't block the flow if de-para save fails
+          }
+        }
       }
 
       if (embedded && autoFinalizeMaterialCliente) {
@@ -625,7 +667,8 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     const matchByFiscalItemId: Record<string, string> = {};
     for (const it of previewData.itens || []) {
       const manual = manualMatches[it.item_id]?.id || null;
-      const auto = it.match_produto_id || null;
+      const autoOk = !overriddenAutoMatches.has(it.item_id);
+      const auto = autoOk ? (it.match_produto_id || null) : null;
       const resolved = manual || auto;
       if (resolved) matchByFiscalItemId[it.item_id] = resolved;
     }
@@ -645,6 +688,8 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
 
   const handleMatchSelect = (itemId: string, product: any) => {
     setManualMatches(prev => ({ ...prev, [itemId]: { id: product.id, name: product.descricao, codigo: product.codigo ?? null } }));
+    // Remove from overridden set since user has now selected a replacement
+    setOverriddenAutoMatches(prev => { const n = new Set(prev); n.delete(itemId); return n; });
   };
 
   // Renderização
@@ -834,62 +879,95 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {matchingSorted.map((item) => {
-                    const isMatched = !!item.match_produto_id || !!manualMatches[item.item_id];
+                    const manual = manualMatches[item.item_id];
+                    const isOverridden = overriddenAutoMatches.has(item.item_id);
+                    const hasAutoMatch = !!item.match_produto_id && !isOverridden;
+                    const matched = isItemMatched(item);
+                    // Determine what to show — manual takes priority over auto
+                    const showAutoMatch = hasAutoMatch && !manual;
+                    const showManual = !!manual;
+                    const showSearch = !showAutoMatch && !showManual;
+
+                    // Product details for auto-match display
+                    const matchNome = item.match_produto_nome;
+                    const matchSku = item.match_produto_sku;
+                    const matchGtin = item.match_produto_gtin;
+                    const strategy = STRATEGY_LABELS[item.match_strategy] || null;
+
                     return (
-                      <tr key={item.item_id} className={isMatched ? 'bg-green-50/30' : 'bg-red-50/30'}>
+                      <tr key={item.item_id} className={matched ? 'bg-green-50/30' : 'bg-red-50/30'}>
                         <td className="px-4 py-3">
                           <p className="text-sm font-medium text-gray-900">{item.xprod}</p>
-                          <p className="text-xs text-gray-500">Cód: {item.cprod} | EAN: {item.ean || '-'}</p>
+                          <p className="text-xs text-gray-500">
+                            Cód: {item.cprod || '-'}
+                            {' | '}
+                            EAN: <span className={!isValidEan(item.ean) ? 'text-gray-400 italic' : ''}>{formatEanDisplay(item.ean)}</span>
+                          </p>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-700">
                           {formatQty(item.qcom)} <span className="text-xs text-gray-500">{item.ucom}</span>
                         </td>
                         <td className="px-4 py-3 w-[40rem]">
-                          {item.match_produto_id || manualMatches[item.item_id] ? (
+                          {showAutoMatch && (
                             <div className="flex items-center gap-2 text-sm text-green-700">
-                              <CheckCircle size={16} />
-                              <div>
-                                <p className="font-medium">
-                                  {item.match_produto_id
-                                    ? (item.match_strategy === 'sku'
-                                        ? `Encontrado por SKU: ${item.cprod}`
-                                        : item.match_strategy === 'ean'
-                                        ? `Encontrado por EAN: ${item.ean}`
-                                        : 'Produto encontrado automaticamente')
-                                    : manualMatches[item.item_id]?.name || 'Produto vinculado manualmente'}
-                                </p>
+                              <CheckCircle size={16} className="flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{matchNome || 'Produto encontrado'}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  {item.match_produto_id && item.match_strategy !== 'none' && (
-                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                                      {item.match_strategy === 'sku' ? 'SKU' : 'EAN'}
+                                  {strategy && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${strategy.color}`}>
+                                      {strategy.label}
                                     </span>
                                   )}
-                                  {!item.match_produto_id && manualMatches[item.item_id] && (
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                                      Manual
+                                  {matchSku && (
+                                    <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                                      SKU: {matchSku}
                                     </span>
                                   )}
-                                  {!item.match_produto_id && manualMatches[item.item_id]?.codigo && (
+                                  {isValidEan(matchGtin) && (
                                     <span className="text-xs text-gray-500">
-                                      Cód: {manualMatches[item.item_id]?.codigo}
+                                      EAN: {matchGtin}
                                     </span>
                                   )}
                                 </div>
                               </div>
-                              {!item.match_produto_id && (
-                                <button
-                                  onClick={() => {
-                                    const newMatches = { ...manualMatches };
-                                    delete newMatches[item.item_id];
-                                    setManualMatches(newMatches);
-                                  }}
-                                  className="ml-2 text-xs text-red-500 hover:text-red-700 underline"
-                                >
-                                  Desvincular
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setOverriddenAutoMatches(prev => new Set(prev).add(item.item_id))}
+                                className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                              >
+                                Alterar
+                              </button>
                             </div>
-                          ) : (
+                          )}
+                          {showManual && (
+                            <div className="flex items-center gap-2 text-sm text-green-700">
+                              <CheckCircle size={16} className="flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{manual.name}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                    Manual
+                                  </span>
+                                  {manual.codigo && (
+                                    <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                                      SKU: {manual.codigo}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newMatches = { ...manualMatches };
+                                  delete newMatches[item.item_id];
+                                  setManualMatches(newMatches);
+                                }}
+                                className="ml-2 text-xs text-red-500 hover:text-red-700 underline whitespace-nowrap"
+                              >
+                                Desvincular
+                              </button>
+                            </div>
+                          )}
+                          {showSearch && (
                             <div className="w-full max-w-[40rem]">
                               <ItemAutocomplete
                                 onSelect={(prod) => handleMatchSelect(item.item_id, prod)}
@@ -899,7 +977,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                                 createProductInitialValues={{
                                   nome: item.xprod || '',
                                   sku: item.cprod || '',
-                                  gtin: item.ean || '',
+                                  gtin: isValidEan(item.ean) ? (item.ean || '') : '',
                                   unidade: item.ucom || 'un',
                                   preco_custo: item.vuncom || 0,
                                 }}
@@ -908,7 +986,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {isMatched ? (
+                          {matched ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               Pronto
                             </span>
