@@ -7,7 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { AlertTriangle, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
+import { AlertTriangle, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import NaturezaOperacaoAutocomplete from '@/components/common/NaturezaOperacaoAutocomplete';
@@ -21,6 +21,7 @@ import {
   fiscalNfeAuditTimelineList,
   fiscalNfeConsultaStatus,
   fiscalNfeEmissaoDraftUpsert,
+  fiscalNfeEmissaoDelete,
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
   fiscalNfeSubmit,
@@ -97,6 +98,18 @@ const STATUS_LABEL: Record<string, string> = {
   cancelada: 'Cancelada',
   erro: 'Erro',
 };
+
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  rascunho: 'bg-indigo-100 text-indigo-800',
+  enfileirada: 'bg-amber-100 text-amber-800',
+  processando: 'bg-amber-100 text-amber-800',
+  autorizada: 'bg-emerald-100 text-emerald-800',
+  rejeitada: 'bg-red-100 text-red-800',
+  cancelada: 'bg-slate-100 text-slate-600',
+  erro: 'bg-red-100 text-red-800',
+};
+
+const DELETABLE_STATUSES = ['rascunho', 'erro', 'rejeitada'];
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
@@ -193,13 +206,21 @@ export default function NfeEmissoesPage() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [sort, setSort] = useState<SortState<string>>({ column: 'atualizado', direction: 'desc' });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<NfeEmissao | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const columns: TableColumnWidthDef[] = [
-    { id: 'status', defaultWidth: 260, minWidth: 200 },
-    { id: 'numero_serie', defaultWidth: 160, minWidth: 140 },
-    { id: 'ambiente', defaultWidth: 140, minWidth: 120 },
-    { id: 'valor', defaultWidth: 160, minWidth: 140 },
-    { id: 'atualizado', defaultWidth: 220, minWidth: 180 },
+    { id: 'checkbox', defaultWidth: 48, minWidth: 40 },
+    { id: 'status', defaultWidth: 180, minWidth: 140 },
+    { id: 'destinatario', defaultWidth: 200, minWidth: 150 },
+    { id: 'natureza', defaultWidth: 180, minWidth: 140 },
+    { id: 'numero_serie', defaultWidth: 120, minWidth: 100 },
+    { id: 'ambiente', defaultWidth: 120, minWidth: 100 },
+    { id: 'valor', defaultWidth: 140, minWidth: 120 },
+    { id: 'atualizado', defaultWidth: 160, minWidth: 140 },
     { id: 'acao', defaultWidth: 320, minWidth: 260 },
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'fiscal:nfe-emissoes', columns });
@@ -351,10 +372,11 @@ export default function NfeEmissoesPage() {
     const rascunhos = rows.filter((r) => r.status === 'rascunho').length;
     const autorizadas = rows.filter((r) => r.status === 'autorizada').length;
     const pendentes = rows.filter((r) => ['enfileirada', 'processando'].includes(r.status)).length;
+    const rejeitadasErro = rows.filter((r) => ['rejeitada', 'erro'].includes(r.status)).length;
     const totalAutorizadasValor = rows
       .filter((r) => r.status === 'autorizada')
       .reduce((sum, r) => sum + (r.total_nfe ?? r.valor_total ?? 0), 0);
-    return { total, rascunhos, autorizadas, pendentes, totalAutorizadasValor };
+    return { total, rascunhos, autorizadas, pendentes, rejeitadasErro, totalAutorizadasValor };
   }, [rows]);
 
   const exportCsv = () => {
@@ -388,6 +410,8 @@ export default function NfeEmissoesPage() {
       sort as any,
       [
         { id: 'status', type: 'string', getValue: (r) => STATUS_LABEL[r.status] || r.status },
+        { id: 'destinatario', type: 'string', getValue: (r) => r.destinatario_nome ?? '' },
+        { id: 'natureza', type: 'string', getValue: (r) => r.natureza_operacao ?? '' },
         { id: 'numero_serie', type: 'number', getValue: (r) => Number(r.numero ?? 0) * 1000 + Number(r.serie ?? 0) },
         { id: 'ambiente', type: 'string', getValue: (r) => r.ambiente ?? '' },
         { id: 'valor', type: 'number', getValue: (r) => Number(r.total_nfe ?? r.valor_total ?? 0) },
@@ -395,6 +419,65 @@ export default function NfeEmissoesPage() {
       ] as const
     );
   }, [rows, sort]);
+
+  const deletableRows = useMemo(() => sortedRows.filter((r) => DELETABLE_STATUSES.includes(r.status)), [sortedRows]);
+  const selectedCount = selected.size;
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === deletableRows.length && deletableRows.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(deletableRows.map((r) => r.id)));
+    }
+  };
+
+  // Clear selection when rows change
+  useEffect(() => { setSelected(new Set()); }, [rows]);
+
+  const handleDeleteSingle = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await fiscalNfeEmissaoDelete(deleteTarget.id);
+      addToast('NF-e excluída com sucesso.', 'success');
+      setDeleteTarget(null);
+      await fetchList();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao excluir NF-e.', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selected);
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of ids) {
+      try {
+        await fiscalNfeEmissaoDelete(id);
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+    if (successCount > 0) addToast(`${successCount} NF-e(s) excluída(s) com sucesso.`, 'success');
+    if (errorCount > 0) addToast(`${errorCount} NF-e(s) não puderam ser excluídas.`, 'error');
+    setShowBulkDeleteConfirm(false);
+    setSelected(new Set());
+    setBulkDeleting(false);
+    await fetchList();
+  };
 
   const openNew = async () => {
     setEditing(null);
@@ -850,9 +933,9 @@ export default function NfeEmissoesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-          <p className="text-xs text-slate-700 font-semibold">Total (filtro)</p>
+          <p className="text-xs text-slate-700 font-semibold">Total</p>
           <p className="text-2xl font-bold text-slate-800">{totals.total}</p>
         </div>
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
@@ -866,6 +949,10 @@ export default function NfeEmissoesPage() {
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
           <p className="text-xs text-amber-700 font-semibold">Pendentes</p>
           <p className="text-2xl font-bold text-amber-800">{totals.pendentes}</p>
+        </div>
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+          <p className="text-xs text-red-700 font-semibold">Rejeitadas / Erro</p>
+          <p className="text-2xl font-bold text-red-800">{totals.rejeitadasErro}</p>
         </div>
         <div className="bg-green-50 border border-green-100 rounded-xl p-4">
           <p className="text-xs text-green-700 font-semibold">Valor Autorizado</p>
@@ -919,6 +1006,26 @@ export default function NfeEmissoesPage() {
         </button>
       </div>
 
+      {selectedCount > 0 && (
+        <div className="mb-3 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <span className="text-sm font-semibold text-blue-800">{selectedCount} selecionada(s)</span>
+          <button
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-100 text-red-800 hover:bg-red-200 disabled:opacity-50"
+            onClick={() => setShowBulkDeleteConfirm(true)}
+            disabled={bulkDeleting}
+          >
+            <Trash2 size={14} />
+            Excluir selecionadas
+          </button>
+          <button
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+            onClick={() => setSelected(new Set())}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="h-56 flex items-center justify-center">
@@ -936,8 +1043,19 @@ export default function NfeEmissoesPage() {
               <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-3 py-3 w-12">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={deletableRows.length > 0 && selected.size === deletableRows.length}
+                      onChange={toggleSelectAll}
+                      title="Selecionar todos os deletáveis"
+                    />
+                  </th>
                   <ResizableSortableTh columnId="status" label="Status" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
-                  <ResizableSortableTh columnId="numero_serie" label="Número/Série" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="destinatario" label="Destinatário" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="natureza" label="Nat. Operação" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="numero_serie" label="Nº / Série" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
                   <ResizableSortableTh columnId="ambiente" label="Ambiente" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
                   <ResizableSortableTh columnId="valor" label="Valor" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
                   <ResizableSortableTh columnId="atualizado" label="Atualizado" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
@@ -945,10 +1063,26 @@ export default function NfeEmissoesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedRows.map((row) => (
+                {sortedRows.map((row) => {
+                  const isDeletable = DELETABLE_STATUSES.includes(row.status);
+                  return (
                   <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      <span className="font-semibold">{STATUS_LABEL[row.status] || row.status}</span>
+                    <td className="px-3 py-4 w-12">
+                      {isDeletable ? (
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={selected.has(row.id)}
+                          onChange={() => toggleSelect(row.id)}
+                        />
+                      ) : <span className="block w-4" />}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE_CLASS[row.status] || 'bg-gray-100 text-gray-700'}`}>
+                        {row.status === 'processando' && !isProcessandoStale(row) && <Loader2 size={12} className="animate-spin mr-1" />}
+                        {row.status === 'processando' && isProcessandoStale(row) && <AlertTriangle size={12} className="mr-1" />}
+                        {STATUS_LABEL[row.status] || row.status}
+                      </span>
                       {(row.rejection_code || row.last_error) ? (
                         <RejectionCard
                           code={row.rejection_code}
@@ -957,69 +1091,68 @@ export default function NfeEmissoesPage() {
                         />
                       ) : null}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[200px] truncate" title={row.destinatario_nome ?? ''}>
+                      {row.destinatario_nome || <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[180px] truncate" title={row.natureza_operacao ?? ''}>
+                      {row.natureza_operacao || <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
                       {row.numero != null ? row.numero : '—'} / {row.serie != null ? row.serie : '—'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
                       {row.ambiente === 'producao' ? (
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Produção</span>
                       ) : (
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Homologação</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">
                       {formatCurrency(row.total_nfe ?? row.valor_total)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(row.updated_at)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-3">
-                        {['rascunho', 'erro', 'rejeitada'].includes(row.status) ? (
-                          <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(row.updated_at)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        {isDeletable ? (
+                          <button className="text-blue-600 hover:text-blue-900 text-sm font-semibold" onClick={() => void openEdit(row)} title="Abrir rascunho">
                             Abrir
                           </button>
                         ) : null}
-                        {['rascunho', 'erro', 'rejeitada'].includes(row.status) && features.nfe_emissao_enabled ? (
+                        {isDeletable && features.nfe_emissao_enabled ? (
                           <button
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
                             onClick={() => void handleSubmitNfe(row.id)}
                             disabled={submitting === row.id}
                             title="Enviar para SEFAZ via Focus NF-e"
                           >
-                            {submitting === row.id ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                            Enviar SEFAZ
+                            {submitting === row.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                            Enviar
                           </button>
                         ) : null}
                         {row.status === 'processando' ? (
-                          <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-amber-100 text-amber-800">
-                            {isProcessandoStale(row)
-                              ? <AlertTriangle size={16} className="text-amber-600" />
-                              : <Loader2 size={16} className="animate-spin" />}
-                            {isProcessandoStale(row) ? 'Aguardando SEFAZ (+10 min)' : 'Processando'}
-                            <button
-                              className="ml-1 underline text-xs font-normal hover:text-amber-900"
-                              title="Verificar status agora"
-                              onClick={() => void fiscalNfeConsultaStatus(row.id).then(() => fetchList())}
-                            >
-                              Verificar
-                            </button>
-                          </span>
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200"
+                            title="Verificar status agora"
+                            onClick={() => void fiscalNfeConsultaStatus(row.id).then(() => fetchList())}
+                          >
+                            <Search size={14} />
+                            Verificar
+                          </button>
                         ) : null}
                         <button
-                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200"
                           onClick={() => void openAudit(row.id)}
-                          title="Auditoria da NF-e"
+                          title="Auditoria"
                         >
-                          <Search size={16} />
-                          Auditoria
+                          <Eye size={14} />
                         </button>
                         {row.chave_acesso ? (
                           <button
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200"
                             onClick={() => void copyChave(row.chave_acesso!)}
                             title="Copiar chave de acesso"
                           >
-                            <Copy size={16} />
-                            Chave
+                            <Copy size={14} />
                           </button>
                         ) : null}
                         {row.danfe_url ? (
@@ -1027,10 +1160,10 @@ export default function NfeEmissoesPage() {
                             href={row.danfe_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
                             title="Download DANFE (PDF)"
                           >
-                            <FileText size={16} />
+                            <FileText size={14} />
                             DANFE
                           </a>
                         ) : null}
@@ -1039,17 +1172,27 @@ export default function NfeEmissoesPage() {
                             href={row.xml_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-gray-100 text-gray-800 hover:bg-gray-200"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
                             title="Download XML"
                           >
-                            <Download size={16} />
+                            <Download size={14} />
                             XML
                           </a>
+                        ) : null}
+                        {isDeletable ? (
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100"
+                            onClick={() => setDeleteTarget(row)}
+                            title="Excluir NF-e"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         ) : null}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1588,6 +1731,46 @@ export default function NfeEmissoesPage() {
               </Button>
             </div>
           ) : null}
+        </div>
+      </Modal>
+
+      {/* Delete single confirmation */}
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Excluir NF-e" size="sm">
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-700">
+            Deseja excluir esta NF-e ({deleteTarget?.destinatario_nome || 'sem destinatário'})? Esta ação não pode ser desfeita.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</Button>
+            <Button
+              onClick={() => void handleDeleteSingle()}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
+              Excluir
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk delete confirmation */}
+      <Modal isOpen={showBulkDeleteConfirm} onClose={() => setShowBulkDeleteConfirm(false)} title="Excluir NF-e em lote" size="sm">
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-700">
+            Deseja excluir <strong>{selectedCount}</strong> NF-e selecionada(s)? Esta ação não pode ser desfeita.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setShowBulkDeleteConfirm(false)} disabled={bulkDeleting}>Cancelar</Button>
+            <Button
+              onClick={() => void handleBulkDelete()}
+              disabled={bulkDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {bulkDeleting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
+              Excluir {selectedCount}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
