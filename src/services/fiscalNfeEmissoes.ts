@@ -236,3 +236,7 @@ export async function fiscalNfeConsultaStatus(emissaoId: string): Promise<NfeSub
   return data as NfeSubmitResult;
 }
 
+export async function fiscalNfeEmissaoDelete(id: string) {
+  return callRpc<void>('fiscal_nfe_emissao_delete', { p_id: id });
+}
+
