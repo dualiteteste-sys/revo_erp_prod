@@ -198,9 +198,6 @@ function buildFocusPayload(
           }
           if (icms.aliquota != null && icms.aliquota > 0) itemPayload.icms_aliquota = String(icms.aliquota);
           if (icms.valor != null && icms.valor > 0) itemPayload.icms_valor = String(icms.valor);
-          // cBenef: prefer item-level override, then impostos JSONB from motor tributário
-          const cBenef = item.codigo_beneficio_fiscal || icms.codigo_beneficio_fiscal;
-          if (cBenef) itemPayload.codigo_beneficio_fiscal = cBenef;
         } else if (icms.csosn) {
           itemPayload.icms_situacao_tributaria = icms.csosn;
         } else {
@@ -248,6 +245,15 @@ function buildFocusPayload(
         if (ipi.base_calculo != null) itemPayload.ipi_base_calculo = String(ipi.base_calculo);
         if (ipi.aliquota != null && ipi.aliquota > 0) itemPayload.ipi_aliquota = String(ipi.aliquota);
         if (ipi.valor != null && ipi.valor > 0) itemPayload.ipi_valor = String(ipi.valor);
+      }
+
+      // --- cBenef (Código de Benefício Fiscal) ---
+      // Tag cBenef (I05f) é campo do ITEM (det/prod/cBenef), não do ICMS.
+      // Fontes (prioridade): item.codigo_beneficio_fiscal → impostos.icms.codigo_beneficio_fiscal
+      // DEVE ficar fora dos blocos ICMS para executar em qualquer caminho.
+      {
+        const cBenef = (item.codigo_beneficio_fiscal || impostos?.icms?.codigo_beneficio_fiscal || "").trim();
+        if (cBenef) itemPayload.codigo_beneficio_fiscal = cBenef;
       }
 
       // --- xPed / nItemPed / infAdProd (Fase 7) ---
@@ -615,6 +621,47 @@ Deno.serve(async (req) => {
     // 6. Build Focus NFe payload
     const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens, transportadora);
 
+    // 6b. Pre-flight: validate cBenef on items that require it
+    // CSTs that require cBenef (per NT 2019.001 / N12-85): 20,30,40,41,50,51,70,90
+    const CST_REQUIRES_CBENEF = new Set(["20", "30", "40", "41", "50", "51", "70", "90"]);
+    const ufEmitente = (emitenteFull.endereco_uf || "").toUpperCase();
+    const cbenefWarnings: string[] = [];
+    if (focusPayload.items && Array.isArray(focusPayload.items)) {
+      for (const fi of focusPayload.items) {
+        const cst = String(fi.icms_situacao_tributaria || "");
+        if (CST_REQUIRES_CBENEF.has(cst) && !fi.codigo_beneficio_fiscal) {
+          cbenefWarnings.push(
+            `Item ${fi.numero_item} (${fi.descricao}): CST ${cst} exige cBenef mas não informado. ` +
+            `Preencha o campo "cBenef" no item do rascunho ou use SP099999 (sem benefício).`
+          );
+        }
+      }
+    }
+    if (cbenefWarnings.length > 0) {
+      const detail = `Validação cBenef: ${cbenefWarnings.join(" | ")}`;
+      await admin.from("fiscal_nfe_emissoes").update({
+        status: "erro",
+        last_error: detail,
+        updated_at: new Date().toISOString(),
+      }).eq("id", emissao_id);
+
+      await admin.from("fiscal_nfe_provider_logs").insert({
+        empresa_id: empresaId,
+        emissao_id,
+        provider: "focusnfe",
+        level: "warn",
+        message: `cBenef validation failed`,
+        payload: { warnings: cbenefWarnings, uf: ufEmitente, request_id: requestId },
+      });
+
+      return json(422, {
+        ok: false,
+        error: "CBENEF_MISSING",
+        detail,
+        warnings: cbenefWarnings,
+      }, cors);
+    }
+
     // 7. Generate idempotency ref (use emissao UUID)
     const ref = emissao_id;
     const baseUrl = getFocusBaseUrl(ambiente);
@@ -626,14 +673,19 @@ Deno.serve(async (req) => {
       .update({ status: "processando", last_error: null, updated_at: new Date().toISOString() })
       .eq("id", emissao_id);
 
-    // Log the submission
+    // Log the submission (include cBenef values for each item for diagnostics)
+    const itemsCbenefDiag = (focusPayload.items || []).map((fi: any) => ({
+      numero_item: fi.numero_item,
+      cst: fi.icms_situacao_tributaria,
+      codigo_beneficio_fiscal: fi.codigo_beneficio_fiscal || null,
+    }));
     await admin.from("fiscal_nfe_provider_logs").insert({
       empresa_id: empresaId,
       emissao_id,
       provider: "focusnfe",
       level: "info",
       message: `Submitting NFe to Focus (${ambiente})`,
-      payload: { url, ref, request_id: requestId },
+      payload: { url, ref, request_id: requestId, items_cbenef: itemsCbenefDiag },
     });
 
     // 9. Call Focus NFe API
