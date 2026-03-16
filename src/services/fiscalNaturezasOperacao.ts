@@ -13,6 +13,7 @@ export type NaturezaOperacaoRow = {
   icms_csosn: string | null;
   icms_aliquota: number;
   icms_reducao_base: number;
+  codigo_beneficio_fiscal: string | null;
   pis_cst: string;
   pis_aliquota: number;
   cofins_cst: string;
@@ -43,6 +44,7 @@ export type NaturezaOperacaoSearchHit = {
   icms_csosn: string | null;
   icms_aliquota: number;
   icms_reducao_base: number;
+  codigo_beneficio_fiscal: string | null;
   pis_cst: string;
   pis_aliquota: number;
   cofins_cst: string;
