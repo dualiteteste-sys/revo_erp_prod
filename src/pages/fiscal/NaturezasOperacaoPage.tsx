@@ -572,7 +572,7 @@ const NaturezasOperacaoPage: React.FC = () => {
                 placeholder="Ex: SP000202"
                 maxLength={10}
               />
-              <p className="text-xs text-slate-400 mt-1">Obrigatório para CSTs 20, 30, 40, 41, 50, 51, 70. Consulte a tabela do seu estado.</p>
+              <p className="text-xs text-slate-400 mt-1">Obrigatório para CSTs 20, 30, 40, 41, 50, 51, 70 e 90. Consulte a tabela do seu estado.</p>
             </div>
           </fieldset>
 
