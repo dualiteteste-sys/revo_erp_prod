@@ -52,6 +52,7 @@ type FormData = {
   icms_csosn: string;
   icms_aliquota: string;
   icms_reducao_base: string;
+  codigo_beneficio_fiscal: string;
   pis_cst: string;
   pis_aliquota: string;
   cofins_cst: string;
@@ -78,6 +79,7 @@ const EMPTY_FORM: FormData = {
   icms_csosn: '',
   icms_aliquota: '0',
   icms_reducao_base: '0',
+  codigo_beneficio_fiscal: '',
   pis_cst: '99',
   pis_aliquota: '0',
   cofins_cst: '99',
@@ -106,6 +108,7 @@ function rowToForm(r: NaturezaOperacaoRow): FormData {
     icms_csosn: r.icms_csosn ?? '',
     icms_aliquota: String(r.icms_aliquota),
     icms_reducao_base: String(r.icms_reducao_base),
+    codigo_beneficio_fiscal: r.codigo_beneficio_fiscal ?? '',
     pis_cst: r.pis_cst ?? '99',
     pis_aliquota: String(r.pis_aliquota),
     cofins_cst: r.cofins_cst ?? '99',
@@ -220,6 +223,7 @@ const NaturezasOperacaoPage: React.FC = () => {
         icms_csosn: form.icms_csosn.trim() || null,
         icms_aliquota: Number(form.icms_aliquota) || 0,
         icms_reducao_base: Number(form.icms_reducao_base) || 0,
+        codigo_beneficio_fiscal: form.codigo_beneficio_fiscal.trim() || null,
         pis_cst: form.pis_cst.trim() || '99',
         pis_aliquota: Number(form.pis_aliquota) || 0,
         cofins_cst: form.cofins_cst.trim() || '99',
@@ -558,6 +562,17 @@ const NaturezasOperacaoPage: React.FC = () => {
                   min="0"
                 />
               </div>
+            </div>
+            <div className="mt-3">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Cód. Benefício Fiscal (cBenef)</label>
+              <input
+                className="w-full md:w-1/2 p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
+                value={form.codigo_beneficio_fiscal}
+                onChange={(e) => setForm(f => ({ ...f, codigo_beneficio_fiscal: e.target.value.toUpperCase().slice(0, 10) }))}
+                placeholder="Ex: SP000202"
+                maxLength={10}
+              />
+              <p className="text-xs text-slate-400 mt-1">Obrigatório para CSTs 20, 30, 40, 41, 50, 51, 70. Consulte a tabela do seu estado.</p>
             </div>
           </fieldset>
 
