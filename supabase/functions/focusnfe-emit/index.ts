@@ -190,7 +190,12 @@ function buildFocusPayload(
         const icms = impostos.icms;
         if (isRegimeNormal && icms.cst) {
           itemPayload.icms_situacao_tributaria = normCst(icms.cst);
-          if (icms.base_calculo != null) itemPayload.icms_base_calculo = String(icms.base_calculo);
+          // modBC must precede vBC in the NF-e XML schema
+          // 0=MVA, 1=Pauta, 2=Preço Tabelado Máx, 3=Valor da Operação (default)
+          if (icms.base_calculo != null) {
+            itemPayload.icms_modalidade_base_calculo = String(icms.modalidade_base_calculo ?? 3);
+            itemPayload.icms_base_calculo = String(icms.base_calculo);
+          }
           if (icms.aliquota != null && icms.aliquota > 0) itemPayload.icms_aliquota = String(icms.aliquota);
           if (icms.valor != null && icms.valor > 0) itemPayload.icms_valor = String(icms.valor);
         } else if (icms.csosn) {
