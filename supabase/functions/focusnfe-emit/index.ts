@@ -198,7 +198,9 @@ function buildFocusPayload(
           }
           if (icms.aliquota != null && icms.aliquota > 0) itemPayload.icms_aliquota = String(icms.aliquota);
           if (icms.valor != null && icms.valor > 0) itemPayload.icms_valor = String(icms.valor);
-          if (icms.codigo_beneficio_fiscal) itemPayload.icms_codigo_beneficio = icms.codigo_beneficio_fiscal;
+          // cBenef: prefer item-level override, then impostos JSONB from motor tributário
+          const cBenef = item.codigo_beneficio_fiscal || icms.codigo_beneficio_fiscal;
+          if (cBenef) itemPayload.codigo_beneficio_fiscal = cBenef;
         } else if (icms.csosn) {
           itemPayload.icms_situacao_tributaria = icms.csosn;
         } else {

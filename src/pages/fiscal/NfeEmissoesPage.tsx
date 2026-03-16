@@ -87,6 +87,7 @@ type NfeItemForm = {
   cst: string;
   csosn: string;
   informacoes_adicionais: string;
+  codigo_beneficio_fiscal: string;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -294,6 +295,17 @@ export default function NfeEmissoesPage() {
         pedido_origem_id: r.pedido_origem_id ?? null,
         danfe_url: r.danfe_url ?? null,
         xml_url: r.xml_url ?? null,
+        forma_pagamento: r.forma_pagamento ?? null,
+        condicao_pagamento_id: r.condicao_pagamento_id ?? null,
+        condicao_pagamento_nome: r.condicao_pagamento_nome ?? null,
+        transportadora_id: r.transportadora_id ?? null,
+        transportadora_nome: r.transportadora_nome ?? null,
+        modalidade_frete: r.modalidade_frete ?? null,
+        duplicatas: r.duplicatas ?? null,
+        peso_bruto: r.peso_bruto ?? null,
+        peso_liquido: r.peso_liquido ?? null,
+        quantidade_volumes: r.quantidade_volumes ?? null,
+        especie_volumes: r.especie_volumes ?? null,
       }));
 
       setRows(list);
@@ -544,6 +556,7 @@ export default function NfeEmissoesPage() {
           cst: (it.cst ?? '').toString(),
           csosn: (it.csosn ?? '').toString(),
           informacoes_adicionais: (it.informacoes_adicionais ?? '').toString(),
+          codigo_beneficio_fiscal: (it.codigo_beneficio_fiscal ?? '').toString(),
         }))
       );
     } catch (e: any) {
@@ -691,6 +704,7 @@ export default function NfeEmissoesPage() {
         cst: it.cst || null,
         csosn: it.csosn || null,
         informacoes_adicionais: it.informacoes_adicionais || null,
+        codigo_beneficio_fiscal: it.codigo_beneficio_fiscal || null,
       })),
     });
 
@@ -735,6 +749,7 @@ export default function NfeEmissoesPage() {
         cst: (fiscalDefaults?.cst_padrao ?? '').toString(),
         csosn: (fiscalDefaults?.csosn_padrao ?? '').toString(),
         informacoes_adicionais: '',
+        codigo_beneficio_fiscal: '',
       },
     ]);
     setProductToAddId(null);
@@ -1469,7 +1484,7 @@ export default function NfeEmissoesPage() {
             </div>
 
             <div className="mt-4 overflow-auto border border-gray-200 rounded-xl bg-white">
-              <table className="min-w-[1320px] w-full text-sm">
+              <table className="min-w-[1440px] w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="text-left p-3 min-w-[320px]">Produto</th>
@@ -1478,6 +1493,7 @@ export default function NfeEmissoesPage() {
                     <th className="text-left p-3 min-w-[90px]">CFOP</th>
                     <th className="text-left p-3 min-w-[90px]">CST</th>
                     <th className="text-left p-3 min-w-[110px]">CSOSN</th>
+                    <th className="text-left p-3 min-w-[120px]">cBenef</th>
                     <th className="text-right p-3 min-w-[110px]">Qtd</th>
                     <th className="text-right p-3 min-w-[140px]">Vlr Unit</th>
                     <th className="text-right p-3 min-w-[140px]">Desconto</th>
@@ -1488,7 +1504,7 @@ export default function NfeEmissoesPage() {
                 <tbody className="divide-y divide-gray-100">
                   {items.length === 0 ? (
                     <tr>
-                      <td className="p-4 text-gray-500" colSpan={11}>
+                      <td className="p-4 text-gray-500" colSpan={12}>
                         Nenhum item ainda. Use “Adicionar produto”.
                       </td>
                     </tr>
@@ -1547,6 +1563,15 @@ export default function NfeEmissoesPage() {
                               placeholder="000"
                             />
                           </td>
+                          <td className="p-3">
+                            <input
+                              value={it.codigo_beneficio_fiscal}
+                              onChange={(e) => updateItem(it.id, { codigo_beneficio_fiscal: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="Ex: SP000202"
+                              maxLength={10}
+                            />
+                          </td>
                           <td className="p-3 text-right">
                             <input
                               type="number"
@@ -1589,7 +1614,7 @@ export default function NfeEmissoesPage() {
                           </td>
                         </tr>
                         <tr className="bg-slate-50/30">
-                          <td colSpan={11} className="px-3 pb-2 pt-0">
+                          <td colSpan={12} className="px-3 pb-2 pt-0">
                             <input
                               value={it.informacoes_adicionais}
                               onChange={(e) => updateItem(it.id, { informacoes_adicionais: e.target.value })}
