@@ -238,6 +238,34 @@ export async function fiscalNfeConsultaStatus(emissaoId: string): Promise<NfeSub
   return data as NfeSubmitResult;
 }
 
+export async function fiscalNfeFetchDocument(
+  emissaoId: string,
+  type: 'danfe' | 'xml' = 'danfe',
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-danfe', {
+    body: { emissao_id: emissaoId, type },
+  });
+
+  if (error) {
+    // The response body may be in error.context (Response object)
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx instanceof Response) {
+        const body = await ctx.json();
+        return { ok: false, error: body?.detail || body?.error || 'Erro ao buscar documento' };
+      }
+    } catch { /* ignore */ }
+    return { ok: false, error: (error as any)?.message || String(error) };
+  }
+
+  // data is an ArrayBuffer or Blob from the edge function
+  const blob = data instanceof Blob ? data : new Blob([data], {
+    type: type === 'xml' ? 'application/xml' : 'application/pdf',
+  });
+  const url = URL.createObjectURL(blob);
+  return { ok: true, url };
+}
+
 export async function fiscalNfeEmissaoDelete(id: string) {
   return callRpc<void>('fiscal_nfe_emissao_delete', { p_id: id });
 }
