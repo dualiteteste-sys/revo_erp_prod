@@ -738,9 +738,9 @@ Deno.serve(async (req) => {
 
       if (focusStatus === "autorizado") {
         // Immediate authorization (rare but possible)
-        // Extract or construct DANFE/XML URLs
-        const danfeUrl = focusData?.caminho_danfe || `${baseUrl}/v2/nfe/${ref}/danfe`;
-        const xmlUrl = focusData?.caminho_xml_nota_fiscal || `${baseUrl}/v2/nfe/${ref}/xml`;
+        // caminho_danfe/caminho_xml are relative paths — prepend Focus base URL
+        const danfeUrl = focusData?.caminho_danfe ? `${baseUrl}${focusData.caminho_danfe}` : null;
+        const xmlUrl = focusData?.caminho_xml_nota_fiscal ? `${baseUrl}${focusData.caminho_xml_nota_fiscal}` : null;
 
         await admin.from("fiscal_nfe_emissoes").update({
           status: "autorizada",
