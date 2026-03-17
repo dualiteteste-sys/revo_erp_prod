@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     // Read emissao
     const { data: emissao } = await admin
       .from("fiscal_nfe_emissoes")
-      .select("id, status, ambiente, chave_acesso, numero, last_error, danfe_url, xml_url")
+      .select("id, status, ambiente, chave_acesso, numero, last_error")
       .eq("id", emissao_id)
       .eq("empresa_id", empresaId)
       .single();
