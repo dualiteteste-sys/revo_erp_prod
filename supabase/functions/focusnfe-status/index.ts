@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     // Read emissao
     const { data: emissao } = await admin
       .from("fiscal_nfe_emissoes")
-      .select("id, status, ambiente, chave_acesso, numero, last_error")
+      .select("id, status, ambiente, chave_acesso, numero, last_error, danfe_url, xml_url")
       .eq("id", emissao_id)
       .eq("empresa_id", empresaId)
       .single();
@@ -118,8 +118,28 @@ Deno.serve(async (req) => {
       return json(404, { ok: false, error: "EMISSAO_NOT_FOUND" }, cors);
     }
 
-    // If already terminal, just return current status
+    // If already terminal, check if DANFE URL is missing and backfill if needed
     if (["autorizada", "cancelada"].includes(emissao.status)) {
+      // Check if DANFE URL exists in provider link
+      const { data: providerLink } = await admin
+        .from("fiscal_nfe_nfeio_emissoes")
+        .select("danfe_url, xml_url")
+        .eq("emissao_id", emissao_id)
+        .maybeSingle();
+
+      if (emissao.status === "autorizada" && (!providerLink?.danfe_url || !providerLink?.xml_url)) {
+        // Backfill: construct DANFE/XML URLs from ref
+        const ambiente = emissao.ambiente || "homologacao";
+        const bUrl = getFocusBaseUrl(ambiente);
+        const danfeUrl = `${bUrl}/v2/nfe/${emissao_id}/danfe`;
+        const xmlUrl = `${bUrl}/v2/nfe/${emissao_id}/xml`;
+        await admin.from("fiscal_nfe_nfeio_emissoes").update({
+          danfe_url: danfeUrl,
+          xml_url: xmlUrl,
+          last_sync_at: new Date().toISOString(),
+        }).eq("emissao_id", emissao_id);
+      }
+
       return json(200, {
         ok: true,
         status: emissao.status,
@@ -194,12 +214,14 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }).eq("id", emissao_id);
 
-      // Update provider link with DANFE/XML URLs
+      // Update provider link with DANFE/XML URLs (construct from ref if Focus doesn't return them)
+      const danfeUrl = focusData?.caminho_danfe || `${baseUrl}/v2/nfe/${ref}/danfe`;
+      const xmlUrl = focusData?.caminho_xml_nota_fiscal || `${baseUrl}/v2/nfe/${ref}/xml`;
       await admin.from("fiscal_nfe_nfeio_emissoes").update({
         provider_status: "autorizado",
         response_payload: focusData,
-        danfe_url: focusData?.caminho_danfe || null,
-        xml_url: focusData?.caminho_xml_nota_fiscal || null,
+        danfe_url: danfeUrl,
+        xml_url: xmlUrl,
         last_sync_at: new Date().toISOString(),
       }).eq("emissao_id", emissao_id);
 
