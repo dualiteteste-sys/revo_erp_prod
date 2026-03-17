@@ -96,10 +96,32 @@ Deno.serve(async (req) => {
       }, cors);
     }
 
+    const cleanCnpj = (emitente.cnpj || "").replace(/\D/g, "");
+    if (!cleanCnpj || cleanCnpj.length !== 14) {
+      return json(422, {
+        ok: false,
+        error: "CNPJ_INVALIDO",
+        detail: "CNPJ da empresa não está preenchido ou é inválido. Verifique em Fiscal → Configurações.",
+      }, cors);
+    }
+
     const result = await syncEmpresa(admin, empresaId, emitente.cnpj, requestId);
     return json(200, { ok: true, ...result }, cors);
   } catch (err: any) {
-    return json(500, { ok: false, error: "INTERNAL_ERROR", detail: err?.message }, cors);
+    const msg = err?.message || String(err);
+    // FocusNFe returns validation errors (CNPJ not authorized, etc.) — don't mask as 500
+    if (msg.includes("Focus NFe MDe API error:")) {
+      const focusDetail = msg.replace("Focus NFe MDe API error: ", "");
+      const isAuthError = /não autorizado|não informado|não habilitad/i.test(focusDetail);
+      return json(422, {
+        ok: false,
+        error: isAuthError ? "MDE_NAO_HABILITADO" : "FOCUS_VALIDATION_ERROR",
+        detail: isAuthError
+          ? "Empresa não habilitada para MDe (NFe Recebidas) na FocusNFe. Habilite no Painel API da FocusNFe."
+          : focusDetail,
+      }, cors);
+    }
+    return json(500, { ok: false, error: "INTERNAL_ERROR", detail: msg }, cors);
   }
 });
 
