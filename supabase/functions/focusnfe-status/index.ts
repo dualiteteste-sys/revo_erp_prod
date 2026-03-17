@@ -128,16 +128,29 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (emissao.status === "autorizada" && (!providerLink?.danfe_url || !providerLink?.xml_url)) {
-        // Backfill: construct DANFE/XML URLs from ref
+        // Backfill: consult FocusNFe to get proper download paths
         const ambiente = emissao.ambiente || "homologacao";
         const bUrl = getFocusBaseUrl(ambiente);
-        const danfeUrl = `${bUrl}/v2/nfe/${emissao_id}/danfe`;
-        const xmlUrl = `${bUrl}/v2/nfe/${emissao_id}/xml`;
-        await admin.from("fiscal_nfe_nfeio_emissoes").update({
-          danfe_url: danfeUrl,
-          xml_url: xmlUrl,
-          last_sync_at: new Date().toISOString(),
-        }).eq("emissao_id", emissao_id);
+        const backfillToken = await getCompanyApiToken(admin, empresaId, ambiente);
+        if (backfillToken) {
+          try {
+            const consultRes = await fetch(`${bUrl}/v2/nfe/${emissao_id}`, {
+              headers: { Authorization: basicAuth(backfillToken) },
+            });
+            if (consultRes.ok) {
+              const consultData = await consultRes.json();
+              const danfeUrl = consultData?.caminho_danfe ? `${bUrl}${consultData.caminho_danfe}` : null;
+              const xmlUrl = consultData?.caminho_xml_nota_fiscal ? `${bUrl}${consultData.caminho_xml_nota_fiscal}` : null;
+              if (danfeUrl || xmlUrl) {
+                await admin.from("fiscal_nfe_nfeio_emissoes").update({
+                  ...(danfeUrl ? { danfe_url: danfeUrl } : {}),
+                  ...(xmlUrl ? { xml_url: xmlUrl } : {}),
+                  last_sync_at: new Date().toISOString(),
+                }).eq("emissao_id", emissao_id);
+              }
+            }
+          } catch { /* backfill is best-effort */ }
+        }
       }
 
       return json(200, {
@@ -214,9 +227,10 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }).eq("id", emissao_id);
 
-      // Update provider link with DANFE/XML URLs (construct from ref if Focus doesn't return them)
-      const danfeUrl = focusData?.caminho_danfe || `${baseUrl}/v2/nfe/${ref}/danfe`;
-      const xmlUrl = focusData?.caminho_xml_nota_fiscal || `${baseUrl}/v2/nfe/${ref}/xml`;
+      // Update provider link with DANFE/XML URLs
+      // caminho_danfe/caminho_xml are relative paths — prepend Focus base URL
+      const danfeUrl = focusData?.caminho_danfe ? `${baseUrl}${focusData.caminho_danfe}` : null;
+      const xmlUrl = focusData?.caminho_xml_nota_fiscal ? `${baseUrl}${focusData.caminho_xml_nota_fiscal}` : null;
       await admin.from("fiscal_nfe_nfeio_emissoes").update({
         provider_status: "autorizado",
         response_payload: focusData,

@@ -119,21 +119,65 @@ Deno.serve(async (req) => {
   }
 
   const baseUrl = getFocusBaseUrl(ambiente);
-  const endpoint = `${baseUrl}/v2/nfe/${emissao_id}/${docType}`;
+  const authHeaders = { Authorization: basicAuth(apiToken) };
 
-  const focusResponse = await fetch(endpoint, {
-    headers: { Authorization: basicAuth(apiToken) },
-  });
+  // Step 1: Consult NFe to get download paths
+  const consultUrl = `${baseUrl}/v2/nfe/${emissao_id}`;
+  const consultRes = await fetch(consultUrl, { headers: authHeaders });
 
-  if (!focusResponse.ok) {
+  if (!consultRes.ok) {
     return jsonRes(502, {
       ok: false,
-      error: "FOCUS_FETCH_ERROR",
-      detail: `FocusNFe retornou ${focusResponse.status}`,
+      error: "FOCUS_CONSULT_ERROR",
+      detail: `FocusNFe consulta retornou ${consultRes.status}. Verifique ambiente e referência.`,
     }, cors);
   }
 
-  const fileBytes = await focusResponse.arrayBuffer();
+  let consultData: any;
+  try {
+    consultData = await consultRes.json();
+  } catch {
+    return jsonRes(502, { ok: false, error: "FOCUS_PARSE_ERROR", detail: "Resposta da consulta não é JSON válido." }, cors);
+  }
+
+  // Step 2: Get the download path from consultation response
+  const rawPath = docType === "xml"
+    ? consultData?.caminho_xml_nota_fiscal
+    : consultData?.caminho_danfe;
+
+  if (!rawPath) {
+    return jsonRes(404, {
+      ok: false,
+      error: "DOCUMENT_NOT_AVAILABLE",
+      detail: `${docType === "xml" ? "XML" : "DANFE"} não disponível. Status FocusNFe: ${consultData?.status || "desconhecido"}.`,
+    }, cors);
+  }
+
+  // Step 3: Build the download URL
+  // FocusNFe returns caminho_danfe as a relative path (e.g. /arquivos_development/...)
+  // or sometimes as a full URL with wrong domain. Always use FocusNFe base URL + path.
+  let downloadUrl: string;
+  try {
+    const parsed = new URL(rawPath);
+    // Full URL returned — replace domain with correct FocusNFe base
+    downloadUrl = `${baseUrl}${parsed.pathname}`;
+  } catch {
+    // Relative path — prepend base URL
+    downloadUrl = rawPath.startsWith("/") ? `${baseUrl}${rawPath}` : `${baseUrl}/${rawPath}`;
+  }
+
+  // Step 4: Download the file (with auth, following redirects)
+  const fileRes = await fetch(downloadUrl, { headers: authHeaders, redirect: "follow" });
+
+  if (!fileRes.ok) {
+    return jsonRes(502, {
+      ok: false,
+      error: "FOCUS_DOWNLOAD_ERROR",
+      detail: `Download retornou ${fileRes.status} de ${downloadUrl}`,
+    }, cors);
+  }
+
+  const fileBytes = await fileRes.arrayBuffer();
 
   const contentType = docType === "xml" ? "application/xml" : "application/pdf";
   const ext = docType === "xml" ? "xml" : "pdf";
