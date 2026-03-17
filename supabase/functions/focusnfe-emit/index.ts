@@ -738,6 +738,10 @@ Deno.serve(async (req) => {
 
       if (focusStatus === "autorizado") {
         // Immediate authorization (rare but possible)
+        // Extract or construct DANFE/XML URLs
+        const danfeUrl = focusData?.caminho_danfe || `${baseUrl}/v2/nfe/${ref}/danfe`;
+        const xmlUrl = focusData?.caminho_xml_nota_fiscal || `${baseUrl}/v2/nfe/${ref}/xml`;
+
         await admin.from("fiscal_nfe_emissoes").update({
           status: "autorizada",
           chave_acesso: focusData?.chave_nfe || null,
@@ -745,6 +749,15 @@ Deno.serve(async (req) => {
           last_error: null,
           updated_at: new Date().toISOString(),
         }).eq("id", emissao_id);
+
+        // Save DANFE/XML URLs to provider link
+        await admin.from("fiscal_nfe_nfeio_emissoes").update({
+          provider_status: "autorizado",
+          response_payload: focusData,
+          danfe_url: danfeUrl,
+          xml_url: xmlUrl,
+          last_sync_at: new Date().toISOString(),
+        }).eq("emissao_id", emissao_id);
       } else if (focusStatus === "erro_autorizacao" || focusStatus === "rejeitado") {
         const rejectMsg = focusData?.mensagem || focusData?.mensagem_sefaz || JSON.stringify(focusData);
         const rejectionCode = parseRejectionCode(rejectMsg);
