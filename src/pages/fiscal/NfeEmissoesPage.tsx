@@ -24,6 +24,7 @@ import {
   fiscalNfeEmissaoDelete,
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
+  fiscalNfeFetchDocument,
   fiscalNfeSubmit,
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
@@ -191,6 +192,7 @@ export default function NfeEmissoesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [fetchingDoc, setFetchingDoc] = useState<string | null>(null);
   const [rows, setRows] = useState<NfeEmissao[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -888,6 +890,22 @@ export default function NfeEmissoesPage() {
     }
   };
 
+  const openDocument = async (emissaoId: string, type: 'danfe' | 'xml') => {
+    setFetchingDoc(`${emissaoId}-${type}`);
+    try {
+      const result = await fiscalNfeFetchDocument(emissaoId, type);
+      if (result.ok) {
+        window.open(result.url, '_blank');
+      } else {
+        addToast(result.error || 'Erro ao buscar documento.', 'error');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao buscar documento.', 'error');
+    } finally {
+      setFetchingDoc(null);
+    }
+  };
+
   const openAudit = async (emissaoId: string) => {
     setAuditEmissaoId(emissaoId);
     setAuditOpen(true);
@@ -1170,29 +1188,27 @@ export default function NfeEmissoesPage() {
                             <Copy size={14} />
                           </button>
                         ) : null}
-                        {row.danfe_url ? (
-                          <a
-                            href={row.danfe_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
-                            title="Download DANFE (PDF)"
+                        {['autorizada', 'cancelada'].includes(row.status) ? (
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200 disabled:opacity-50"
+                            title="Visualizar DANFE (PDF)"
+                            disabled={fetchingDoc === `${row.id}-danfe`}
+                            onClick={() => void openDocument(row.id, 'danfe')}
                           >
-                            <FileText size={14} />
+                            {fetchingDoc === `${row.id}-danfe` ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
                             DANFE
-                          </a>
+                          </button>
                         ) : null}
-                        {row.xml_url ? (
-                          <a
-                            href={row.xml_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        {['autorizada', 'cancelada'].includes(row.status) ? (
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
                             title="Download XML"
+                            disabled={fetchingDoc === `${row.id}-xml`}
+                            onClick={() => void openDocument(row.id, 'xml')}
                           >
-                            <Download size={14} />
+                            {fetchingDoc === `${row.id}-xml` ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                             XML
-                          </a>
+                          </button>
                         ) : null}
                         {isDeletable ? (
                           <button
