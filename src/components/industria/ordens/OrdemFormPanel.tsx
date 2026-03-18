@@ -21,7 +21,9 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
-import FaturamentoOBModal from './FaturamentoOBModal';
+// @deprecated — FaturamentoOBModal replaced by FaturamentoBeneficiamentoPage
+// import FaturamentoOBModal from './FaturamentoOBModal';
+import { liberarEntregasParaFaturamento } from '@/services/industriaFaturamento';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -83,7 +85,7 @@ export default function OrdemFormPanel({
   const highlightTimerRef = useRef<number | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
-  const [showFaturamentoModal, setShowFaturamentoModal] = useState(false);
+  const [liberandoFaturamento, setLiberandoFaturamento] = useState(false);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
@@ -1177,15 +1179,38 @@ export default function OrdemFormPanel({
           Fechar
         </button>
         <div className="flex gap-3">
-          {formData.id && formData.produto_final_id && formData.status !== 'cancelada' && formData.status_faturamento !== 'faturado' && canEdit && (
+          {formData.id && formData.tipo_ordem === 'beneficiamento' && formData.status !== 'cancelada' && canEdit && (formData.entregas || []).some((e: any) => e.status_faturamento === 'nao_faturado') && (
             <button
               type="button"
-              onClick={() => setShowFaturamentoModal(true)}
-              className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold py-2 px-4 rounded-lg hover:bg-emerald-100"
-              title="Gerar NF-e rascunho a partir desta ordem"
+              disabled={liberandoFaturamento}
+              onClick={async () => {
+                setLiberandoFaturamento(true);
+                try {
+                  const res = await liberarEntregasParaFaturamento({ ordemId: formData.id! });
+                  addToast(`${res.updated_count} entrega(s) liberada(s) para faturamento.`, 'success');
+                  if (formData.id) loadDetails(formData.id);
+                } catch (err: any) {
+                  addToast(err?.message || 'Erro ao liberar entregas.', 'error');
+                } finally {
+                  setLiberandoFaturamento(false);
+                }
+              }}
+              className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold py-2 px-4 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
+              title="Marca entregas como prontas para faturamento"
+            >
+              {liberandoFaturamento ? <Loader2 size={18} className="animate-spin" /> : <Receipt size={18} />}
+              Liberar p/ Faturamento
+            </button>
+          )}
+          {formData.id && formData.tipo_ordem === 'beneficiamento' && formData.status !== 'cancelada' && formData.cliente_id && (
+            <button
+              type="button"
+              onClick={() => navigate(`/app/industria/faturamento-beneficiamento?cliente=${formData.cliente_id}`)}
+              className="flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold py-2 px-4 rounded-lg hover:bg-blue-100"
+              title="Abrir tela de faturamento de beneficiamento"
             >
               <Receipt size={18} />
-              Faturar
+              Ir p/ Faturamento
             </button>
           )}
           {formData.id && isHeaderLocked && canEdit && (
@@ -1380,25 +1405,7 @@ export default function OrdemFormPanel({
           })();
         }}
       />
-      {formData.id && (
-        <FaturamentoOBModal
-          isOpen={showFaturamentoModal}
-          onClose={() => setShowFaturamentoModal(false)}
-          ordemId={formData.id}
-          ordemNumero={formData.numero || 0}
-          produtoNome={formData.produto_nome || ''}
-          quantidade={formData.quantidade_planejada || 0}
-          unidade={formData.unidade || ''}
-          clienteId={formData.cliente_id || null}
-          clienteNome={formData.cliente_nome || ''}
-          onSuccess={() => {
-            onSaveSuccess();
-            if (formData.id) {
-              loadDetails(formData.id);
-            }
-          }}
-        />
-      )}
+      {/* FaturamentoOBModal removed — replaced by FaturamentoBeneficiamentoPage */}
     </div>
   );
 }

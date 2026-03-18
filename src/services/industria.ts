@@ -224,10 +224,11 @@ export async function gerarExecucaoOrdem(ordemId: string, roteiroId?: string | n
   });
 }
 
-// ─── Faturamento direto OB ───
+// ─── Faturamento direto OB (@deprecated — use industriaFaturamento.ts) ───
 
 export type FaturarObResult = { pedido_id: string; emissao_id: string };
 
+/** @deprecated Use comporNfeBeneficiamento from industriaFaturamento.ts */
 export async function faturarOrdemBeneficiamento(
   ordemId: string,
   clienteId: string,
