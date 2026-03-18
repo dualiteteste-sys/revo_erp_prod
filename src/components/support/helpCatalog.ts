@@ -1790,6 +1790,33 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'industria',
   },
 
+  {
+    match: '/app/industria/faturamento-beneficiamento',
+    title: 'Guia Rápido de Faturamento de Beneficiamento',
+    whatIs:
+      'Tela de composição fiscal para ordens de beneficiamento. Selecione entregas elegíveis de uma ou mais OBs do mesmo cliente e gere uma NF-e rascunho diretamente, sem criar pedido de venda intermediário.',
+    steps: [
+      'Filtre por cliente, data ou busca livre.',
+      'Selecione as entregas que deseja faturar (checkboxes).',
+      'Ajuste o preço unitário se necessário.',
+      'Escolha a natureza de operação (ex: Retorno de Beneficiamento).',
+      'Clique em "Gerar NF-e Rascunho".',
+      'Revise a NF-e na tela de emissões, calcule impostos e envie à SEFAZ.',
+    ],
+    dependsOn: ['OB com entregas marcadas como "Pronto para Faturar"'],
+    connectsWith: ['NF-e Emissões', 'OP / OB', 'Status de Beneficiamentos'],
+    fillPerfectly: [
+      'Libere entregas para faturamento na OB antes de acessar esta tela.',
+      'Agrupe entregas do mesmo cliente para reduzir número de NF-e.',
+      'Revise a natureza de operação e CFOP antes de enviar à SEFAZ.',
+    ],
+    commonMistakes: [
+      'Esquecer de liberar entregas na OB (status fica "Não Faturado").',
+      'Selecionar entregas de clientes diferentes (NF-e precisa de um único destinatário).',
+    ],
+    roadmapKey: 'industria',
+  },
+
   // OS (rota antiga / listagem)
   {
     match: '/app/ordens-de-servico',
@@ -1814,7 +1841,7 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Crie uma OP/OB e aplique o roteiro/BOM.',
       'No chão de fábrica: aponte execução por etapa (quantidade/tempo/ocorrências).',
       'Valide consumo e saldos no estoque (quando aplicável) e finalize sem quebrar estados.',
-      'Para faturar: clique em “Faturar” na OP ou OB a qualquer momento — será criado um pedido + NF-e em rascunho para revisão. O cliente da OB é pré-preenchido automaticamente.',
+      'Para faturar OB: registre entregas, clique em “Liberar p/ Faturamento” e depois vá em “Faturamento Beneficiamento” para compor a NF-e. Para OP: use o botão “Faturar” diretamente.',
     ],
     dependsOn: ['Produtos', 'Centros de trabalho', 'Roteiro + BOM', 'Permissão: Indústria (create/update)'],
     connectsWith: ['Suprimentos (estoque/consumo)', 'Qualidade (lotes/bloqueio)', 'Relatórios industriais', 'Fiscal (NF-e)'],

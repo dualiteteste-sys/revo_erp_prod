@@ -111,6 +111,7 @@ const MateriaisClientePage = lazyImport(() => import("../pages/industria/Materia
 const MrpDemandasPage = lazyImport(() => import("../pages/industria/mrp/MrpDemandasPage"));
 const PcpDashboardPage = lazyImport(() => import("../pages/industria/pcp/PcpDashboardPage"));
 const StatusBeneficiamentosPage = lazyImport(() => import("../pages/industria/StatusBeneficiamentosPage"));
+const FaturamentoBeneficiamentoPage = lazyImport(() => import("../pages/industria/FaturamentoBeneficiamentoPage"));
 const RelatoriosIndustriaPage = lazyImport(() => import("../pages/industria/RelatoriosIndustriaPage"));
 
 // Suprimentos Pages
@@ -276,6 +277,7 @@ export const appRoutes: RouteObject[] = [
             { path: "industria/qualidade/lotes", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "qualidade", action: "view" }}><Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense></RequirePermission></PlanGuard> },
             { path: "industria/dashboard", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense></RequirePermission></PlanGuard> },
             { path: "industria/status-beneficiamentos", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/faturamento-beneficiamento", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><FaturamentoBeneficiamentoPage /></Suspense></RequirePermission></PlanGuard> },
             { path: "industria/producao", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense></RequirePermission></PlanGuard> },
             { path: "industria/ordens", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></RequirePermission></PlanGuard> },
             { path: "industria/mrp", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "mrp", action: "view" }}><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></RequirePermission></PlanGuard> },

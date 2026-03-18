@@ -57,6 +57,7 @@ export const menuConfig: MenuItem[] = [
     children: [
       { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard', permission: { domain: 'industria', action: 'view' } },
       { name: 'Status de Beneficiamentos', icon: ClipboardList, href: '/app/industria/status-beneficiamentos', permission: { domain: 'industria', action: 'view' } },
+      { name: 'Faturamento Beneficiamento', icon: Receipt, href: '/app/industria/faturamento-beneficiamento', permission: { domain: 'industria', action: 'view' } },
       { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente', permission: { domain: 'industria', action: 'view' } },
       { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho', permission: { domain: 'industria', action: 'view' } },
       { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms', permission: { domain: 'industria', action: 'view' } },
