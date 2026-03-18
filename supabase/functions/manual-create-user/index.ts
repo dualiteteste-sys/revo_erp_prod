@@ -181,35 +181,69 @@ serve(async (req) => {
       });
     }
 
-    // Segurança: "manual create" não deve resetar senha de usuário existente.
+    // Check if user already exists in auth.users
     const existingUserId = await findUserIdByEmail(svc, email).catch(() => null);
+    let userId: string;
+
     if (existingUserId) {
-      return new Response(JSON.stringify({ ok: false, error: "USER_ALREADY_EXISTS" }), {
-        status: 409,
-        headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
+      // Check if user already linked to THIS empresa
+      const { data: existingLink } = await svc
+        .from("empresa_usuarios")
+        .select("user_id")
+        .eq("empresa_id", empresaId!)
+        .eq("user_id", existingUserId)
+        .maybeSingle();
 
-    const { data: created, error: createErr } = await svc.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        must_change_password: true,
-        pending_empresa_id: empresaId,
-        created_via: "manual",
-        created_by: callerId,
-      },
-    });
-    if (createErr || !created?.user?.id) {
-      console.error("[AUTH] admin.createUser failed", createErr);
-      return new Response(JSON.stringify({ ok: false, error: "AUTH_CREATE_FAILED" }), {
-        status: 500,
-        headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
+      if (existingLink) {
+        return new Response(JSON.stringify({ ok: false, error: "USER_ALREADY_EXISTS" }), {
+          status: 409,
+          headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
 
-    const userId = created.user.id as string;
+      // User exists in auth but not linked to this empresa (orphaned or cross-tenant).
+      userId = existingUserId;
+
+      // If no memberships anywhere (orphaned after invite deletion), update password + metadata
+      const { count } = await svc
+        .from("empresa_usuarios")
+        .select("user_id", { count: "exact", head: true })
+        .eq("user_id", existingUserId);
+
+      if ((count ?? 0) === 0) {
+        const { error: updErr } = await svc.auth.admin.updateUser(existingUserId, {
+          password,
+          user_metadata: {
+            must_change_password: true,
+            pending_empresa_id: empresaId,
+            created_via: "manual",
+            created_by: callerId,
+          },
+        });
+        if (updErr) console.warn("[AUTH] updateUser (orphaned) failed", updErr);
+      }
+    } else {
+      // Brand new user — create in auth.users
+      const { data: created, error: createErr } = await svc.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          must_change_password: true,
+          pending_empresa_id: empresaId,
+          created_via: "manual",
+          created_by: callerId,
+        },
+      });
+      if (createErr || !created?.user?.id) {
+        console.error("[AUTH] admin.createUser failed", createErr);
+        return new Response(JSON.stringify({ ok: false, error: "AUTH_CREATE_FAILED" }), {
+          status: 500,
+          headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
+      userId = created.user.id as string;
+    }
 
     // Upsert vínculo: robusto contra eventual race do FK (auth.users) logo após createUser.
     const retries = [0, 120, 350, 800, 1500];
