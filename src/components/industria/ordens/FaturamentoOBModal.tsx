@@ -1,3 +1,8 @@
+/**
+ * @deprecated Este modal foi substituído pela página FaturamentoBeneficiamentoPage.
+ * O novo fluxo usa composição fiscal (entregas → NF-e) sem pedido intermediário.
+ * Mantido temporariamente para referência; não é mais importado por nenhum componente.
+ */
 import React, { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
