@@ -220,6 +220,7 @@ export default function ImportProductsCsvModal(props: {
             status,
             preco_venda: preco ?? 0,
             moeda: 'BRL',
+            icms_origem: 0,
             ncm,
             controla_estoque: controla_estoque ?? true,
             permitir_inclusao_vendas: true,
