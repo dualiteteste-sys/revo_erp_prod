@@ -256,8 +256,8 @@ test('Fiscal: NF-e rascunhos e configurações abrem sem erros de console', asyn
   await expect(page).toHaveURL(/\/app(\/|$)/);
 
   await page.goto('/app/fiscal/nfe');
-  await expect(page.getByRole('heading', { name: 'NF-e (Rascunhos e Histórico)' })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole('table').getByText('Rascunho', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NF-e (Pré-NF-e e Histórico)' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('table').getByText('Pré-NF-e', { exact: true })).toBeVisible();
 
   await page.goto('/app/fiscal/nfe/configuracoes');
   await expect(page.getByRole('heading', { name: 'Configurações de NF-e' })).toBeVisible();
