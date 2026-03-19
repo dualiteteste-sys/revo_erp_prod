@@ -270,3 +270,16 @@ export async function fiscalNfeEmissaoDelete(id: string) {
   return callRpc<void>('fiscal_nfe_emissao_delete', { p_id: id });
 }
 
+export type ChangeStatusResult = {
+  ok: boolean;
+  previous_status: string;
+  new_status: string;
+};
+
+export async function fiscalNfeEmissaoChangeStatus(emissaoId: string, newStatus: string) {
+  return callRpc<ChangeStatusResult>('fiscal_nfe_emissao_change_status', {
+    p_emissao_id: emissaoId,
+    p_new_status: newStatus,
+  });
+}
+

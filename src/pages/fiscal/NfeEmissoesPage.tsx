@@ -7,7 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { AlertTriangle, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
+import { AlertTriangle, Calculator, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import NaturezaOperacaoAutocomplete from '@/components/common/NaturezaOperacaoAutocomplete';
@@ -26,6 +26,7 @@ import {
   fiscalNfeEmissoesList,
   fiscalNfeFetchDocument,
   fiscalNfeSubmit,
+  fiscalNfeCalcularImpostos,
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
 import { getRejectionInfo, parseRejectionCode } from '@/lib/fiscal/nfe-rejection-catalog';
@@ -33,6 +34,8 @@ import type { NaturezaOperacaoSearchHit } from '@/services/fiscalNaturezasOperac
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 import { getCarriers, type CarrierListItem } from '@/services/carriers';
 import { fiscalNfeGerarDuplicatas, type DuplicataItem } from '@/services/fiscalNfeEmissoes';
+import NfeStatusBadge from '@/components/fiscal/NfeStatusBadge';
+import NfeModeToggle, { getNfeMode, setNfeMode, type NfeMode } from '@/components/fiscal/NfeModeToggle';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -92,7 +95,11 @@ type NfeItemForm = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  rascunho: 'Rascunho',
+  rascunho: 'Pré-NF-e',
+  em_composicao: 'Em Composição',
+  aguardando_validacao: 'Aguardando Validação',
+  com_pendencias: 'Com Pendências',
+  pronta: 'Pronta p/ Emissão',
   enfileirada: 'Enfileirada',
   processando: 'Processando',
   autorizada: 'Autorizada',
@@ -103,6 +110,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   rascunho: 'bg-indigo-100 text-indigo-800',
+  em_composicao: 'bg-blue-100 text-blue-800',
+  aguardando_validacao: 'bg-yellow-100 text-yellow-800',
+  com_pendencias: 'bg-orange-100 text-orange-800',
+  pronta: 'bg-teal-100 text-teal-800',
   enfileirada: 'bg-amber-100 text-amber-800',
   processando: 'bg-amber-100 text-amber-800',
   autorizada: 'bg-emerald-100 text-emerald-800',
@@ -111,7 +122,7 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   erro: 'bg-red-100 text-red-800',
 };
 
-const DELETABLE_STATUSES = ['rascunho', 'erro', 'rejeitada'];
+const DELETABLE_STATUSES = ['rascunho', 'em_composicao', 'aguardando_validacao', 'com_pendencias', 'pronta', 'erro', 'rejeitada'];
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
@@ -210,6 +221,8 @@ export default function NfeEmissoesPage() {
   const [dataFim, setDataFim] = useState('');
   const [sort, setSort] = useState<SortState<string>>({ column: 'atualizado', direction: 'desc' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [nfeMode, setNfeModeState] = useState<NfeMode>(getNfeMode);
+  const [recalculating, setRecalculating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NfeEmissao | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -766,6 +779,47 @@ export default function NfeEmissoesPage() {
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
+  const handleModeChange = (m: NfeMode) => {
+    setNfeModeState(m);
+    setNfeMode(m);
+  };
+
+  const handleRecalcularImpostos = async () => {
+    if (!editing?.id) return;
+    setRecalculating(true);
+    try {
+      const res = await fiscalNfeCalcularImpostos(editing.id);
+      if (res && res.ok) {
+        addToast(`Impostos recalculados (${res.items_calculated} itens).`, 'success');
+        // Reload items to show updated impostos
+        const data = await fiscalNfeEmissaoItensList(editing.id);
+        if (data) {
+          setItems(data.map((it: any) => ({
+            id: it.id,
+            produto_id: it.produto_id,
+            produto_nome: it.descricao,
+            unidade: it.unidade,
+            quantidade: it.quantidade,
+            valor_unitario: it.valor_unitario,
+            valor_desconto: it.valor_desconto,
+            ncm: it.ncm || '',
+            cfop: it.cfop || '',
+            cst: it.cst || '',
+            csosn: it.csosn || '',
+            informacoes_adicionais: it.informacoes_adicionais || '',
+            codigo_beneficio_fiscal: it.codigo_beneficio_fiscal || '',
+          })));
+        }
+      } else {
+        addToast('Erro ao recalcular impostos.', 'error');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao recalcular impostos.', 'error');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!empresaId) return;
     const local = validateDraftLocal();
@@ -936,8 +990,8 @@ export default function NfeEmissoesPage() {
     <div className="p-1">
       <div className="mb-6">
         <PageHeader
-          title="NF-e (Rascunhos e Histórico)"
-          description="Crie rascunhos e prepare payloads. O envio/autorizar pode permanecer desativado até o go-live."
+          title="NF-e (Pré-NF-e e Histórico)"
+          description="Crie Pré-NF-e, calcule impostos com o motor fiscal e envie para autorização."
           icon={<Receipt size={20} />}
           actions={
             <>
@@ -949,7 +1003,7 @@ export default function NfeEmissoesPage() {
               </Link>
               <Button onClick={openNew}>
                 <Plus size={18} />
-                <span className="ml-2">Novo rascunho</span>
+                <span className="ml-2">Nova Pré-NF-e</span>
               </Button>
             </>
           }
@@ -1006,7 +1060,11 @@ export default function NfeEmissoesPage() {
         </div>
         <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="min-w-[220px]">
           <option value="">Todos os status</option>
-          <option value="rascunho">Rascunho</option>
+          <option value="rascunho">Pré-NF-e</option>
+          <option value="em_composicao">Em Composição</option>
+          <option value="aguardando_validacao">Aguardando Validação</option>
+          <option value="com_pendencias">Com Pendências</option>
+          <option value="pronta">Pronta p/ Emissão</option>
           <option value="enfileirada">Enfileirada</option>
           <option value="processando">Processando</option>
           <option value="autorizada">Autorizada</option>
@@ -1111,11 +1169,11 @@ export default function NfeEmissoesPage() {
                       ) : <span className="block w-4" />}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE_CLASS[row.status] || 'bg-gray-100 text-gray-700'}`}>
-                        {row.status === 'processando' && !isProcessandoStale(row) && <Loader2 size={12} className="animate-spin mr-1" />}
-                        {row.status === 'processando' && isProcessandoStale(row) && <AlertTriangle size={12} className="mr-1" />}
-                        {STATUS_LABEL[row.status] || row.status}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {row.status === 'processando' && !isProcessandoStale(row) && <Loader2 size={12} className="animate-spin text-amber-600" />}
+                        {row.status === 'processando' && isProcessandoStale(row) && <AlertTriangle size={12} className="text-amber-600" />}
+                        <NfeStatusBadge status={row.status} />
+                      </div>
                       {(row.rejection_code || row.last_error) ? (
                         <RejectionCard
                           code={row.rejection_code}
@@ -1230,7 +1288,7 @@ export default function NfeEmissoesPage() {
         )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar rascunho NF-e' : 'Novo rascunho NF-e'} size="80pct">
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar Pré-NF-e' : 'Nova Pré-NF-e'} size="80pct">
         <div className="p-6 space-y-6">
           {draftErrors.length ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4">
@@ -1473,10 +1531,25 @@ export default function NfeEmissoesPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Itens</h3>
-                <p className="text-xs text-slate-500 mt-1">Adicione produtos e ajuste quantidade/valor. Tributos serão calculados na etapa do motor fiscal.</p>
+                <p className="text-xs text-slate-500 mt-1">Adicione produtos e ajuste quantidade/valor. Use "Recalcular" para aplicar regras fiscais automaticamente.</p>
               </div>
-              <div className="text-xs text-slate-500">
-                {items.length} {items.length === 1 ? 'item' : 'itens'}
+              <div className="flex items-center gap-3">
+                <NfeModeToggle mode={nfeMode} onChange={handleModeChange} />
+                {editing?.id && items.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRecalcularImpostos}
+                    disabled={recalculating || saving}
+                    title="Recalcula CFOP, CST e alíquotas usando o motor fiscal v2 (natureza → regra fiscal → produto → manual)"
+                  >
+                    {recalculating ? <Loader2 size={14} className="animate-spin mr-1" /> : <Calculator size={14} className="mr-1" />}
+                    Recalcular
+                  </Button>
+                )}
+                <span className="text-xs text-slate-500">
+                  {items.length} {items.length === 1 ? 'item' : 'itens'}
+                </span>
               </div>
             </div>
 
