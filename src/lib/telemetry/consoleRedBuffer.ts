@@ -60,6 +60,7 @@ export function recordConsoleRedEvent(input: {
   url?: string | null;
   action?: string | null;
   request_meta?: unknown | null;
+  rpc_params?: Record<string, unknown> | null;
 }) {
   if (typeof window === "undefined") return;
 
@@ -133,6 +134,7 @@ export function recordConsoleRedEvent(input: {
     url: ev.url,
     action: ev.action,
     request_meta: ev.request_meta,
+    rpc_params: input.rpc_params ?? null,
   });
 }
 

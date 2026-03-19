@@ -21,6 +21,9 @@ export type ErrorIncidentEvent = {
   url?: string | null;
   action?: string | null;
   request_meta?: unknown | null;
+  rpc_params?: Record<string, unknown> | null;
+  empresa_id?: string | null;
+  user_id?: string | null;
   severity: ErrorIncidentSeverity;
   kind: ErrorIncidentKind;
   fingerprint: string;
@@ -38,12 +41,16 @@ export type ErrorIncident = {
   correlation_id: string | null;
   action: string | null;
   request_meta: unknown | null;
+  rpc_params: Record<string, unknown> | null;
+  empresa_id: string | null;
+  user_id: string | null;
   url: string | null;
   http_status: number | null;
   code: string | null;
   first_seen_at: string;
   last_seen_at: string;
   occurrences: number;
+  occurrence_timestamps: string[];
   stack_sample: string | null;
 };
 
@@ -59,7 +66,94 @@ type IncidentInput = {
   url?: string | null;
   action?: string | null;
   request_meta?: unknown | null;
+  rpc_params?: Record<string, unknown> | null;
 };
+
+// ─── Tenant/User context (sync, best-effort) ────────────────
+function getTenantContext(): { empresa_id: string | null; user_id: string | null } {
+  if (typeof window === "undefined") return { empresa_id: null, user_id: null };
+  try {
+    const empresa_id = sessionStorage.getItem("revo_active_empresa_id") ?? null;
+    // Supabase stores session in localStorage under sb-<ref>-auth-token
+    let user_id: string | null = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            user_id = parsed?.user?.id ?? null;
+          }
+        } catch { /* ignore */ }
+        break;
+      }
+    }
+    return { empresa_id, user_id };
+  } catch {
+    return { empresa_id: null, user_id: null };
+  }
+}
+
+// ─── RPC source auto-link ───────────────────────────────────
+// Maps RPC name prefixes to probable source files for quick navigation.
+const RPC_SOURCE_MAP: [RegExp, string[]][] = [
+  [/^industria_faturamento_/, ["src/services/industriaFaturamento.ts", "supabase/migrations/*ind_faturamento*"]],
+  [/^industria_/, ["src/services/industria.ts", "supabase/migrations/*industria*"]],
+  [/^fiscal_nfe_/, ["src/services/fiscalNfeEmissoes.ts", "supabase/migrations/*fiscal*nfe*"]],
+  [/^fiscal_naturezas_/, ["src/services/fiscalNaturezas.ts", "supabase/migrations/*naturezas*"]],
+  [/^fiscal_/, ["src/services/fiscal*.ts", "supabase/migrations/*fiscal*"]],
+  [/^fin_/, ["src/services/financeiro*.ts", "supabase/migrations/*fin_*"]],
+  [/^vendas_/, ["src/services/vendas*.ts", "supabase/migrations/*vendas*"]],
+  [/^estoque_/, ["src/services/estoque*.ts", "supabase/migrations/*estoque*"]],
+  [/^ops_/, ["src/services/ops*.ts", "supabase/migrations/*ops*"]],
+  [/^woo_/, ["src/services/woo*.ts", "supabase/migrations/*woo*"]],
+  [/^pessoas_/, ["src/services/pessoas*.ts", "supabase/migrations/*pessoas*"]],
+  [/^produtos_/, ["src/services/produtos*.ts", "supabase/migrations/*produtos*"]],
+];
+
+function guessRpcSourceFiles(rpcName: string | null): string[] | null {
+  if (!rpcName) return null;
+  // Extract RPC name from source label like "rpc:industria_faturamento_listar_elegiveis"
+  const clean = rpcName.replace(/^(rpc:|network\.rpc:\s*)/i, "").split(":")[0]?.trim();
+  if (!clean) return null;
+  for (const [pattern, files] of RPC_SOURCE_MAP) {
+    if (pattern.test(clean)) return files;
+  }
+  return null;
+}
+
+function extractRpcName(source: string, message: string, url: string | null): string | null {
+  // From URL: /rest/v1/rpc/industria_faturamento_listar_elegiveis
+  if (url) {
+    const m = url.match(/\/rest\/v1\/rpc\/([^/?#]+)/);
+    if (m?.[1]) return decodeURIComponent(m[1]);
+  }
+  // From message: "rpc:industria_faturamento_listar_elegiveis: column..."
+  const msgMatch = message.match(/^rpc:([a-z_]+)/i);
+  if (msgMatch?.[1]) return msgMatch[1];
+  // From source: "network.rpc"
+  if (source.includes("rpc") && url) {
+    const m2 = url.match(/\/rpc\/([^/?#]+)/);
+    if (m2?.[1]) return decodeURIComponent(m2[1]);
+  }
+  return null;
+}
+
+// ─── Occurrence rate formatting ─────────────────────────────
+const MAX_OCCURRENCE_TIMESTAMPS = 100;
+
+function formatOccurrenceRate(timestamps: string[]): string {
+  if (timestamps.length <= 1) return `${timestamps.length} ocorrência`;
+  const first = new Date(timestamps[0]).getTime();
+  const last = new Date(timestamps[timestamps.length - 1]).getTime();
+  const spanMs = Math.abs(last - first);
+  const spanMin = Math.max(1, Math.round(spanMs / 60_000));
+  if (spanMin < 2) return `${timestamps.length} ocorrências em < 1 min`;
+  if (spanMin < 60) return `${timestamps.length} ocorrências em ${spanMin} min`;
+  const spanH = Math.round(spanMin / 60);
+  return `${timestamps.length} ocorrências em ${spanH}h`;
+}
 
 const NOISE_PATTERNS: RegExp[] = [
   /a listener indicated an asynchronous response by returning true/i,
@@ -140,6 +234,7 @@ function eventFromInput(input: IncidentInput): ErrorIncidentEvent {
     url: input.url ?? null,
     message: `${input.source}: ${message}`,
   });
+  const tenant = getTenantContext();
   return {
     id: newId(),
     at: new Date().toISOString(),
@@ -154,6 +249,9 @@ function eventFromInput(input: IncidentInput): ErrorIncidentEvent {
     url: input.url ?? null,
     action: input.action ?? null,
     request_meta: input.request_meta ?? null,
+    rpc_params: input.rpc_params ?? null,
+    empresa_id: tenant.empresa_id,
+    user_id: tenant.user_id,
     severity,
     kind,
     fingerprint,
@@ -212,17 +310,24 @@ export function recordErrorIncident(input: IncidentInput) {
       correlation_id: event.correlation_id ?? null,
       action: event.action ?? null,
       request_meta: event.request_meta ?? null,
+      rpc_params: event.rpc_params ?? null,
+      empresa_id: event.empresa_id ?? null,
+      user_id: event.user_id ?? null,
       url: event.url ?? null,
       http_status: event.http_status ?? null,
       code: event.code ?? null,
       first_seen_at: event.at,
       last_seen_at: event.at,
       occurrences: 1,
+      occurrence_timestamps: [event.at],
       stack_sample: event.stack ?? null,
     });
   } else {
     prev.last_seen_at = event.at;
     prev.occurrences += 1;
+    if (prev.occurrence_timestamps.length < MAX_OCCURRENCE_TIMESTAMPS) {
+      prev.occurrence_timestamps.push(event.at);
+    }
     prev.request_id = event.request_id ?? prev.request_id;
     prev.http_status = event.http_status ?? prev.http_status;
     prev.code = event.code ?? prev.code;
@@ -231,6 +336,9 @@ export function recordErrorIncident(input: IncidentInput) {
     prev.correlation_id = event.correlation_id ?? prev.correlation_id;
     prev.action = event.action ?? prev.action;
     prev.request_meta = event.request_meta ?? prev.request_meta;
+    prev.rpc_params = event.rpc_params ?? prev.rpc_params;
+    prev.empresa_id = event.empresa_id ?? prev.empresa_id;
+    prev.user_id = event.user_id ?? prev.user_id;
     prev.message = event.message || prev.message;
     prev.stack_sample = event.stack ?? prev.stack_sample;
     if (event.severity === "P0" || (event.severity === "P1" && prev.severity === "P2")) prev.severity = event.severity;
@@ -269,6 +377,9 @@ export function buildIncidentPrompt(incident: ErrorIncident, opts?: { userNote?:
     ? modalStack.map((item) => item.logicalRoute || item.name).filter(Boolean).join(" > ")
     : "sem modal ativo";
 
+  const rpcName = extractRpcName(incident.source, incident.message, incident.url);
+  const sourceFiles = guessRpcSourceFiles(rpcName ?? incident.message);
+
   const steps = [
     "1) Navegar até a rota indicada.",
     `2) Repetir a ação: ${actionLine}.`,
@@ -286,12 +397,17 @@ export function buildIncidentPrompt(incident: ErrorIncident, opts?: { userNote?:
     incident.occurrences > 3 ? "- Priorizar mitigação imediata: erro recorrente." : "- Reproduzir com logging detalhado para confirmar causa raiz.",
   ];
 
+  // Gather similar incidents (same code+message but different fingerprints)
+  const related = findRelatedIncidents(incident);
+
   return [
+    "Resolva o seguinte problema reportado automaticamente pelo sistema de monitoramento:",
+    "",
     "### Resumo executivo",
     `- Severidade: ${incident.severity}`,
     `- Tipo: ${incident.kind}`,
     `- Impacto: ${incident.message}`,
-    `- Ocorrências: ${incident.occurrences}`,
+    `- Ocorrências: ${formatOccurrenceRate(incident.occurrence_timestamps)}`,
     "",
     "### Evidências técnicas",
     `- Fonte: ${incident.source}`,
@@ -307,6 +423,39 @@ export function buildIncidentPrompt(incident: ErrorIncident, opts?: { userNote?:
     `- Última ocorrência: ${formatWhen(incident.last_seen_at)}`,
     incident.stack_sample ? `- Stack (amostra): ${incident.stack_sample}` : "- Stack (amostra): —",
     "",
+    "### Contexto do tenant",
+    `- empresa_id: ${incident.empresa_id ?? "—"}`,
+    `- user_id: ${incident.user_id ?? "—"}`,
+    "",
+    incident.rpc_params
+      ? [
+          "### Payload da request (parâmetros RPC)",
+          `\`\`\`json`,
+          JSON.stringify(sanitizeLogData(incident.rpc_params), null, 2),
+          `\`\`\``,
+        ].join("\n")
+      : null,
+    sourceFiles
+      ? [
+          "",
+          "### Arquivos relacionados (auto-link)",
+          ...sourceFiles.map((f) => `- ${f}`),
+          rpcName ? `- RPC: \`${rpcName}\`` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : null,
+    related.length > 0
+      ? [
+          "",
+          "### Incidentes relacionados (mesmo code/message)",
+          ...related.map(
+            (r) =>
+              `- [${r.severity}] ${r.source} | ${r.route ?? "—"} | ${formatOccurrenceRate(r.occurrence_timestamps)} | last: ${formatWhen(r.last_seen_at)}`,
+          ),
+        ].join("\n")
+      : null,
+    "",
     "### Passos para reproduzir",
     ...steps.map((step) => `- ${step}`),
     opts?.userNote ? `- Observação do usuário: ${opts.userNote}` : null,
@@ -319,8 +468,24 @@ export function buildIncidentPrompt(incident: ErrorIncident, opts?: { userNote?:
     "- Confirmar console limpo e network sem 4xx/5xx inesperado no fluxo.",
     "- Adicionar/ajustar teste para evitar regressão.",
   ]
-    .filter(Boolean)
+    .filter((line) => line != null)
     .join("\n");
+}
+
+/** Find incidents with the same code+message but different fingerprints */
+function findRelatedIncidents(incident: ErrorIncident): ErrorIncident[] {
+  if (!incident.code && !incident.http_status) return [];
+  const related: ErrorIncident[] = [];
+  for (const other of incidentsByFingerprint.values()) {
+    if (other.fingerprint === incident.fingerprint) continue;
+    const sameCode = incident.code && other.code === incident.code;
+    const sameStatus = incident.http_status && other.http_status === incident.http_status;
+    if (sameCode || sameStatus) {
+      related.push({ ...other });
+    }
+    if (related.length >= 5) break;
+  }
+  return related;
 }
 
 export function clearErrorIncidents() {
