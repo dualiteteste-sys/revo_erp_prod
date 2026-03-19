@@ -29,7 +29,7 @@ RETURNS TABLE (
   observacoes         text
 )
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_empresa uuid := public.current_empresa_id();
