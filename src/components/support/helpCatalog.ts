@@ -1432,6 +1432,40 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'fiscal',
   },
   {
+    match: '/app/fiscal/regras',
+    title: 'Guia Rápido — Regras Fiscais',
+    whatIs:
+      'Regras Fiscais são condições que sobrescrevem automaticamente CFOP, CST, alíquotas e outros dados fiscais para itens específicos da NF-e. Quando o motor fiscal calcula os impostos, ele verifica se alguma regra se aplica ao item (por grupo de produto, NCM, UF do destinatário, tipo de operação ou regime). A regra mais prioritária vence e seus valores substituem os defaults da Natureza de Operação.',
+    steps: [
+      'Acesse Fiscal → Regras Fiscais.',
+      'Clique "Nova regra" e defina um nome descritivo (ex: "ICMS ST Informática SP").',
+      'Configure as condições: selecione quando a regra se aplica (grupo de produto, padrão de NCM como 8471%, UF, tipo de operação, regime).',
+      'Preencha os overrides: CFOP, CST/CSOSN, alíquotas — somente os campos que devem ser diferentes da natureza padrão.',
+      'Defina a prioridade (menor número = maior prioridade). Quando dois itens casam com regras diferentes, a de menor prioridade vence.',
+      'Ao recalcular impostos da NF-e (botão "Recalcular"), o motor aplica: natureza → regra fiscal → defaults do produto → edição manual. Cada item mostra a origem dos dados no "explain".',
+    ],
+    dependsOn: ['Empresa ativa', 'Naturezas de Operação configuradas', 'Grupos de Produto (se usar condição por grupo)'],
+    connectsWith: ['Naturezas de Operação', 'Emissão de NF-e', 'Motor Fiscal v2', 'Cadastro de Produtos'],
+    fillPerfectly: [
+      'Deixe condições vazias para aplicar a "qualquer item" — útil para regras gerais de PIS/COFINS.',
+      'Use padrão NCM com % para cobrir famílias inteiras (ex: 8471% = toda linha de informática).',
+      'Crie regras específicas (prioridade menor) e regras genéricas (prioridade maior) para hierarquia.',
+      'Campos override vazios significam "manter o valor da natureza" — preencha só o que muda.',
+    ],
+    commonMistakes: [
+      'Criar regras com prioridade idêntica para as mesmas condições — o motor escolhe arbitrariamente.',
+      'Esquecer de preencher tanto CFOP dentro quanto fora UF — se só preencher um, o outro usa o default da natureza.',
+      'Confundir CST (regime normal) com CSOSN (Simples) — preencha o campo correto para o regime da empresa.',
+      'Deixar todas as condições vazias E prioridade baixa — a regra vai sobrescrever tudo indiscriminadamente.',
+    ],
+    links: [
+      { label: 'Regras Fiscais', href: '/app/fiscal/regras', kind: 'internal' as const },
+      { label: 'Naturezas de Operação', href: '/app/fiscal/naturezas-operacao', kind: 'internal' as const },
+      { label: 'Emissão de NF-e', href: '/app/fiscal/nfe', kind: 'internal' as const },
+    ],
+    roadmapKey: 'fiscal',
+  },
+  {
     match: '/app/fiscal/nfse',
     title: 'Guia Rápido — NFS-e (Nota Fiscal de Serviço Eletrônica)',
     whatIs:
