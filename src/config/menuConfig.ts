@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard, Filter
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -117,6 +117,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'NFS-e', icon: FileText, href: '/app/fiscal/nfse' },
       { name: 'NF-e Recebidas', icon: FileDown, href: '/app/fiscal/nfe-recebidas' },
       { name: 'Naturezas de Operação', icon: BookOpen, href: '/app/fiscal/naturezas-operacao' },
+      { name: 'Regras Fiscais', icon: Filter, href: '/app/fiscal/regras' },
       { name: 'Configurações NF-e', icon: Settings, href: '/app/fiscal/nfe/configuracoes' },
     ],
   },
