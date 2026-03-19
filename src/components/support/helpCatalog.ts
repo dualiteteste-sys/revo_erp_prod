@@ -1336,10 +1336,39 @@ export const HELP_CATALOG: HelpEntry[] = [
 
   // Fiscal (NF-e) — mesmo deixando NF por último, o guia precisa ser específico
   {
+    match: '/app/fiscal/dashboard',
+    title: 'Guia Rápido — Dashboard Fiscal',
+    whatIs:
+      'O Dashboard Fiscal é a central de indicadores do módulo fiscal: valor autorizado no período, quantidade de Pré-NF-e pendentes, rejeitadas, erros e status do IBS/CBS. Permite identificar gargalos e agir rapidamente.',
+    steps: [
+      'Acesse Fiscal → Dashboard Fiscal.',
+      'Ajuste o período (início/fim) para filtrar os indicadores.',
+      'Analise os KPIs: valor autorizado, pendentes, rejeitadas, regras fiscais ativas.',
+      'Clique nos cards para navegar diretamente para a tela correspondente (NF-e, Regras).',
+      'Verifique o status do IBS/CBS 2026 — se necessário, ative em Configurações NF-e.',
+    ],
+    dependsOn: ['Empresa ativa', 'NF-e configurada'],
+    connectsWith: ['Emissão de NF-e', 'Regras Fiscais', 'Naturezas de Operação', 'Configurações NF-e'],
+    fillPerfectly: [
+      'Consultar diariamente para detectar NF-e pendentes ou rejeitadas.',
+      'Usar o filtro de período para comparar meses.',
+      'Manter regras fiscais ativas atualizadas para o motor funcionar corretamente.',
+    ],
+    commonMistakes: [
+      'Ignorar NF-e pendentes acumuladas (rascunhos esquecidos).',
+      'Não investigar rejeitadas no período — cada rejeição pode exigir ação.',
+    ],
+    links: [
+      { label: 'Dashboard Fiscal', href: '/app/fiscal/dashboard', kind: 'internal' as const },
+      { label: 'NF-e', href: '/app/fiscal/nfe', kind: 'internal' as const },
+    ],
+    roadmapKey: 'fiscal',
+  },
+  {
     match: '/app/fiscal/nfe/configuracoes',
     title: 'Guia Rápido de Configurações de NF-e',
     whatIs:
-      'Configurações de NF-e definem emitente, série/numeração e ambiente. O objetivo é evitar rejeição e suporte na hora de emitir.',
+      'Configurações de NF-e definem emitente, série/numeração, ambiente e toggle IBS/CBS 2026. O objetivo é evitar rejeição e suporte na hora de emitir.',
     steps: [
       'Preencha emitente (dados da empresa) e confirme ambiente (homologação/produção).',
       'Defina série e numeração (ponto crítico para não duplicar).',

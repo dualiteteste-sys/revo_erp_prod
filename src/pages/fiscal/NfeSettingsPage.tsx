@@ -25,6 +25,7 @@ import {
 } from '@/services/fiscalNfeSettings';
 import type { FocusNfeEmpresaStatus } from '@/services/fiscalNfeSettings';
 import { uploadCertToFocusNfe } from '@/services/nfeDestinadasService';
+import { callRpc } from '@/lib/api';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -98,6 +99,8 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [validatingCert, setValidatingCert] = useState(false);
 
   const [nfeEnabled, setNfeEnabled] = useState(false);
+  const [ibsCbsEnabled, setIbsCbsEnabled] = useState(false);
+  const [savingIbsCbs, setSavingIbsCbs] = useState(false);
   const [config, setConfig] = useState<NfeConfig | null>(null);
   const [emitente, setEmitente] = useState<NfeEmitente | null>(null);
   const [numeracoes, setNumeracoes] = useState<NfeNumeracao[]>([]);
@@ -125,6 +128,13 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       setFocusStatus(focusSt ?? null);
 
       setNfeEnabled(!!flags?.nfe_emissao_enabled);
+
+      // Load IBS/CBS status
+      try {
+        const ibsStatus = await callRpc<{ ok: boolean; fiscal_ibs_cbs_enabled: boolean }>('fiscal_ibs_cbs_status', {});
+        setIbsCbsEnabled(!!ibsStatus?.fiscal_ibs_cbs_enabled);
+      } catch { /* ignore if RPC not yet deployed */ }
+
       setConfig(
         cfgFocusRow
           ? {
@@ -1033,6 +1043,44 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                 />
               </div>
             </div>
+          </GlassCard>
+
+          {/* IBS/CBS 2026 Toggle */}
+          <GlassCard className="p-6 mt-6 border border-violet-200 bg-violet-50/20">
+            <h2 className="text-lg font-bold text-violet-800 mb-1">IBS / CBS — Reforma Tributária 2026</h2>
+            <p className="text-sm text-violet-600 mb-4">
+              Ativa os campos IBS/CBS nas naturezas de operação, regras fiscais e itens de NF-e. Quando ativo, o motor fiscal calcula IBS e CBS automaticamente.
+            </p>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ibsCbsEnabled}
+                  onChange={async (e) => {
+                    const enabled = e.target.checked;
+                    setSavingIbsCbs(true);
+                    try {
+                      await callRpc('fiscal_ibs_cbs_toggle', { p_enabled: enabled });
+                      setIbsCbsEnabled(enabled);
+                      addToast(enabled ? 'IBS/CBS ativado.' : 'IBS/CBS desativado.', 'success');
+                    } catch (err: any) {
+                      addToast(err?.message || 'Erro ao alterar flag IBS/CBS.', 'error');
+                    } finally {
+                      setSavingIbsCbs(false);
+                    }
+                  }}
+                  disabled={!canAdmin || savingIbsCbs}
+                  className="h-5 w-5 accent-violet-600"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  {ibsCbsEnabled ? 'IBS/CBS Ativado' : 'IBS/CBS Desativado'}
+                </span>
+                {savingIbsCbs && <Loader2 size={14} className="animate-spin text-violet-600" />}
+              </label>
+            </div>
+            <p className="text-xs text-violet-500 mt-3">
+              Quando desativado, os campos IBS/CBS ficam invisíveis nas telas e o motor fiscal ignora esses impostos. Nenhum dado é perdido ao desativar.
+            </p>
           </GlassCard>
         </div>
       )}
