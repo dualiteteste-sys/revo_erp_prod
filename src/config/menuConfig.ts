@@ -113,6 +113,7 @@ export const menuConfig: MenuItem[] = [
     href: '#',
     gradient: 'from-sky-500 to-sky-600',
     children: [
+      { name: 'Dashboard Fiscal', icon: BarChart3, href: '/app/fiscal/dashboard' },
       { name: 'NF-e', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'NFS-e', icon: FileText, href: '/app/fiscal/nfse' },
       { name: 'NF-e Recebidas', icon: FileDown, href: '/app/fiscal/nfe-recebidas' },
