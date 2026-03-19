@@ -246,6 +246,34 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         }
       };
 
+      // Extract RPC params from request body (sanitized, for error diagnostics)
+      const extractRpcParams = (): Record<string, unknown> | null => {
+        if (!isRpc) return null;
+        const body = init?.body;
+        if (!body || typeof body !== "string") return null;
+        try {
+          if (body.length > 50_000) return null;
+          const parsed = JSON.parse(body);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+          const SENSITIVE_RE = /(password|secret|token|authorization|cookie|api[_-]?key)/i;
+          const safe: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+            if (SENSITIVE_RE.test(k)) {
+              safe[k] = "[REDACTED]";
+            } else if (typeof v === "string" && v.length > 500) {
+              safe[k] = v.slice(0, 500) + `…(len=${v.length})`;
+            } else if (Array.isArray(v) && v.length > 20) {
+              safe[k] = `[Array len=${v.length}]`;
+            } else {
+              safe[k] = v;
+            }
+          }
+          return safe;
+        } catch {
+          return null;
+        }
+      };
+
       try {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         
@@ -345,6 +373,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   });
                 }
 
+                const rpcParams = extractRpcParams();
+
                 recordConsoleRedEvent({
                   level: "error",
                   source: isRpc ? "network.rpc" : "network.edge",
@@ -357,6 +387,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   url,
                   action: edgeAction.action,
                   request_meta: edgeAction.requestMeta,
+                  rpc_params: rpcParams,
                 });
 
                 await logOpsAppErrorFetchBestEffort({
