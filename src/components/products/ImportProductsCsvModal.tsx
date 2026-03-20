@@ -504,7 +504,7 @@ export default function ImportProductsCsvModal(props: {
     const peso_liquido_kg = parseNumSafe(resolveField(row, 'peso_liquido_kg'));
     const peso_bruto_kg = parseNumSafe(resolveField(row, 'peso_bruto_kg'));
     const tipo_embalagem_raw = resolveField(row, 'tipo_embalagem')?.toLowerCase().trim() || '';
-    const tipo_embalagem = TIPO_EMBALAGEM_MAP[tipo_embalagem_raw] || null;
+    const tipo_embalagem = TIPO_EMBALAGEM_MAP[tipo_embalagem_raw] || 'pacote_caixa';
     const largura_cm = parseNumSafe(resolveField(row, 'largura_cm'));
     const altura_cm = parseNumSafe(resolveField(row, 'altura_cm'));
     const comprimento_cm = parseNumSafe(resolveField(row, 'comprimento_cm'));
