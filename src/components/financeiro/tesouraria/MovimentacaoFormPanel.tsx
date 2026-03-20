@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { Movimentacao, MovimentacaoPayload, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
@@ -10,6 +10,10 @@ import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import CategoriaMovimentacaoDropdown from '@/components/common/CategoriaMovimentacaoDropdown';
+import Modal from '@/components/ui/Modal';
+
+const QuickCreateContaAReceberPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel'));
+const QuickCreateContaPagarPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel'));
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -29,6 +33,10 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
     origem_tipo: 'manual',
     valor: 0,
   });
+  const [showQuickCR, setShowQuickCR] = useState(false);
+  const [showQuickCP, setShowQuickCP] = useState(false);
+  const [savedMov, setSavedMov] = useState<Movimentacao | null>(null);
+  const isNewRecord = !movimentacao?.id;
 
   const valorProps = useNumericField(formData.valor, (v) => handleChange('valor', v));
 
@@ -59,9 +67,20 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
 
     setIsSaving(true);
     try {
-      await saveMovimentacao(formData);
+      const saved = await saveMovimentacao(formData);
       addToast('Movimentação salva com sucesso!', 'success');
-      onSaveSuccess();
+
+      // Para novas movimentações manuais, oferecer criação de conta financeira
+      if (isNewRecord) {
+        setSavedMov(saved);
+        if (formData.tipo_mov === 'entrada') {
+          setShowQuickCR(true);
+        } else {
+          setShowQuickCP(true);
+        }
+      } else {
+        onSaveSuccess();
+      }
     } catch (e: any) {
       addToast(e.message, 'error');
     } finally {
@@ -190,6 +209,51 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
           ) : null}
         </div>
       </footer>
+
+      {/* Modal: Gerar Conta a Receber (após salvar entrada) */}
+      <Modal
+        isOpen={showQuickCR}
+        onClose={() => { setShowQuickCR(false); onSaveSuccess(); }}
+        title="Gerar Conta a Receber"
+        size="2xl"
+      >
+        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+          <QuickCreateContaAReceberPanel
+            initialValues={{
+              descricao: savedMov?.descricao || '',
+              valor: savedMov?.valor ?? 0,
+              data_vencimento: savedMov?.data_movimento || '',
+              documento_ref: savedMov?.documento_ref || '',
+              origem_tipo: 'movimentacao',
+              origem_id: savedMov?.id || '',
+            }}
+            onSaveSuccess={() => { setShowQuickCR(false); onSaveSuccess(); }}
+            onClose={() => { setShowQuickCR(false); onSaveSuccess(); }}
+          />
+        </Suspense>
+      </Modal>
+
+      {/* Modal: Gerar Conta a Pagar (após salvar saída) */}
+      <Modal
+        isOpen={showQuickCP}
+        onClose={() => { setShowQuickCP(false); onSaveSuccess(); }}
+        title="Gerar Conta a Pagar"
+        size="2xl"
+      >
+        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+          <QuickCreateContaPagarPanel
+            formaPagamento=""
+            initialValues={{
+              descricao: savedMov?.descricao || '',
+              valor_total: savedMov?.valor ?? 0,
+              data_vencimento: savedMov?.data_movimento || '',
+              documento_ref: savedMov?.documento_ref || '',
+            }}
+            onSaveSuccess={() => { setShowQuickCP(false); onSaveSuccess(); }}
+            onClose={() => { setShowQuickCP(false); onSaveSuccess(); }}
+          />
+        </Suspense>
+      </Modal>
     </div>
   );
 }
