@@ -1,50 +1,49 @@
 import React, { useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { saveContaPagar, type ContaPagarPayload } from '@/services/financeiro';
+import { saveContaAReceber, type ContaAReceberPayload } from '@/services/contasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 
-type QuickCreateContaPagarPanelProps = {
-  /** Fixed payment method — shown as disabled input */
-  formaPagamento: string;
+type QuickCreateContaAReceberPanelProps = {
   initialValues?: {
     descricao?: string;
-    valor_total?: number;
+    valor?: number;
     data_vencimento?: string;
     documento_ref?: string;
+    origem_tipo?: string;
+    origem_id?: string;
   };
   onSaveSuccess: () => void;
   onClose: () => void;
 };
 
-export default function QuickCreateContaPagarPanel({
-  formaPagamento,
+export default function QuickCreateContaAReceberPanel({
   initialValues,
   onSaveSuccess,
   onClose,
-}: QuickCreateContaPagarPanelProps) {
+}: QuickCreateContaAReceberPanelProps) {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<Partial<ContaPagarPayload>>({
-    status: 'aberta',
-    valor_total: initialValues?.valor_total ?? 0,
-    valor_pago: 0,
-    forma_pagamento: formaPagamento,
-    descricao: initialValues?.descricao ?? undefined,
-    data_vencimento: initialValues?.data_vencimento ?? undefined,
-    documento_ref: initialValues?.documento_ref ?? undefined,
+  const [formData, setFormData] = useState<Partial<ContaAReceberPayload>>({
+    status: 'pendente',
+    descricao: initialValues?.descricao ?? '',
+    valor: initialValues?.valor ?? 0,
+    data_vencimento: initialValues?.data_vencimento ?? '',
+    origem_tipo: initialValues?.origem_tipo ?? undefined,
+    origem_id: initialValues?.origem_id ?? undefined,
   });
-  const [fornecedorName, setFornecedorName] = useState('');
+  const [clienteName, setClienteName] = useState('');
 
-  const valorTotalProps = useNumericField(formData.valor_total, (value) =>
-    setFormData((prev) => ({ ...prev, valor_total: value ?? undefined })),
+  const valorProps = useNumericField(formData.valor, (value) =>
+    setFormData((prev) => ({ ...prev, valor: value ?? undefined })),
   );
 
-  const handleFormChange = (field: keyof ContaPagarPayload, value: any) => {
+  const handleFormChange = (field: keyof ContaAReceberPayload, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -57,18 +56,22 @@ export default function QuickCreateContaPagarPanel({
       addToast('Data de Vencimento é obrigatória.', 'error');
       return;
     }
-    if (!formData.valor_total || formData.valor_total <= 0) {
-      addToast('Valor Total deve ser maior que zero.', 'error');
+    if (!formData.valor || formData.valor <= 0) {
+      addToast('Valor deve ser maior que zero.', 'error');
+      return;
+    }
+    if (!formData.cliente_id) {
+      addToast('Cliente é obrigatório.', 'error');
       return;
     }
 
     setIsSaving(true);
     try {
-      await saveContaPagar({ ...formData, forma_pagamento: formaPagamento });
-      addToast('Conta a pagar criada com sucesso!', 'success');
+      await saveContaAReceber(formData);
+      addToast('Conta a receber criada com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao criar conta a pagar.', 'error');
+      addToast(e?.message || 'Erro ao criar conta a receber.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -77,7 +80,7 @@ export default function QuickCreateContaPagarPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-grow overflow-y-auto scrollbar-styled">
-        <Section title="Dados da Conta" description="Campos essenciais para lançar a conta a pagar.">
+        <Section title="Dados da Conta" description="Campos essenciais para lançar a conta a receber.">
           <Input
             label="Descrição"
             name="descricao"
@@ -85,45 +88,36 @@ export default function QuickCreateContaPagarPanel({
             onChange={(e) => handleFormChange('descricao', e.target.value)}
             required
             className="sm:col-span-4"
-            placeholder="Ex: Fatura cartão março"
+            placeholder="Ex: Pagamento serviço março"
           />
           <Input
             label="Doc. Referência"
             name="documento_ref"
-            value={formData.documento_ref || ''}
-            onChange={(e) => handleFormChange('documento_ref', e.target.value)}
+            value={(formData as any).documento_ref || ''}
+            onChange={(e) => handleFormChange('documento_ref' as any, e.target.value)}
             className="sm:col-span-2"
-            placeholder="Ex: NF 123"
+            placeholder="Ex: NF 456"
           />
 
           <div className="sm:col-span-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
             <ClientAutocomplete
-              value={formData.fornecedor_id || null}
-              initialName={fornecedorName}
-              entity="supplier"
+              value={formData.cliente_id || null}
+              initialName={clienteName}
               onChange={(id, name) => {
-                handleFormChange('fornecedor_id', id);
-                if (name) setFornecedorName(name);
+                handleFormChange('cliente_id', id);
+                if (name) setClienteName(name);
               }}
-              placeholder="Buscar fornecedor..."
+              placeholder="Buscar cliente..."
             />
           </div>
 
           <Input
-            label="Forma de Pagamento"
-            name="forma_pagamento"
-            value={formaPagamento}
-            disabled
-            className="sm:col-span-3"
-          />
-
-          <Input
-            label="Valor Total"
-            name="valor_total"
+            label="Valor"
+            name="valor"
             startAdornment="R$"
             inputMode="numeric"
-            {...valorTotalProps}
+            {...valorProps}
             required
             className="sm:col-span-3"
           />
@@ -138,22 +132,19 @@ export default function QuickCreateContaPagarPanel({
             className="sm:col-span-3"
           />
 
-          <Input
-            label="Categoria"
-            name="categoria"
-            value={formData.categoria || ''}
-            onChange={(e) => handleFormChange('categoria', e.target.value)}
-            className="sm:col-span-3"
-          />
-
-          <Input
-            label="Data de Emissão"
-            name="data_emissao"
-            type="date"
-            value={formData.data_emissao?.split('T')[0] || ''}
-            onChange={(e) => handleFormChange('data_emissao', e.target.value)}
-            className="sm:col-span-3"
-          />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
+            <CentroDeCustoDropdown
+              valueId={(formData as any).centro_de_custo_id || null}
+              valueName={null}
+              onChange={(id, name) => {
+                handleFormChange('centro_de_custo_id' as any, id);
+                if (name) handleFormChange('centro_custo' as any, name);
+              }}
+              placeholder="Selecionar…"
+              allowedTipos={['receita']}
+            />
+          </div>
 
           <TextArea
             label="Observações"
@@ -173,7 +164,7 @@ export default function QuickCreateContaPagarPanel({
             onClick={onClose}
             className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
           >
-            Cancelar
+            Pular
           </button>
           <button
             onClick={handleSave}
