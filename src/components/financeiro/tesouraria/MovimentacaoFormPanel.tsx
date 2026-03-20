@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { Movimentacao, MovimentacaoPayload, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
@@ -11,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import CategoriaMovimentacaoDropdown from '@/components/common/CategoriaMovimentacaoDropdown';
 import Modal from '@/components/ui/Modal';
-import QuickCreateContaAReceberPanel from '@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel';
-import QuickCreateContaPagarPanel from '@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel';
+
+const QuickCreateContaAReceberPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel'));
+const QuickCreateContaPagarPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel'));
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -216,18 +217,20 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
         title="Gerar Conta a Receber"
         size="2xl"
       >
-        <QuickCreateContaAReceberPanel
-          initialValues={{
-            descricao: savedMov?.descricao || '',
-            valor: savedMov?.valor ?? 0,
-            data_vencimento: savedMov?.data_movimento || '',
-            documento_ref: savedMov?.documento_ref || '',
-            origem_tipo: 'movimentacao',
-            origem_id: savedMov?.id || '',
-          }}
-          onSaveSuccess={() => { setShowQuickCR(false); onSaveSuccess(); }}
-          onClose={() => { setShowQuickCR(false); onSaveSuccess(); }}
-        />
+        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+          <QuickCreateContaAReceberPanel
+            initialValues={{
+              descricao: savedMov?.descricao || '',
+              valor: savedMov?.valor ?? 0,
+              data_vencimento: savedMov?.data_movimento || '',
+              documento_ref: savedMov?.documento_ref || '',
+              origem_tipo: 'movimentacao',
+              origem_id: savedMov?.id || '',
+            }}
+            onSaveSuccess={() => { setShowQuickCR(false); onSaveSuccess(); }}
+            onClose={() => { setShowQuickCR(false); onSaveSuccess(); }}
+          />
+        </Suspense>
       </Modal>
 
       {/* Modal: Gerar Conta a Pagar (após salvar saída) */}
@@ -237,17 +240,19 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
         title="Gerar Conta a Pagar"
         size="2xl"
       >
-        <QuickCreateContaPagarPanel
-          formaPagamento=""
-          initialValues={{
-            descricao: savedMov?.descricao || '',
-            valor_total: savedMov?.valor ?? 0,
-            data_vencimento: savedMov?.data_movimento || '',
-            documento_ref: savedMov?.documento_ref || '',
-          }}
-          onSaveSuccess={() => { setShowQuickCP(false); onSaveSuccess(); }}
-          onClose={() => { setShowQuickCP(false); onSaveSuccess(); }}
-        />
+        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+          <QuickCreateContaPagarPanel
+            formaPagamento=""
+            initialValues={{
+              descricao: savedMov?.descricao || '',
+              valor_total: savedMov?.valor ?? 0,
+              data_vencimento: savedMov?.data_movimento || '',
+              documento_ref: savedMov?.documento_ref || '',
+            }}
+            onSaveSuccess={() => { setShowQuickCP(false); onSaveSuccess(); }}
+            onClose={() => { setShowQuickCP(false); onSaveSuccess(); }}
+          />
+        </Suspense>
       </Modal>
     </div>
   );
