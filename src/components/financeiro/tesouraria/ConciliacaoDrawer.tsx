@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, Link2, Plus } from 'lucide-react';
+import { X, Loader2, Link2, Plus, FileText } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
@@ -10,6 +10,10 @@ import DatePicker from '@/components/ui/DatePicker';
 import { formatDatePtBR } from '@/lib/dateDisplay';
 import { useNumericField } from '@/hooks/useNumericField';
 import { autoAllocateFifoByVencimento } from '@/lib/conciliacao/allocation';
+import SideSheet from '@/components/ui/SideSheet';
+
+const QuickCreateContaAReceberPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel'));
+const QuickCreateContaPagarPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel'));
 
 interface Props {
   isOpen: boolean;
@@ -105,6 +109,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [allocating, setAllocating] = useState(false);
   const [createCreditoEmConta, setCreateCreditoEmConta] = useState(false);
   const [creditoPessoaId, setCreditoPessoaId] = useState<string | null>(null);
+  const [showQuickCreateConta, setShowQuickCreateConta] = useState(false);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -1082,15 +1087,26 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
               ) : candidates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
                     <p>Nenhuma movimentação compatível encontrada.</p>
-                    <button 
-                        type="button"
-                        onClick={handleCreateAndConciliate}
-                        disabled={isCreating || hasMissingExtratoValue}
-                        className="mt-4 text-blue-600 font-semibold hover:underline flex items-center justify-center gap-1 mx-auto"
-                    >
-                        {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                        Criar Movimentação Igual
-                    </button>
+                    <div className="flex flex-col items-center gap-2 mt-4">
+                      <button
+                          type="button"
+                          onClick={() => setShowQuickCreateConta(true)}
+                          disabled={hasMissingExtratoValue}
+                          className="text-blue-600 font-semibold hover:underline flex items-center justify-center gap-1"
+                      >
+                          <FileText size={16} />
+                          Criar conta igual
+                      </button>
+                      <button
+                          type="button"
+                          onClick={handleCreateAndConciliate}
+                          disabled={isCreating || hasMissingExtratoValue}
+                          className="text-xs text-gray-500 hover:text-gray-700 hover:underline flex items-center justify-center gap-1"
+                      >
+                          {isCreating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+                          Criar movimentação e conciliar
+                      </button>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -1152,15 +1168,24 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             )}
             
             {candidates.length > 0 && (
-                 <div className="mt-6 pt-6 border-t">
-                    <button 
+                 <div className="mt-6 pt-6 border-t space-y-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowQuickCreateConta(true)}
+                        disabled={hasMissingExtratoValue}
+                        className="w-full py-3 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                    >
+                        <FileText size={18} />
+                        Não encontrou? Criar conta igual
+                    </button>
+                    <button
                         type="button"
                         onClick={handleCreateAndConciliate}
                         disabled={isCreating || !!linkingId || hasMissingExtratoValue}
-                        className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-1"
                     >
-                        {isCreating ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
-                        Não encontrou? Criar Nova Movimentação
+                        {isCreating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+                        Criar movimentação e conciliar
                     </button>
                  </div>
             )}
@@ -1168,6 +1193,49 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             ) : null}
         </div>
       </motion.div>
+
+      {/* SideSheet: Criar conta a receber ou a pagar */}
+      <SideSheet
+        isOpen={showQuickCreateConta}
+        onClose={() => setShowQuickCreateConta(false)}
+        title={extratoItem?.tipo_lancamento === 'credito' ? 'Criar Conta a Receber' : 'Criar Conta a Pagar'}
+        description="Preencha os dados da conta financeira. Os campos já vêm preenchidos com os dados do extrato."
+      >
+        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+          {extratoItem?.tipo_lancamento === 'credito' ? (
+            <QuickCreateContaAReceberPanel
+              initialValues={{
+                descricao: extratoItem?.descricao || '',
+                valor: extratoItem?.valor ?? 0,
+                data_vencimento: extratoItem?.data_lancamento || '',
+                documento_ref: extratoItem?.documento_ref || '',
+              }}
+              onSaveSuccess={() => {
+                setShowQuickCreateConta(false);
+                addToast('Conta criada com sucesso!', 'success');
+                onClose();
+              }}
+              onClose={() => setShowQuickCreateConta(false)}
+            />
+          ) : (
+            <QuickCreateContaPagarPanel
+              formaPagamento=""
+              initialValues={{
+                descricao: extratoItem?.descricao || '',
+                valor_total: extratoItem?.valor ?? 0,
+                data_vencimento: extratoItem?.data_lancamento || '',
+                documento_ref: extratoItem?.documento_ref || '',
+              }}
+              onSaveSuccess={() => {
+                setShowQuickCreateConta(false);
+                addToast('Conta criada com sucesso!', 'success');
+                onClose();
+              }}
+              onClose={() => setShowQuickCreateConta(false)}
+            />
+          )}
+        </Suspense>
+      </SideSheet>
     </div>
   );
 }
