@@ -68,6 +68,11 @@ export default function MediaTab({ produtoId, empresaId }: Props) {
     const fetchSignedUrls = async () => {
       const urls: Record<string, string> = {};
       const urlPromises = imagens.map(async (img) => {
+        // External URLs (from CSV import) — use directly
+        if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
+          urls[img.id] = img.url;
+          return;
+        }
         const { data, error } = await supabase.storage
           .from('product_images')
           .createSignedUrl(img.url, 3600); // 1 hour expiry
