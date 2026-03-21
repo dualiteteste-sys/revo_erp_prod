@@ -50,6 +50,7 @@ export const useContasCorrentes = () => {
     },
     // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
     placeholderData: empresaChanged ? undefined : keepPreviousData,
+    staleTime: 2 * 60 * 1000, // 2 min — contas correntes mudam pouco
     enabled: !!empresaId,
   });
 
@@ -109,6 +110,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     },
     // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
     placeholderData: empresaChanged ? undefined : keepPreviousData,
+    staleTime: 30 * 1000, // 30s — movimentações podem mudar com frequência
     enabled: !!empresaId && !!contaCorrenteId,
   });
 
@@ -170,6 +172,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     },
     // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
     placeholderData: empresaChanged ? undefined : keepPreviousData,
+    staleTime: 60 * 1000, // 1 min — extratos importados mudam menos que movimentações
     enabled: !!empresaId && !!contaCorrenteId,
   });
 

@@ -181,85 +181,61 @@ export default function IndustriaDashboardPage() {
   const producaoStatus = stats?.producao_status ?? [];
   const beneficiamentoStatus = stats?.beneficiamento_status ?? [];
 
-  const chartDataStatus = producaoStatus.map(s => ({
-    value: Number(s.total),
-    name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  }));
-
-  const statusChartOption = {
-    title: { text: 'Ordens de Produção por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
-    tooltip: { trigger: 'item' },
-    legend: { bottom: '0%' },
-    series: [
-      {
-        name: 'Status',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['50%', '45%'],
+  const statusChartOption = useMemo(() => {
+    const chartDataStatus = producaoStatus.map(s => ({
+      value: Number(s.total),
+      name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    }));
+    return {
+      title: { text: 'Ordens de Produção por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+      tooltip: { trigger: 'item' },
+      legend: { bottom: '0%' },
+      series: [{
+        name: 'Status', type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'],
         itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
         data: chartDataStatus.length > 0 ? chartDataStatus : [{ value: 0, name: 'Sem dados' }]
-      }
-    ]
-  };
+      }]
+    };
+  }, [producaoStatus]);
 
-  const barChartOption = {
+  const barChartOption = useMemo(() => ({
     title: { text: 'Pipeline de Produção', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: producaoStatus.map(s => s.status.replace(/_/g, ' ')),
-      axisLabel: { rotate: 20 }
-    },
+    xAxis: { type: 'category', data: producaoStatus.map(s => s.status.replace(/_/g, ' ')), axisLabel: { rotate: 20 } },
     yAxis: { type: 'value' },
-    series: [
-      {
-        data: producaoStatus.map(s => Number(s.total)),
-        type: 'bar',
-        itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top' }
-      }
-    ]
-  };
+    series: [{
+      data: producaoStatus.map(s => Number(s.total)), type: 'bar',
+      itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] }, label: { show: true, position: 'top' }
+    }]
+  }), [producaoStatus]);
 
-  const benefStatusData = beneficiamentoStatus.map(s => ({
-    value: Number(s.total),
-    name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  }));
-
-  const benefStatusChartOption = {
-    title: { text: 'Beneficiamento por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
-    tooltip: { trigger: 'item' },
-    legend: { bottom: '0%' },
-    series: [
-      {
-        name: 'Status',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['50%', '45%'],
+  const benefStatusChartOption = useMemo(() => {
+    const benefStatusData = beneficiamentoStatus.map(s => ({
+      value: Number(s.total),
+      name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    }));
+    return {
+      title: { text: 'Beneficiamento por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+      tooltip: { trigger: 'item' },
+      legend: { bottom: '0%' },
+      series: [{
+        name: 'Status', type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'],
         itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
         data: benefStatusData.length > 0 ? benefStatusData : [{ value: 0, name: 'Sem dados' }]
-      }
-    ]
-  };
+      }]
+    };
+  }, [beneficiamentoStatus]);
 
-  const benefPipelineChartOption = {
+  const benefPipelineChartOption = useMemo(() => ({
     title: { text: 'Pipeline de Beneficiamento', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: beneficiamentoStatus.map(s => s.status.replace(/_/g, ' ')),
-      axisLabel: { rotate: 20 }
-    },
+    xAxis: { type: 'category', data: beneficiamentoStatus.map(s => s.status.replace(/_/g, ' ')), axisLabel: { rotate: 20 } },
     yAxis: { type: 'value' },
-    series: [
-      {
-        data: beneficiamentoStatus.map(s => Number(s.total)),
-        type: 'bar',
-        itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top' }
-      }
-    ]
-  };
+    series: [{
+      data: beneficiamentoStatus.map(s => Number(s.total)), type: 'bar',
+      itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] }, label: { show: true, position: 'top' }
+    }]
+  }), [beneficiamentoStatus]);
 
   // KPI Calculations (Safe)
   const concluidasProd = producaoStatus.find(s => s.status === 'concluida')?.total ?? 0;

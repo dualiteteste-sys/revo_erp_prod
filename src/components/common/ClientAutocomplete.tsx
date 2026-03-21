@@ -3,7 +3,7 @@ import { searchClients, ClientHit } from '@/services/clients';
 import { searchSuppliers, type SupplierHit } from '@/services/compras';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2, Plus } from 'lucide-react';
-import Modal from '@/components/ui/Modal';
+import SideSheet from '@/components/ui/SideSheet';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
@@ -188,11 +188,12 @@ export default function ClientAutocomplete({
         )}
       </div>
 
-      <Modal
+      <SideSheet
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title={isSupplier ? 'Novo Fornecedor' : 'Novo Cliente'}
-        size="4xl"
+        description="Preencha os dados e salve. O parceiro será selecionado automaticamente."
+        widthClassName="w-[min(720px,88vw)]"
       >
         <PartnerFormPanel
           partner={null}
@@ -200,7 +201,7 @@ export default function ClientAutocomplete({
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
         />
-      </Modal>
+      </SideSheet>
     </div>
   );
 }

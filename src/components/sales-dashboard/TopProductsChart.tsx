@@ -1,32 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 
-export default function TopProductsChart(props: {
+const TopProductsChart = React.memo(function TopProductsChart(props: {
   items: Array<{ name: string; value: number }>;
   title?: string;
 }) {
-  const data = props.items;
-  const title = props.title ?? 'Top 5 Produtos';
+  const { items, title: titleText = 'Top 5 Produtos' } = props;
 
-  const option = {
+  const option = useMemo(() => ({
     title: {
-        text: title,
-        left: 'center',
-        textStyle: {
-            color: '#334155',
-            fontWeight: 'bold',
-        }
+      text: titleText,
+      left: 'center',
+      textStyle: {
+        color: '#334155',
+        fontWeight: 'bold',
+      }
     },
-    tooltip: { 
-        trigger: 'item', 
-        formatter: '{b}: {c} ({d}%)' 
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} ({d}%)'
     },
-    legend: { 
-        orient: 'vertical',
-        left: 'left',
-        top: 'middle',
-        data: data.map(d => d.name)
+    legend: {
+      orient: 'vertical',
+      left: 'left',
+      top: 'middle',
+      data: items.map(d => d.name)
     },
     series: [
       {
@@ -50,17 +49,19 @@ export default function TopProductsChart(props: {
           }
         },
         labelLine: { show: false },
-        data: data,
+        data: items,
         animationType: 'scale',
         animationEasing: 'elasticOut',
-        animationDelay: (idx: number) => Math.random() * 200
+        animationDelay: (idx: number) => idx * 50
       }
     ]
-  };
+  }), [items, titleText]);
 
   return (
     <GlassCard className="p-4 overflow-hidden h-96">
       <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
     </GlassCard>
   );
-}
+});
+
+export default TopProductsChart;
