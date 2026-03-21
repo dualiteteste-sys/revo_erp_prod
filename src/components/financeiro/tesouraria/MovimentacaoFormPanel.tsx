@@ -12,8 +12,8 @@ import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import CategoriaMovimentacaoDropdown from '@/components/common/CategoriaMovimentacaoDropdown';
 import Modal from '@/components/ui/Modal';
 
-const QuickCreateContaAReceberPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel'));
-const QuickCreateContaPagarPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel'));
+const ContasAReceberFormPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/ContasAReceberFormPanel'));
+const ContasPagarFormPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/ContasPagarFormPanel'));
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -108,10 +108,10 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
         ) : null}
         <Section title="Dados da Movimentação" description="Registre uma entrada ou saída manual.">
           <div className="sm:col-span-2">
-            <Select 
-                label="Tipo" 
-                name="tipo" 
-                value={formData.tipo_mov} 
+            <Select
+                label="Tipo"
+                name="tipo"
+                value={formData.tipo_mov}
                 onChange={e => handleChange('tipo_mov', e.target.value)}
                 disabled={readOnly}
             >
@@ -119,7 +119,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
                 <option value="saida">Saída (Débito)</option>
             </Select>
           </div>
-          
+
           <Input
             label="Valor"
             name="valor"
@@ -130,23 +130,23 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
             disabled={readOnly}
           />
 
-          <Input 
-            label="Data" 
-            name="data" 
+          <Input
+            label="Data"
+            name="data"
             type="date"
-            value={formData.data_movimento || ''} 
-            onChange={e => handleChange('data_movimento', e.target.value)} 
-            className="sm:col-span-2" 
+            value={formData.data_movimento || ''}
+            onChange={e => handleChange('data_movimento', e.target.value)}
+            className="sm:col-span-2"
             disabled={readOnly}
           />
 
-          <Input 
-            label="Descrição" 
-            name="desc" 
-            value={formData.descricao || ''} 
-            onChange={e => handleChange('descricao', e.target.value)} 
-            required 
-            className="sm:col-span-6" 
+          <Input
+            label="Descrição"
+            name="desc"
+            value={formData.descricao || ''}
+            onChange={e => handleChange('descricao', e.target.value)}
+            required
+            className="sm:col-span-6"
             disabled={readOnly}
           />
 
@@ -173,26 +173,26 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
               disabled={readOnly}
             />
             <div className="text-[11px] text-gray-500 mt-1">
-              Usado em relatórios e auditoria. Se vazio, fica “sem centro”.
+              Usado em relatórios e auditoria. Se vazio, fica "sem centro".
             </div>
           </div>
 
-          <Input 
-            label="Documento Ref." 
-            name="doc" 
-            value={formData.documento_ref || ''} 
-            onChange={e => handleChange('documento_ref', e.target.value)} 
-            className="sm:col-span-2" 
+          <Input
+            label="Documento Ref."
+            name="doc"
+            value={formData.documento_ref || ''}
+            onChange={e => handleChange('documento_ref', e.target.value)}
+            className="sm:col-span-2"
             disabled={readOnly}
           />
 
-          <TextArea 
-            label="Observações" 
-            name="obs" 
-            value={formData.observacoes || ''} 
-            onChange={e => handleChange('observacoes', e.target.value)} 
-            rows={3} 
-            className="sm:col-span-6" 
+          <TextArea
+            label="Observações"
+            name="obs"
+            value={formData.observacoes || ''}
+            onChange={e => handleChange('observacoes', e.target.value)}
+            rows={3}
+            className="sm:col-span-6"
             disabled={readOnly}
           />
         </Section>
@@ -218,12 +218,11 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
         size="2xl"
       >
         <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
-          <QuickCreateContaAReceberPanel
-            initialValues={{
+          <ContasAReceberFormPanel
+            conta={{
               descricao: savedMov?.descricao || '',
               valor: savedMov?.valor ?? 0,
               data_vencimento: savedMov?.data_movimento || '',
-              documento_ref: savedMov?.documento_ref || '',
               origem_tipo: 'movimentacao',
               origem_id: savedMov?.id || '',
             }}
@@ -241,9 +240,8 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
         size="2xl"
       >
         <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
-          <QuickCreateContaPagarPanel
-            formaPagamento=""
-            initialValues={{
+          <ContasPagarFormPanel
+            conta={{
               descricao: savedMov?.descricao || '',
               valor_total: savedMov?.valor ?? 0,
               data_vencimento: savedMov?.data_movimento || '',
