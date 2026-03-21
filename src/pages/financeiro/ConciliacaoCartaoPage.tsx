@@ -17,7 +17,7 @@ import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import SideSheet from '@/components/ui/SideSheet';
-import QuickCreateContaPagarPanel from '@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel';
+import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 
 type Tipo = 'receber' | 'pagar';
 
@@ -424,8 +424,10 @@ export default function ConciliacaoCartaoPage() {
         description="A forma de pagamento é fixada em Cartão de Crédito."
         widthClassName="w-[min(640px,92vw)]"
       >
-        <QuickCreateContaPagarPanel
-          formaPagamento={formaPagamento || 'Cartão de crédito'}
+        <ContasPagarFormPanel
+          conta={{
+            forma_pagamento: formaPagamento || 'Cartão de crédito',
+          }}
           onSaveSuccess={() => {
             setQuickCreateOpen(false);
             void loadData();
