@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 
@@ -6,13 +6,14 @@ type StatusRow = { status: string; count: number };
 
 const palette = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b', '#64748b'];
 
-const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = ({ status, loading }) => {
-  const rows = (status ?? []).filter(Boolean);
-  const top = rows.slice(0, 6);
-  const rest = rows.slice(6);
-  const restCount = rest.reduce((acc, r) => acc + Number(r.count || 0), 0);
+const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = React.memo(({ status, loading }) => {
+  const option = useMemo(() => {
+    const rows = (status ?? []).filter(Boolean);
+    const top = rows.slice(0, 6);
+    const rest = rows.slice(6);
+    const restCount = rest.reduce((acc, r) => acc + Number(r.count || 0), 0);
 
-  const pieData = [
+    const pieData = [
     ...top.map((r, idx) => ({
       value: Number(r.count || 0),
       name: r.status,
@@ -41,7 +42,7 @@ const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = ({ s
       : []),
   ];
 
-  const option = {
+  return {
     tooltip: {
       trigger: 'item',
       formatter: (p: any) => `${p?.name}: <strong>${p?.value ?? 0}</strong> (${p?.percent ?? 0}%)`,
@@ -76,10 +77,11 @@ const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = ({ s
         data: pieData,
         animationType: 'scale',
         animationEasing: 'elasticOut',
-        animationDelay: (idx: number) => Math.random() * 200
+        animationDelay: (idx: number) => idx * 50
       }
     ]
   };
+  }, [status]);
 
   return (
     <GlassCard className="p-0 overflow-hidden h-96">
@@ -90,6 +92,8 @@ const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = ({ s
       )}
     </GlassCard>
   );
-};
+});
+
+GraficoVendas.displayName = 'GraficoVendas';
 
 export default GraficoVendas;

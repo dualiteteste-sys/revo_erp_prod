@@ -1,20 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 
-export default function SalesLineChart(props: { labels: string[]; values: number[]; title?: string }) {
-  const labels = props.labels;
-  const data = props.values;
-  const title = props.title ?? 'Faturamento por Período';
+const SalesLineChart = React.memo(function SalesLineChart(props: { labels: string[]; values: number[]; title?: string }) {
+  const { labels, values, title: titleText = 'Faturamento por Período' } = props;
 
-  const option = {
+  const option = useMemo(() => ({
     title: {
-        text: title,
-        left: 'center',
-        textStyle: {
-            color: '#334155',
-            fontWeight: 'bold',
-        }
+      text: titleText,
+      left: 'center',
+      textStyle: {
+        color: '#334155',
+        fontWeight: 'bold',
+      }
     },
     tooltip: {
       trigger: 'axis',
@@ -69,16 +67,18 @@ export default function SalesLineChart(props: { labels: string[]; values: number
             colorStops: [{ offset: 0, color: 'rgba(59, 130, 246, 0.3)' }, { offset: 1, color: 'rgba(59, 130, 246, 0)' }]
           }
         },
-        data: data,
-        animationDuration: 2000,
+        data: values,
+        animationDuration: 800,
         animationEasing: 'cubicInOut',
       },
     ],
-  };
+  }), [labels, values, titleText]);
 
   return (
     <GlassCard className="p-4 overflow-hidden h-96">
       <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
     </GlassCard>
   );
-}
+});
+
+export default SalesLineChart;

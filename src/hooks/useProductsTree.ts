@@ -46,6 +46,7 @@ export function useProductsTree() {
     queryKey: PRODUCTS_TREE_KEYS.parents({ ...queryOptions, empresaId: activeEmpresa?.id }),
     queryFn: () => getProductParents(queryOptions),
     placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // 5 min — árvore de produtos muda pouco
     enabled: !!activeEmpresa,
   });
 

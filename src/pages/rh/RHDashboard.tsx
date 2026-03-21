@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDashboardStats, RHDashboardStats, seedRhData, getTrainingCompliance, type TrainingComplianceResponse } from '@/services/rh';
 import { Loader2, Users, Briefcase, AlertTriangle, GraduationCap, TrendingDown, DollarSign, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -153,38 +153,31 @@ export default function RHDashboard() {
   const topGaps = stats.top_gaps ?? [];
   const statusTreinamentos = stats.status_treinamentos ?? [];
 
-  const gapsChartOption = {
+  const gapsChartOption = useMemo(() => ({
     title: { text: 'Top 5 Gaps de Competência', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: { type: 'value' },
     yAxis: { type: 'category', data: topGaps.map(g => g.nome).reverse() },
-    series: [
-      {
-        name: 'Gaps',
-        type: 'bar',
-        data: topGaps.map(g => g.total_gaps).reverse(),
-        itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] }
-      }
-    ]
-  };
+    series: [{
+      name: 'Gaps', type: 'bar',
+      data: topGaps.map(g => g.total_gaps).reverse(),
+      itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] }
+    }]
+  }), [topGaps]);
 
-  const statusChartOption = {
+  const statusChartOption = useMemo(() => ({
     title: { text: 'Status dos Treinamentos', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'item' },
-    series: [
-      {
-        name: 'Treinamentos',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
-        data: (statusTreinamentos.length > 0 ? statusTreinamentos : [{ status: 'sem_dados', total: 0 }]).map(s => ({
-          value: s.total,
-          name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-        }))
-      }
-    ]
-  };
+    series: [{
+      name: 'Treinamentos', type: 'pie', radius: ['40%', '70%'],
+      itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+      data: (statusTreinamentos.length > 0 ? statusTreinamentos : [{ status: 'sem_dados', total: 0 }]).map(s => ({
+        value: s.total,
+        name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }))
+    }]
+  }), [statusTreinamentos]);
 
   return (
     <div className="p-1 space-y-6">
