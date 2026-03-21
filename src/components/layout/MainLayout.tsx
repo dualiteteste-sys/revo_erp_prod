@@ -21,6 +21,9 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import MobileBottomNav from './MobileBottomNav';
 import MobileTopBar from './MobileTopBar';
 import { getDefaultSettingsRoute, resolveSettingsRouteFromLegacyParam } from '@/lib/settingsRoute';
+import { AssistantProvider } from '@/contexts/AssistantProvider';
+import AssistantPanel from '@/components/assistant/AssistantPanel';
+import AssistantLauncher from '@/components/assistant/AssistantLauncher';
 
 const LayoutDebugOverlay = import.meta.env.DEV
   ? React.lazy(() => import('@/components/dev/LayoutDebugOverlay'))
@@ -158,85 +161,90 @@ const MainLayout: React.FC = () => {
             setIsOnboardingWizardOpen(true);
           }}
         >
-          <RoadmapProvider>
-            <TenantQueryCacheGuard />
+          <AssistantProvider>
+            <RoadmapProvider>
+              <TenantQueryCacheGuard />
 
-            {/* Container principal - responsivo */}
-            <div className={`h-screen flex ${isMobile ? 'flex-col' : 'p-4 gap-4'}`}>
-              <CommandPalette />
-              {import.meta.env.DEV && LayoutDebugOverlay && (
-                <React.Suspense fallback={null}>
-                  <LayoutDebugOverlay />
-                </React.Suspense>
-              )}
-              <OnboardingWizardModal
-                isOpen={isOnboardingWizardOpen}
-                mode="auto"
-                forceStepKey={onboardingForceStepKey}
-                onClose={() => {
-                  setIsOnboardingWizardOpen(false);
-                  setOnboardingForceStepKey(null);
-                }}
-              />
-              <PostInviteWelcomeModal
-                isOpen={isPostInviteWelcomeOpen}
-                onClose={() => setIsPostInviteWelcomeOpen(false)}
-              />
-              <PlanIntentCheckoutModal />
-
-              {/* Mobile: Top Bar */}
-              {isMobile && <MobileTopBar />}
-
-              {/* Desktop: Sidebar (oculta em mobile) */}
-              {!isMobile && (
-                <Sidebar
-                  isCollapsed={isSidebarCollapsed}
-                  setIsCollapsed={setIsSidebarCollapsed}
-                  onOpenSettings={handleOpenSettings}
-                  onOpenCreateCompanyModal={() => {
-                    /* No-op, modal removido */
+              {/* Container principal - responsivo */}
+              <div className={`h-screen flex ${isMobile ? 'flex-col' : 'p-4 gap-4'}`}>
+                <CommandPalette />
+                {import.meta.env.DEV && LayoutDebugOverlay && (
+                  <React.Suspense fallback={null}>
+                    <LayoutDebugOverlay />
+                  </React.Suspense>
+                )}
+                <OnboardingWizardModal
+                  isOpen={isOnboardingWizardOpen}
+                  mode="auto"
+                  forceStepKey={onboardingForceStepKey}
+                  onClose={() => {
+                    setIsOnboardingWizardOpen(false);
+                    setOnboardingForceStepKey(null);
                   }}
-                  activeItem={activeItem}
-                  setActiveItem={handleSetActiveItem}
                 />
-              )}
+                <PostInviteWelcomeModal
+                  isOpen={isPostInviteWelcomeOpen}
+                  onClose={() => setIsPostInviteWelcomeOpen(false)}
+                />
+                <PlanIntentCheckoutModal />
 
-              {/* Conteúdo principal */}
-              <div className={`flex-1 flex flex-col overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
-                <SubscriptionGuard>
-                  {/* Banners (apenas desktop) */}
-                  {!isMobile && (
-                    <div className="pb-3">
-                      <div className="flex justify-end gap-2 items-start flex-wrap">
-                        <SubscriptionStatusBanner />
-                        <OnboardingGateBanner
-                          onOpenWizard={() => {
-                            setOnboardingForceStepKey(null);
-                            setIsOnboardingWizardOpen(true);
-                          }}
-                        />
-                        <RoadmapButton />
+                {/* Mobile: Top Bar */}
+                {isMobile && <MobileTopBar />}
+
+                {/* Desktop: Sidebar (oculta em mobile) */}
+                {!isMobile && (
+                  <Sidebar
+                    isCollapsed={isSidebarCollapsed}
+                    setIsCollapsed={setIsSidebarCollapsed}
+                    onOpenSettings={handleOpenSettings}
+                    onOpenCreateCompanyModal={() => {
+                      /* No-op, modal removido */
+                    }}
+                    activeItem={activeItem}
+                    setActiveItem={handleSetActiveItem}
+                  />
+                )}
+
+                {/* Conteúdo principal */}
+                <div className={`flex-1 flex flex-col overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
+                  <SubscriptionGuard>
+                    {/* Banners (apenas desktop) */}
+                    {!isMobile && (
+                      <div className="pb-3">
+                        <div className="flex justify-end gap-2 items-start flex-wrap">
+                          <SubscriptionStatusBanner />
+                          <OnboardingGateBanner
+                            onOpenWizard={() => {
+                              setOnboardingForceStepKey(null);
+                              setIsOnboardingWizardOpen(true);
+                            }}
+                          />
+                          <RoadmapButton />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <main
-                    className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-styled flex flex-col min-h-0 ${isMobile ? 'px-4' : 'pr-2'}`}
-                    tabIndex={0}
-                    aria-label="Conteúdo principal"
-                  >
-                    <ContextualHelp />
-                    <div className="flex-1 min-h-0">
-                      <Outlet />
-                    </div>
-                  </main>
-                </SubscriptionGuard>
+                    <main
+                      className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-styled flex flex-col min-h-0 ${isMobile ? 'px-4' : 'pr-2'}`}
+                      tabIndex={0}
+                      aria-label="Conteúdo principal"
+                    >
+                      <ContextualHelp />
+                      <div className="flex-1 min-h-0">
+                        <Outlet />
+                      </div>
+                    </main>
+                  </SubscriptionGuard>
+                </div>
+
+                {/* Mobile: Bottom Navigation (fixo no bottom) */}
+                {isMobile && <MobileBottomNav onOpenSettings={handleOpenSettings} />}
               </div>
 
-              {/* Mobile: Bottom Navigation (fixo no bottom) */}
-              {isMobile && <MobileBottomNav onOpenSettings={handleOpenSettings} />}
-            </div>
-          </RoadmapProvider>
+              <AssistantLauncher />
+              <AssistantPanel />
+            </RoadmapProvider>
+          </AssistantProvider>
         </OnboardingGateProvider>
       </AppContextProvider>
     </SubscriptionProvider>

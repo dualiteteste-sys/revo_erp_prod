@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DoorClosed, DoorOpen, Download, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
-import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
+import PdvSalePanel from '@/components/vendas/PdvSalePanel';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
@@ -123,7 +123,6 @@ export default function PdvPage() {
   const [caixaBusy, setCaixaBusy] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [receiptVenda, setReceiptVenda] = useState<VendaDetails | null>(null);
   const [receiptNfce, setReceiptNfce] = useState<NfceEmissaoInfo | null>(null);
@@ -259,7 +258,6 @@ export default function PdvPage() {
     setCaixaBusy(false);
     setFinalizingId(null);
     setIsFormOpen(false);
-    setSelectedId(null);
     setReceiptVenda(null);
     setReceiptNfce(null);
     setReceiptPagamentos([]);
@@ -322,24 +320,8 @@ export default function PdvPage() {
     );
   }, [filteredRows, sort]);
 
-  const openNew = () => {
-    setSelectedId(null);
-    setIsFormOpen(true);
-  };
-
-  const openEdit = (id: string) => {
-    setSelectedId(id);
-    setIsFormOpen(true);
-  };
-
-  const close = () => {
-    setIsFormOpen(false);
-    setSelectedId(null);
-  };
-
-  const handleSaveSuccess = () => {
-    void load();
-  };
+  const openNew = () => setIsFormOpen(true);
+  const close = () => setIsFormOpen(false);
 
   const handleFinalize = async (pedidoId: string) => {
     if (!billing.ensureCanWrite({ actionLabel: 'Finalizar PDV' })) return;
@@ -366,8 +348,20 @@ export default function PdvPage() {
       setIsCaixaModalOpen(true);
       return;
     }
-    // Find the row to get numero and total for the payment modal
-    const row = rows.find((r) => r.id === pedidoId);
+    // Find the row to get numero and total for the payment modal.
+    // If pedido came from PdvSalePanel, it may not be in rows yet — fetch details.
+    let row = rows.find((r) => r.id === pedidoId);
+    if (!row) {
+      try {
+        const venda = await getVendaDetails(pedidoId);
+        if (venda) {
+          setPaymentPedidoNumero(venda.numero ?? 0);
+          setPaymentTotalGeral(Number(venda.total_geral ?? 0));
+          setPaymentModalPedidoId(pedidoId);
+          return;
+        }
+      } catch { /* fall through */ }
+    }
     setPaymentPedidoNumero(row?.numero ?? 0);
     setPaymentTotalGeral(Number(row?.total_geral ?? 0));
     setPaymentModalPedidoId(pedidoId);
@@ -668,7 +662,11 @@ export default function PdvPage() {
         <button
           type="button"
           onClick={() => openCaixaModal((caixas.find((c) => c.id === caixaId)?.sessao_id ? 'close' : 'open'))}
-          className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 flex items-center gap-2"
+          className={`px-3 py-2 rounded-lg text-white text-sm font-semibold flex items-center gap-2 ${
+            caixas.find((c) => c.id === caixaId)?.sessao_id
+              ? 'bg-red-600 hover:bg-red-700'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
           title="Abrir/encerrar caixa"
         >
           {caixas.find((c) => c.id === caixaId)?.sessao_id ? <DoorClosed size={16} /> : <DoorOpen size={16} />}
@@ -889,9 +887,6 @@ export default function PdvPage() {
                     <td className="px-4 py-3">{formatMoneyBRL(Number(r.total_geral || 0))}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => openEdit(r.id)} className="px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200">
-                          Abrir
-                        </button>
                         {r.status === 'concluido' ? (
                           <button
                             onClick={() => void handleOpenReceipt(r.id)}
@@ -929,13 +924,17 @@ export default function PdvPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={close} title={selectedId ? 'Editar venda' : 'Nova venda'} size="6xl" containerClassName="h-[90vh] max-h-[90vh]">
-        <PedidoVendaFormPanel
-          vendaId={selectedId}
-          onSaveSuccess={handleSaveSuccess}
+      <Modal isOpen={isFormOpen} onClose={close} title="Nova venda" size="4xl" containerClassName="h-[85vh] max-h-[85vh]">
+        <PdvSalePanel
+          caixaId={caixaId}
+          contaCorrenteId={contaCorrenteId}
+          nfceEnabled={nfceEnabled}
+          queuedIds={queuedIds}
+          onSaleComplete={(pid) => {
+            close();
+            void handleFinalize(pid);
+          }}
           onClose={close}
-          mode="pdv"
-          onFinalizePdv={handleFinalize}
         />
       </Modal>
 
