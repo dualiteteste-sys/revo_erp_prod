@@ -7,6 +7,7 @@ import {
   removePdvFinalizeQueue,
   upsertPdvFinalizeQueue,
 } from '@/lib/offlineQueue';
+import type { PdvPagamento } from '@/components/vendas/PdvPaymentModal';
 
 export type ExpedicaoStatus = 'separando' | 'embalado' | 'enviado' | 'entregue' | 'cancelado';
 export type Expedicao = {
@@ -261,6 +262,12 @@ export async function openPdvCaixa(params: { caixaId: string; saldoInicial?: num
   });
 }
 
+export type CaixaPaymentBreakdown = {
+  forma_pagamento: string;
+  total: number;
+  quantidade: number;
+};
+
 export type ClosePdvCaixaResult = {
   ok: boolean;
   sessao_id: string;
@@ -269,6 +276,7 @@ export type ClosePdvCaixaResult = {
   saldo_final: number | null;
   total_vendas: number;
   total_estornos: number;
+  por_forma_pagamento?: CaixaPaymentBreakdown[];
   opened_at: string;
   closed_at: string;
 };
@@ -294,6 +302,7 @@ export async function finalizePdv(params: {
   contaCorrenteId: string;
   estoqueEnabled?: boolean;
   caixaId?: string | null;
+  formasPagamento?: PdvPagamento[] | null;
 }): Promise<VendaDetails> {
   return traceAction(
     'pdv.finalize',
@@ -304,6 +313,7 @@ export async function finalizePdv(params: {
           p_conta_corrente_id: params.contaCorrenteId,
           p_baixar_estoque: params.estoqueEnabled !== false,
           p_pdv_caixa_id: params.caixaId ?? null,
+          p_formas_pagamento: params.formasPagamento ?? null,
         });
         removePdvFinalizeQueue(params.pedidoId);
       } catch (e: any) {

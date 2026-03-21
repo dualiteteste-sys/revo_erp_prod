@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
   // Verify emissao exists and belongs to empresa
   const { data: emissao } = await admin
     .from("fiscal_nfe_emissoes")
-    .select("id, ambiente, status, numero")
+    .select("id, ambiente, status, numero, modelo")
     .eq("id", emissao_id)
     .eq("empresa_id", empresaId)
     .single();
@@ -121,8 +121,9 @@ Deno.serve(async (req) => {
   const baseUrl = getFocusBaseUrl(ambiente);
   const authHeaders = { Authorization: basicAuth(apiToken) };
 
-  // Step 1: Consult NFe to get download paths
-  const consultUrl = `${baseUrl}/v2/nfe/${emissao_id}`;
+  // Step 1: Consult NFe/NFCe to get download paths
+  const docEndpoint = emissao.modelo === "65" ? "nfce" : "nfe";
+  const consultUrl = `${baseUrl}/v2/${docEndpoint}/${emissao_id}`;
   const consultRes = await fetch(consultUrl, { headers: authHeaders });
 
   if (!consultRes.ok) {
@@ -181,7 +182,8 @@ Deno.serve(async (req) => {
 
   const contentType = docType === "xml" ? "application/xml" : "application/pdf";
   const ext = docType === "xml" ? "xml" : "pdf";
-  const fileName = `nfe_${emissao.numero || emissao_id}.${ext}`;
+  const prefix = emissao.modelo === "65" ? "nfce" : "nfe";
+  const fileName = `${prefix}_${emissao.numero || emissao_id}.${ext}`;
 
   return new Response(fileBytes, {
     status: 200,

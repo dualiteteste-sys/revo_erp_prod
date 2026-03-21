@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DoorClosed, DoorOpen, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
+import { DoorClosed, DoorOpen, Download, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
@@ -27,6 +27,9 @@ import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import { useBillingGate } from '@/hooks/useBillingGate';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import { useAuth } from '@/contexts/AuthProvider';
+import PdvPaymentModal, { type PdvPagamento } from '@/components/vendas/PdvPaymentModal';
+import { checkNfceEnabled, createNfceDraftFromPdv, submitNfce, checkNfceStatus, calculateNfceTaxes, getNfceInfoForPedido, downloadDanfce, type NfceEmissaoInfo } from '@/services/fiscalNfceEmissoes';
+import DanfceReceipt, { buildDanfceHtml } from '@/components/vendas/DanfceReceipt';
 
 type PdvRow = {
   id: string;
@@ -123,8 +126,16 @@ export default function PdvPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [receiptVenda, setReceiptVenda] = useState<VendaDetails | null>(null);
+  const [receiptNfce, setReceiptNfce] = useState<NfceEmissaoInfo | null>(null);
+  const [receiptPagamentos, setReceiptPagamentos] = useState<PdvPagamento[]>([]);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [danfceDownloading, setDanfceDownloading] = useState(false);
+  const [caixaCloseResult, setCaixaCloseResult] = useState<{ total_vendas: number; total_estornos: number; quantidade: number; por_forma_pagamento?: Array<{ forma: string; total: number }> } | null>(null);
   const [queuedIds, setQueuedIds] = useState<Set<string>>(() => getQueuedPdvFinalizeIds());
+  const [paymentModalPedidoId, setPaymentModalPedidoId] = useState<string | null>(null);
+  const [paymentPedidoNumero, setPaymentPedidoNumero] = useState<number>(0);
+  const [paymentTotalGeral, setPaymentTotalGeral] = useState<number>(0);
+  const [nfceEnabled, setNfceEnabled] = useState(false);
   const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
 
   const columns: TableColumnWidthDef[] = [
@@ -172,14 +183,16 @@ export default function PdvPage() {
     }
     setLoading(true);
     try {
-      const [{ data: contaData }, pdvData, caixasData] = await Promise.all([
+      const [{ data: contaData }, pdvData, caixasData, nfceConfigured] = await Promise.all([
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
         listPdvPedidos({ limit: 200 }),
         listPdvCaixas().catch(() => [] as PdvCaixaRow[]),
+        checkNfceEnabled().catch(() => false),
       ]);
 
       if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 
+      setNfceEnabled(nfceConfigured);
       setContas(contaData);
       setCaixas(caixasData || []);
       if (typeof window !== 'undefined') {
@@ -248,8 +261,13 @@ export default function PdvPage() {
     setIsFormOpen(false);
     setSelectedId(null);
     setReceiptVenda(null);
+    setReceiptNfce(null);
+    setReceiptPagamentos([]);
     setIsReceiptOpen(false);
+    setDanfceDownloading(false);
     setQueuedIds(new Set());
+    setPaymentModalPedidoId(null);
+    setNfceEnabled(false);
     if (typeof window !== 'undefined') window.localStorage.removeItem('pdv:caixaId');
 
     if (!activeEmpresaId) {
@@ -324,18 +342,14 @@ export default function PdvPage() {
   };
 
   const handleFinalize = async (pedidoId: string) => {
-    const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
-
     if (!billing.ensureCanWrite({ actionLabel: 'Finalizar PDV' })) return;
     const gate = await ensure(['tesouraria.contas_correntes']);
     if (!gate.ok) return;
 
     if (!contaCorrenteId) {
-      addToast('Cadastre/seleciona uma conta corrente para receber no PDV.', 'error');
+      addToast('Cadastre/selecione uma conta corrente para receber no PDV.', 'error');
       return;
     }
-    // Evita race conditions de state (E2E/user clicando rápido antes do load setar caixaId).
     const effectiveCaixaId = caixaId || caixas.find((c) => c.sessao_id)?.id || caixas[0]?.id || '';
     if (!effectiveCaixaId) {
       addToast('Selecione um caixa antes de finalizar.', 'warning');
@@ -352,15 +366,62 @@ export default function PdvPage() {
       setIsCaixaModalOpen(true);
       return;
     }
+    // Find the row to get numero and total for the payment modal
+    const row = rows.find((r) => r.id === pedidoId);
+    setPaymentPedidoNumero(row?.numero ?? 0);
+    setPaymentTotalGeral(Number(row?.total_geral ?? 0));
+    setPaymentModalPedidoId(pedidoId);
+  };
+
+  /** Async NFC-e emission pipeline (fire-and-forget, never blocks the sale). */
+  const emitNfce = async (pedidoId: string) => {
+    try {
+      const emissaoId = await createNfceDraftFromPdv(pedidoId);
+      await calculateNfceTaxes(emissaoId);
+      const submitResult = await submitNfce(emissaoId);
+      if (submitResult.ok && submitResult.status === 'autorizado') {
+        addToast('NFC-e autorizada com sucesso.', 'success');
+        return;
+      }
+      // Poll status (3s x 10 = 30s max)
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const poll = await checkNfceStatus(emissaoId);
+        if (poll.status === 'autorizado') {
+          addToast('NFC-e autorizada com sucesso.', 'success');
+          return;
+        }
+        if (poll.status === 'rejeitado' || poll.status === 'erro') {
+          addToast(`NFC-e não autorizada: ${poll.detail || poll.error || 'erro'}. A venda foi finalizada normalmente.`, 'warning');
+          return;
+        }
+      }
+      addToast('NFC-e em processamento. Verifique o status posteriormente.', 'info');
+    } catch (e: any) {
+      addToast(`Falha na emissão NFC-e: ${e?.message || 'erro'}. A venda foi finalizada normalmente.`, 'warning');
+    }
+  };
+
+  const handleConfirmFinalize = async (pagamentos: PdvPagamento[]) => {
+    const pedidoId = paymentModalPedidoId;
+    if (!pedidoId) return;
+    setPaymentModalPedidoId(null);
+
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    const effectiveCaixaId = caixaId || caixas.find((c) => c.sessao_id)?.id || caixas[0]?.id || '';
+
     const lockKey = `pdv:finalize:${pedidoId}`;
     setFinalizingId(pedidoId);
     try {
       await runWithActionLock(lockKey, async () => {
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId: effectiveCaixaId });
+        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId: effectiveCaixaId, formasPagamento: pagamentos });
       });
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('PDV finalizado (financeiro + estoque).', 'success');
+      setReceiptPagamentos(pagamentos);
+      setReceiptNfce(null);
       try {
         const venda = await getVendaDetails(pedidoId);
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -372,6 +433,10 @@ export default function PdvPage() {
       await load();
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       refreshQueued();
+      // Async NFC-e emission (non-blocking)
+      if (nfceEnabled) {
+        void emitNfce(pedidoId);
+      }
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (e instanceof ActionLockedError) {
@@ -404,6 +469,7 @@ export default function PdvPage() {
     setSaldoInicial(0);
     setSaldoFinal(0);
     setCaixaObs('');
+    setCaixaCloseResult(null);
     setIsCaixaModalOpen(true);
   };
 
@@ -426,9 +492,10 @@ export default function PdvPage() {
         const res = await closePdvCaixa({ caixaId, saldoFinal: saldoFinal ? Number(saldoFinal) : null, observacoes: caixaObs || null });
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(`Caixa fechado. Vendas: ${formatMoneyBRL(res.total_vendas)}.`, 'success');
+        setCaixaCloseResult(res as any);
       }
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-      setIsCaixaModalOpen(false);
+      if (caixaMode === 'open') setIsCaixaModalOpen(false);
       await load();
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -478,9 +545,13 @@ export default function PdvPage() {
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     try {
-      const venda = await getVendaDetails(pedidoId);
+      const [venda, nfceInfo] = await Promise.all([
+        getVendaDetails(pedidoId),
+        getNfceInfoForPedido(pedidoId),
+      ]);
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setReceiptVenda(venda);
+      setReceiptNfce(nfceInfo);
       setIsReceiptOpen(true);
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -488,10 +559,23 @@ export default function PdvPage() {
     }
   };
 
+  const handleDownloadDanfce = async () => {
+    if (!receiptNfce) return;
+    setDanfceDownloading(true);
+    try {
+      await downloadDanfce(receiptNfce.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao baixar DANFCE.', 'error');
+    } finally {
+      setDanfceDownloading(false);
+    }
+  };
+
   const handlePrintReceipt = () => {
     if (!receiptVenda) return;
-    const conta = contas.find((c) => c.id === contaCorrenteId);
-    const html = buildReceiptHtml(receiptVenda, conta?.nome);
+    const html = receiptNfce
+      ? buildDanfceHtml(receiptVenda, receiptNfce, receiptPagamentos)
+      : buildReceiptHtml(receiptVenda, contas.find((c) => c.id === contaCorrenteId)?.nome);
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -597,68 +681,113 @@ export default function PdvPage() {
 
       <Modal
         isOpen={isCaixaModalOpen}
-        onClose={() => setIsCaixaModalOpen(false)}
-        title={caixaMode === 'open' ? 'Abrir caixa' : 'Encerrar caixa'}
+        onClose={() => { setIsCaixaModalOpen(false); setCaixaCloseResult(null); }}
+        title={caixaCloseResult ? 'Resumo do caixa' : caixaMode === 'open' ? 'Abrir caixa' : 'Encerrar caixa'}
         size="lg"
       >
-        <div className="p-6 space-y-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <Wallet size={18} className="text-blue-600" />
-              {caixaMode === 'open' ? 'Saldo inicial' : 'Saldo final (opcional)'}
-            </div>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {caixaMode === 'open' ? (
+        {caixaCloseResult ? (
+          <div className="p-6 space-y-4">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+              <div className="text-sm font-semibold text-green-900 flex items-center gap-2">
+                <Wallet size={18} className="text-green-600" />
+                Caixa encerrado com sucesso
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <label className="text-xs font-semibold text-gray-700">Saldo inicial</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={saldoInicial}
-                    onChange={(e) => setSaldoInicial(Number(e.target.value || 0))}
-                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                  />
+                  <span className="text-gray-600">Total vendas:</span>
+                  <span className="ml-2 font-bold">{formatMoneyBRL(caixaCloseResult.total_vendas)}</span>
                 </div>
-              ) : (
-                <>
+                <div>
+                  <span className="text-gray-600">Quantidade:</span>
+                  <span className="ml-2 font-bold">{caixaCloseResult.quantidade}</span>
+                </div>
+                {Number(caixaCloseResult.total_estornos || 0) > 0 ? (
                   <div>
-                    <label className="text-xs font-semibold text-gray-700">Saldo final (contado)</label>
+                    <span className="text-gray-600">Estornos:</span>
+                    <span className="ml-2 font-bold text-red-600">{formatMoneyBRL(caixaCloseResult.total_estornos)}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            {caixaCloseResult.por_forma_pagamento && caixaCloseResult.por_forma_pagamento.length > 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <div className="text-sm font-semibold text-gray-900 mb-2">Por forma de pagamento</div>
+                <div className="space-y-1">
+                  {caixaCloseResult.por_forma_pagamento.map((p, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-gray-700">{p.forma}</span>
+                      <span className="font-semibold">{formatMoneyBRL(p.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="flex justify-end">
+              <button onClick={() => { setIsCaixaModalOpen(false); setCaixaCloseResult(null); }} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700">
+                Fechar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Wallet size={18} className="text-blue-600" />
+                {caixaMode === 'open' ? 'Saldo inicial' : 'Saldo final (opcional)'}
+              </div>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {caixaMode === 'open' ? (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Saldo inicial</label>
                     <input
                       type="number"
                       step="0.01"
-                      value={saldoFinal}
-                      onChange={(e) => setSaldoFinal(Number(e.target.value || 0))}
+                      value={saldoInicial}
+                      onChange={(e) => setSaldoInicial(Number(e.target.value || 0))}
                       className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                      placeholder="Opcional"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-700">Observações</label>
-                    <input
-                      value={caixaObs}
-                      onChange={(e) => setCaixaObs(e.target.value)}
-                      className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                      placeholder="Ex.: diferença de troco…"
-                    />
-                  </div>
-                </>
-              )}
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-700">Saldo final (contado)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={saldoFinal}
+                        onChange={(e) => setSaldoFinal(Number(e.target.value || 0))}
+                        className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                        placeholder="Opcional"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-700">Observações</label>
+                      <input
+                        value={caixaObs}
+                        onChange={(e) => setCaixaObs(e.target.value)}
+                        className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                        placeholder="Ex.: diferença de troco…"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsCaixaModalOpen(false)} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+                Cancelar
+              </button>
+              <button
+                onClick={() => void handleConfirmCaixa()}
+                disabled={caixaBusy}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {caixaBusy ? 'Salvando…' : caixaMode === 'open' ? 'Abrir' : 'Fechar'}
+              </button>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setIsCaixaModalOpen(false)} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
-              Cancelar
-            </button>
-            <button
-              onClick={() => void handleConfirmCaixa()}
-              disabled={caixaBusy}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {caixaBusy ? 'Salvando…' : caixaMode === 'open' ? 'Abrir' : 'Fechar'}
-            </button>
-          </div>
-        </div>
+        )}
       </Modal>
 
       {queuedIds.size > 0 ? (
@@ -810,14 +939,46 @@ export default function PdvPage() {
         />
       </Modal>
 
+      <PdvPaymentModal
+        isOpen={!!paymentModalPedidoId}
+        onClose={() => setPaymentModalPedidoId(null)}
+        totalGeral={paymentTotalGeral}
+        pedidoNumero={paymentPedidoNumero}
+        onConfirm={handleConfirmFinalize}
+      />
+
       <Modal
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
-        title={receiptVenda?.numero ? `Comprovante PDV #${receiptVenda.numero}` : 'Comprovante PDV'}
+        title={receiptNfce ? `DANFCE #${receiptVenda?.numero || ''}` : receiptVenda?.numero ? `Comprovante PDV #${receiptVenda.numero}` : 'Comprovante PDV'}
         size="lg"
       >
         {!receiptVenda ? (
           <div className="p-6 text-sm text-gray-600">Carregando comprovante…</div>
+        ) : receiptNfce ? (
+          <div className="p-6">
+            <DanfceReceipt venda={receiptVenda} nfce={receiptNfce} pagamentos={receiptPagamentos} />
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setIsReceiptOpen(false)} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+                Fechar
+              </button>
+              {receiptNfce.status === 'autorizada' ? (
+                <button
+                  onClick={() => void handleDownloadDanfce()}
+                  disabled={danfceDownloading}
+                  className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Download size={18} /> {danfceDownloading ? 'Baixando…' : 'DANFCE (PDF)'}
+                </button>
+              ) : null}
+              <button
+                onClick={handlePrintReceipt}
+                className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Printer size={18} /> Imprimir
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="p-6">
             <div className="text-sm text-gray-600">Data: {receiptVenda.data_emissao}</div>
