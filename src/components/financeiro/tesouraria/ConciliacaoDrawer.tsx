@@ -12,8 +12,8 @@ import { useNumericField } from '@/hooks/useNumericField';
 import { autoAllocateFifoByVencimento } from '@/lib/conciliacao/allocation';
 import SideSheet from '@/components/ui/SideSheet';
 
-const QuickCreateContaAReceberPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/QuickCreateContaAReceberPanel'));
-const QuickCreateContaPagarPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/QuickCreateContaPagarPanel'));
+const ContasAReceberFormPanel = React.lazy(() => import('@/components/financeiro/contas-a-receber/ContasAReceberFormPanel'));
+const ContasPagarFormPanel = React.lazy(() => import('@/components/financeiro/contas-pagar/ContasPagarFormPanel'));
 
 interface Props {
   isOpen: boolean;
@@ -1194,7 +1194,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         </div>
       </motion.div>
 
-      {/* SideSheet: Criar conta a receber ou a pagar */}
+      {/* SideSheet: Criar conta a receber ou a pagar (reusa FormPanels existentes) */}
       <SideSheet
         isOpen={showQuickCreateConta}
         onClose={() => setShowQuickCreateConta(false)}
@@ -1203,24 +1203,21 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       >
         <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
           {extratoItem?.tipo_lancamento === 'credito' ? (
-            <QuickCreateContaAReceberPanel
-              initialValues={{
+            <ContasAReceberFormPanel
+              conta={{
                 descricao: extratoItem?.descricao || '',
                 valor: extratoItem?.valor ?? 0,
                 data_vencimento: extratoItem?.data_lancamento || '',
-                documento_ref: extratoItem?.documento_ref || '',
               }}
               onSaveSuccess={() => {
                 setShowQuickCreateConta(false);
-                addToast('Conta criada com sucesso!', 'success');
                 onClose();
               }}
               onClose={() => setShowQuickCreateConta(false)}
             />
           ) : (
-            <QuickCreateContaPagarPanel
-              formaPagamento=""
-              initialValues={{
+            <ContasPagarFormPanel
+              conta={{
                 descricao: extratoItem?.descricao || '',
                 valor_total: extratoItem?.valor ?? 0,
                 data_vencimento: extratoItem?.data_lancamento || '',
@@ -1228,7 +1225,6 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
               }}
               onSaveSuccess={() => {
                 setShowQuickCreateConta(false);
-                addToast('Conta criada com sucesso!', 'success');
                 onClose();
               }}
               onClose={() => setShowQuickCreateConta(false)}
