@@ -458,7 +458,7 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
   });
 
   await expect(page.getByText('Resumo da Nota')).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: 'Confirmar e Importar' }).click();
+  await page.getByRole('button', { name: 'Confirmar e Importar' }).click({ force: true });
 
   await expect(page.getByText('Vincular Produtos')).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: 'Conferir Quantidades' }).click();

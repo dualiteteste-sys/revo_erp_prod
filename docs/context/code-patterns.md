@@ -178,3 +178,11 @@ function MeuForm({ onSuccess }: { onSuccess: () => void }) {
 - Documento criado como parte da infraestrutura de memória semântica do projeto.
 - PRs: planejamento de documentação (FASE 1).
 - Estado atual: padrões estabelecidos e validados em múltiplas sessões de desenvolvimento.
+
+## Última atualização — 2026-03-21
+
+- O que mudou: foi introduzida a camada inicial `assistant` para a Isa, com `Provider`, componentes em `src/components/assistant/` e núcleo em `src/lib/assistant/`.
+- O que mudou: a integração global entra pelo `MainLayout`, mas a lógica de contexto/capacidades fica fora de `pages/`, preservando a separação entre UI, contexto e engine.
+- PRs: n/a (trabalho local ainda não submetido).
+- Armadilhas encontradas: o avatar precisa ter fallback local, então a UI não deve depender da existência imediata dos arquivos em `public/assistant/`.
+- Estado atual: a Isa opera por regras/contexto, sem LLM obrigatório; qualquer provedor futuro deve entrar via adapter (`assistantModelAdapter`) sem acoplar o fornecedor à UI.

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, ScanBarcode, FileText, Wallet } from 'lucide-react';
+import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, FileText, Wallet } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, fetchVendaDetails, getVendaDetails, aprovarVenda, concluirVendaPedido } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -12,7 +12,6 @@ import SideSheet from '@/components/ui/SideSheet';
 import { useNumericField } from '@/hooks/useNumericField';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { searchItemsForOs } from '@/services/os';
-import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
 import { listMarketplaceOrderTimeline, type MarketplaceTimelineEvent } from '@/services/ecommerceOrders';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
@@ -38,8 +37,6 @@ interface Props {
   vendaId: string | null;
   onSaveSuccess: (opts?: { keepOpen?: boolean }) => void;
   onClose: () => void;
-  mode?: 'erp' | 'pdv';
-  onFinalizePdv?: (pedidoId: string) => Promise<void>;
 }
 
 type DiscountAuditRow = {
@@ -62,7 +59,7 @@ function formatMoneyBRL(n: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
 }
 
-export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, mode = 'erp', onFinalizePdv }: Props) {
+export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const { loading: authLoading, activeEmpresaId } = useAuth();
@@ -95,14 +92,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   });
   const canDiscountQuery = useHasPermission('vendas', 'discount');
   const canDiscount = !!canDiscountQuery.data;
-  const skuInputRef = useRef<HTMLInputElement>(null);
-  const [skuQuery, setSkuQuery] = useState('');
-  const [addingSku, setAddingSku] = useState(false);
   const [isQuickCreatePartnerOpen, setIsQuickCreatePartnerOpen] = useState(false);
   const [quickCreatePartnerDraft, setQuickCreatePartnerDraft] = useState<{ q: string } | null>(null);
   const [isQuickCreateProductOpen, setIsQuickCreateProductOpen] = useState(false);
   const [quickCreateProductDraft, setQuickCreateProductDraft] = useState<{ q: string } | null>(null);
-  const canFinalizePdv = mode === 'pdv' && typeof onFinalizePdv === 'function';
   const [marketplaceTimeline, setMarketplaceTimeline] = useState<MarketplaceTimelineEvent[]>([]);
   const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
@@ -117,7 +110,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     if (prevEmpresaId === activeEmpresaId) return;
     actionTokenRef.current += 1;
     setIsSaving(false);
-    setAddingSku(false);
     setLoading(false);
     setLoadingMarketplaceTimeline(false);
     setLoadingDiscountAudit(false);
@@ -264,25 +256,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     return () => { alive = false; };
   }, [activeEmpresaId, authLoading, empresaChanged]);
 
-  useEffect(() => {
-    if (mode !== 'pdv') return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F2') {
-        e.preventDefault();
-        skuInputRef.current?.focus();
-      }
-      if (e.key === 'F9' && canFinalizePdv && formData.id) {
-        e.preventDefault();
-        void handleFinalizePdv();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
-
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
     if (empresaChanged) return false;
     const empresaSnapshot = activeEmpresaId ?? null;
@@ -428,18 +401,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       return null;
     }
     if (!formData.cliente_id) {
-      if (mode === 'pdv') {
-        try {
-          const clienteId = await ensurePdvDefaultClienteId();
-          handleHeaderChange('cliente_id', clienteId);
-        } catch (e: any) {
-          addToast(e?.message || 'Não foi possível definir o cliente padrão do PDV.', 'error');
-          return null;
-        }
-      } else {
-        addToast('Selecione um cliente.', 'error');
-        return null;
-      }
+      addToast('Selecione um cliente.', 'error');
+      return null;
     }
     const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
     const frete = toMoney(formData.frete);
@@ -457,7 +420,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       entityId: formData.id ?? null,
     });
     try {
-      const clienteId = formData.cliente_id || (mode === 'pdv' ? await ensurePdvDefaultClienteId() : null);
+      const clienteId = formData.cliente_id;
       if (!clienteId) {
         addToast('Selecione um cliente.', 'error');
         return null;
@@ -566,57 +529,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     } catch (e: any) {
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
-    }
-  };
-
-  const handleAddSku = async () => {
-    const sku = skuQuery.trim();
-    if (!sku) return;
-    setAddingSku(true);
-    try {
-      const results = await searchItemsForOs(sku, 5, true, 'product');
-      const hit = results?.find((r) => r.type === 'product') || results?.[0];
-      if (!hit) {
-        addToast('SKU não encontrado.', 'warning');
-        return;
-      }
-      await handleAddItem(hit);
-      setSkuQuery('');
-      skuInputRef.current?.focus();
-    } catch (e: any) {
-      addToast(e?.message || 'Falha ao adicionar SKU.', 'error');
-    } finally {
-      setAddingSku(false);
-    }
-  };
-
-  const handleFinalizePdv = async () => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
-    if (!canFinalizePdv || !formData.id) return;
-    if ((formData.itens?.length || 0) === 0) {
-      addToast('Adicione ao menos 1 item para finalizar.', 'error');
-      return;
-    }
-    const ok = await confirm({
-      title: 'Finalizar PDV',
-      description: 'Confirmar finalização? Isso gera recebimento e baixa de estoque.',
-      confirmText: 'Finalizar',
-      cancelText: 'Cancelar',
-      variant: 'primary',
-    });
-    if (!ok) return;
-
-    const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
-    setIsSaving(true);
-    try {
-      await onFinalizePdv(formData.id);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-      onSaveSuccess();
-      onClose();
-    } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-      setIsSaving(false);
     }
   };
 
@@ -1080,11 +992,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               onCreate={openQuickCreatePartner}
               openCreateInNewTabHref="/app/cadastros/clientes-fornecedores?new=1"
             />
-            {mode === 'pdv' ? (
-              <div className="mt-1 text-xs text-gray-500">
-                Opcional no PDV (se vazio, usamos <span className="font-semibold">Consumidor Final</span> automaticamente).
-              </div>
-            ) : null}
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="vendas_vendedor_id" className="block text-sm font-medium text-gray-700 mb-1">
@@ -1177,36 +1084,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         <Section title="Itens" description="Produtos vendidos.">
           {!isLocked && (
             <div className="sm:col-span-6 mb-4">
-              {mode === 'pdv' ? (
-                <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3 flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-gray-700 font-semibold">
-                    <ScanBarcode size={18} /> Leitura por SKU
-                  </div>
-                  <input
-                    ref={skuInputRef}
-                    value={skuQuery}
-                    onChange={(e) => setSkuQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void handleAddSku();
-                      }
-                    }}
-                    className="flex-1 p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Digite/escaneie o SKU e pressione Enter (F2 foca aqui)"
-                    disabled={addingSku}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleAddSku()}
-                    disabled={addingSku || skuQuery.trim().length === 0}
-                    className="px-3 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {addingSku ? 'Adicionando…' : 'Adicionar'}
-                  </button>
-                </div>
-              ) : null}
               <SearchFirstSelect
                 value={null}
                 placeholder="Buscar produto ou serviço…"
@@ -1548,7 +1425,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           Fechar
         </button>
         <div className="flex gap-3">
-          {mode !== 'pdv' && canConcluir && (
+          {canConcluir && (
             <button
               onClick={handleConcluir}
               disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
@@ -1557,7 +1434,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <PackageCheck size={20} /> Concluir (baixa estoque)
             </button>
           )}
-          {mode !== 'pdv' && formData.status === 'concluido' && (
+          {formData.status === 'concluido' && (
             <button
               onClick={() => setParcelamentoOpen(true)}
               disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
@@ -1566,7 +1443,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <Wallet size={20} /> Gerar Financeiro
             </button>
           )}
-          {mode !== 'pdv' && canGerarNfe && (
+          {canGerarNfe && (
             <button
               onClick={handleGerarNfeFromForm}
               disabled={isSaving || gerandoNfe || authLoading || !activeEmpresaId || empresaChanged}
@@ -1593,16 +1470,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={20} /> Aprovar Venda
-            </button>
-          )}
-          {canFinalizePdv && !isLocked && formData.id && (
-            <button
-              onClick={() => void handleFinalizePdv()}
-              disabled={isSaving || (formData.itens?.length || 0) === 0 || authLoading || !activeEmpresaId || empresaChanged}
-              className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-              title="Atalho: F9"
-            >
-              <PackageCheck size={20} /> Finalizar PDV
             </button>
           )}
           {!isLocked && (
