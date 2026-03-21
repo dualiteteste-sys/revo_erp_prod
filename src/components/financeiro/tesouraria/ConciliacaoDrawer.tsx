@@ -1199,25 +1199,30 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         isOpen={showQuickCreateConta}
         extratoItem={extratoItem}
         onClose={() => setShowQuickCreateConta(false)}
-        onSaveSuccess={() => { setShowQuickCreateConta(false); onClose(); }}
+        onConciliate={onConciliate}
+        onDone={() => { setShowQuickCreateConta(false); onClose(); }}
       />
     </div>
   );
 }
 
 /** Subcomponente isolado para evitar que re-renders do ConciliacaoDrawer
- *  recriem o objeto `conta` inline e resetem o formulário. */
+ *  recriem o objeto `conta` inline e resetem o formulário.
+ *  Após salvar a conta, vincula automaticamente o extrato ao título criado. */
 function QuickCreateContaSideSheet({
   isOpen,
   extratoItem,
   onClose,
-  onSaveSuccess,
+  onConciliate,
+  onDone,
 }: {
   isOpen: boolean;
   extratoItem: ExtratoItem | null;
   onClose: () => void;
-  onSaveSuccess: () => void;
+  onConciliate: (movimentacaoId: string) => Promise<void>;
+  onDone: () => void;
 }) {
+  const { addToast } = useToast();
   const isCredito = extratoItem?.tipo_lancamento === 'credito';
 
   const contaPagar = useMemo(() => ({
@@ -1233,6 +1238,26 @@ function QuickCreateContaSideSheet({
     data_vencimento: extratoItem?.data_lancamento || '',
   }), [extratoItem?.descricao, extratoItem?.valor, extratoItem?.data_lancamento]);
 
+  const handleSaveSuccess = async (savedConta?: { id?: string }) => {
+    if (!savedConta?.id || !extratoItem?.id) {
+      onDone();
+      return;
+    }
+    try {
+      const tipo = isCredito ? 'receber' : 'pagar';
+      const { movimentacaoId } = await conciliarExtratoComTitulo({
+        extratoId: extratoItem.id,
+        tipo: tipo as 'receber' | 'pagar',
+        tituloId: savedConta.id,
+      });
+      await onConciliate(movimentacaoId);
+      addToast('Conta criada e extrato conciliado!', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Conta criada, mas erro ao conciliar extrato.', 'warning');
+    }
+    onDone();
+  };
+
   return (
     <SideSheet
       isOpen={isOpen}
@@ -1244,13 +1269,13 @@ function QuickCreateContaSideSheet({
         {isCredito ? (
           <ContasAReceberFormPanel
             conta={contaReceber}
-            onSaveSuccess={onSaveSuccess}
+            onSaveSuccess={handleSaveSuccess}
             onClose={onClose}
           />
         ) : (
           <ContasPagarFormPanel
             conta={contaPagar}
-            onSaveSuccess={onSaveSuccess}
+            onSaveSuccess={handleSaveSuccess}
             onClose={onClose}
           />
         )}
