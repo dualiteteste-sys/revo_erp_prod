@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     // Read emissao
     const { data: emissao } = await admin
       .from("fiscal_nfe_emissoes")
-      .select("id, status, ambiente, chave_acesso, numero, last_error")
+      .select("id, status, ambiente, chave_acesso, numero, last_error, modelo")
       .eq("id", emissao_id)
       .eq("empresa_id", empresaId)
       .single();
@@ -132,9 +132,10 @@ Deno.serve(async (req) => {
         const ambiente = emissao.ambiente || "homologacao";
         const bUrl = getFocusBaseUrl(ambiente);
         const backfillToken = await getCompanyApiToken(admin, empresaId, ambiente);
+        const backfillEndpoint = emissao.modelo === "65" ? "nfce" : "nfe";
         if (backfillToken) {
           try {
-            const consultRes = await fetch(`${bUrl}/v2/nfe/${emissao_id}`, {
+            const consultRes = await fetch(`${bUrl}/v2/${backfillEndpoint}/${emissao_id}`, {
               headers: { Authorization: basicAuth(backfillToken) },
             });
             if (consultRes.ok) {
@@ -179,7 +180,8 @@ Deno.serve(async (req) => {
 
     const ref = emissao_id;
     const baseUrl = getFocusBaseUrl(ambiente);
-    const url = `${baseUrl}/v2/nfe/${ref}`;
+    const endpoint = emissao.modelo === "65" ? "nfce" : "nfe";
+    const url = `${baseUrl}/v2/${endpoint}/${ref}`;
 
     const focusResponse = await fetch(url, {
       method: "GET",
