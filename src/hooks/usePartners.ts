@@ -43,6 +43,7 @@ export const usePartners = () => {
       return partnersService.getPartners(queryOptions);
     },
     placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // 5 min — cadastro de parceiros muda pouco
     enabled: !!activeEmpresa,
   });
 

@@ -39,6 +39,7 @@ export const useProducts = () => {
     queryKey: PRODUCTS_KEYS.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
     queryFn: () => getProducts(queryOptions),
     placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // 5 min — catálogo de produtos muda pouco
     enabled: !!activeEmpresa,
   });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDashboardStats, RHDashboardStats, seedRhData, getTrainingCompliance, type TrainingComplianceResponse } from '@/services/rh';
 import { Loader2, Users, Briefcase, AlertTriangle, GraduationCap, TrendingDown, DollarSign, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -99,6 +99,39 @@ export default function RHDashboard() {
 
   const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
 
+  // Hooks MUST be called before any early return (React Rules of Hooks)
+  const gapsChartOption = useMemo(() => {
+    const gaps = stats?.top_gaps ?? [];
+    return {
+      title: { text: 'Top 5 Gaps de Competência', left: 'center', textStyle: { fontSize: 14 } },
+      tooltip: { trigger: 'axis' },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'value' },
+      yAxis: { type: 'category', data: gaps.map(g => g.nome).reverse() },
+      series: [{
+        name: 'Gaps', type: 'bar',
+        data: gaps.map(g => g.total_gaps).reverse(),
+        itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] }
+      }]
+    };
+  }, [stats?.top_gaps]);
+
+  const statusChartOption = useMemo(() => {
+    const st = stats?.status_treinamentos ?? [];
+    return {
+      title: { text: 'Status dos Treinamentos', left: 'center', textStyle: { fontSize: 14 } },
+      tooltip: { trigger: 'item' },
+      series: [{
+        name: 'Treinamentos', type: 'pie', radius: ['40%', '70%'],
+        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+        data: (st.length > 0 ? st : [{ status: 'sem_dados', total: 0 }]).map(s => ({
+          value: s.total,
+          name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }))
+      }]
+    };
+  }, [stats?.status_treinamentos]);
+
   if (!activeEmpresaId) {
     return (
       <div className="p-6 text-gray-600">
@@ -149,42 +182,6 @@ export default function RHDashboard() {
       </div>
     );
   }
-
-  const topGaps = stats.top_gaps ?? [];
-  const statusTreinamentos = stats.status_treinamentos ?? [];
-
-  const gapsChartOption = {
-    title: { text: 'Top 5 Gaps de Competência', left: 'center', textStyle: { fontSize: 14 } },
-    tooltip: { trigger: 'axis' },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: topGaps.map(g => g.nome).reverse() },
-    series: [
-      {
-        name: 'Gaps',
-        type: 'bar',
-        data: topGaps.map(g => g.total_gaps).reverse(),
-        itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] }
-      }
-    ]
-  };
-
-  const statusChartOption = {
-    title: { text: 'Status dos Treinamentos', left: 'center', textStyle: { fontSize: 14 } },
-    tooltip: { trigger: 'item' },
-    series: [
-      {
-        name: 'Treinamentos',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
-        data: (statusTreinamentos.length > 0 ? statusTreinamentos : [{ status: 'sem_dados', total: 0 }]).map(s => ({
-          value: s.total,
-          name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-        }))
-      }
-    ]
-  };
 
   return (
     <div className="p-1 space-y-6">

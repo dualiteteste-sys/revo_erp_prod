@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 import { formatCurrency } from '@/lib/utils';
 
 type SeriesPoint = { label: string; total: number };
 
-const GraficoFaturamento: React.FC<{ series: SeriesPoint[]; loading?: boolean }> = ({ series, loading }) => {
-  const x = (series ?? []).map(s => s.label);
-  const y = (series ?? []).map(s => Number(s.total ?? 0));
+const GraficoFaturamento: React.FC<{ series: SeriesPoint[]; loading?: boolean }> = React.memo(({ series, loading }) => {
+  const option = useMemo(() => {
+    const x = (series ?? []).map(s => s.label);
+    const y = (series ?? []).map(s => Number(s.total ?? 0));
 
-  const option = {
+    return {
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -62,11 +63,12 @@ const GraficoFaturamento: React.FC<{ series: SeriesPoint[]; loading?: boolean }>
           }
         },
         data: y,
-        animationDuration: 2000,
+        animationDuration: 800,
         animationEasing: 'cubicInOut',
       },
     ],
   };
+  }, [series]);
 
   return (
     <GlassCard className="p-0 overflow-hidden h-96">
@@ -77,6 +79,8 @@ const GraficoFaturamento: React.FC<{ series: SeriesPoint[]; loading?: boolean }>
       )}
     </GlassCard>
   );
-};
+});
+
+GraficoFaturamento.displayName = 'GraficoFaturamento';
 
 export default GraficoFaturamento;

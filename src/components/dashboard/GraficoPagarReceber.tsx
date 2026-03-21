@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 import { formatCurrency } from '@/lib/utils';
@@ -13,12 +13,13 @@ function formatMesLabel(ym: string) {
   return date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
 }
 
-const GraficoPagarReceber: React.FC<{ series: PagarReceberPoint[]; loading?: boolean }> = ({ series, loading }) => {
-  const x = (series ?? []).map((s) => formatMesLabel(s.mes));
-  const pagar = (series ?? []).map((s) => Number(s.pagar ?? 0));
-  const receber = (series ?? []).map((s) => Number(s.receber ?? 0));
+const GraficoPagarReceber: React.FC<{ series: PagarReceberPoint[]; loading?: boolean }> = React.memo(({ series, loading }) => {
+  const option = useMemo(() => {
+    const x = (series ?? []).map((s) => formatMesLabel(s.mes));
+    const pagar = (series ?? []).map((s) => Number(s.pagar ?? 0));
+    const receber = (series ?? []).map((s) => Number(s.receber ?? 0));
 
-  const option = {
+    return {
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -83,7 +84,7 @@ const GraficoPagarReceber: React.FC<{ series: PagarReceberPoint[]; loading?: boo
           },
         },
         data: receber,
-        animationDuration: 2000,
+        animationDuration: 800,
         animationEasing: 'cubicInOut',
       },
       {
@@ -115,11 +116,12 @@ const GraficoPagarReceber: React.FC<{ series: PagarReceberPoint[]; loading?: boo
           },
         },
         data: pagar,
-        animationDuration: 2000,
+        animationDuration: 800,
         animationEasing: 'cubicInOut',
       },
     ],
   };
+  }, [series]);
 
   return (
     <GlassCard className="p-0 overflow-hidden h-96">
@@ -130,7 +132,9 @@ const GraficoPagarReceber: React.FC<{ series: PagarReceberPoint[]; loading?: boo
       )}
     </GlassCard>
   );
-};
+});
+
+GraficoPagarReceber.displayName = 'GraficoPagarReceber';
 
 export default GraficoPagarReceber;
 
