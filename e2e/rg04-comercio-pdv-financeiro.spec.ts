@@ -262,6 +262,12 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
+    // NFC-e check (no CSC configured in test)
+    if (url.includes('/rest/v1/rpc/fiscal_nfce_check_enabled')) {
+      await route.fulfill({ json: { csc_configured: false } });
+      return;
+    }
+
     // Finalize PDV (RPC idempotente server-side)
     if (url.includes('/rest/v1/rpc/vendas_pdv_finalize_v2')) {
       movimentoGerado = true;
@@ -291,6 +297,11 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
   await expect(page.getByText(`#${pdvPedido.numero}`)).toBeVisible({ timeout: 20000 });
 
   await page.getByRole('button', { name: 'Finalizar' }).click();
+
+  // Payment modal opens — confirm with default payment (Dinheiro)
+  await expect(page.getByText('Pagamento')).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'Confirmar' }).click();
+
   await expect(page.getByText('PDV finalizado (financeiro + estoque).')).toBeVisible({ timeout: 20000 });
 
   // Comprovante (modal) abre automaticamente após finalizar
@@ -430,6 +441,12 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
       return;
     }
 
+    // NFC-e check (no CSC configured in test)
+    if (url.includes('/rest/v1/rpc/fiscal_nfce_check_enabled')) {
+      await route.fulfill({ json: { csc_configured: false } });
+      return;
+    }
+
     if (url.includes('/rest/v1/rpc/vendas_pdv_finalize_v2')) {
       finalizeCalls += 1;
       if (failFinalize) {
@@ -460,6 +477,11 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
   await expect(page.getByText(`#${pdvPedido.numero}`)).toBeVisible({ timeout: 20000 });
 
   await page.getByRole('button', { name: 'Finalizar' }).click();
+
+  // Payment modal opens — confirm with default payment (Dinheiro)
+  await expect(page.getByText('Pagamento')).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'Confirmar' }).click();
+
   await expect(page.getByText('Sem conexão: o PDV ficou pendente e será sincronizado automaticamente.')).toBeVisible({
     timeout: 20000,
   });
