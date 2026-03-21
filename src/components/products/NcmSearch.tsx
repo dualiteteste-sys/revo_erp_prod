@@ -127,7 +127,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" align="start">
+        <PopoverContent className="w-[400px] p-0 bg-white rounded-lg shadow-xl border border-gray-200" align="start">
           <Command className="rounded-lg border shadow-md overflow-hidden" shouldFilter={false} filter={() => 1}>
             <div className="flex items-center border-b px-3" data-cmdk-input-wrapper="">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />

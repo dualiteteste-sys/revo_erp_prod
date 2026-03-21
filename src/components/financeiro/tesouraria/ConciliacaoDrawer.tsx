@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, Loader2, Link2, Plus, FileText } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
@@ -1195,43 +1195,66 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       </motion.div>
 
       {/* SideSheet: Criar conta a receber ou a pagar (reusa FormPanels existentes) */}
-      <SideSheet
+      <QuickCreateContaSideSheet
         isOpen={showQuickCreateConta}
+        extratoItem={extratoItem}
         onClose={() => setShowQuickCreateConta(false)}
-        title={extratoItem?.tipo_lancamento === 'credito' ? 'Criar Conta a Receber' : 'Criar Conta a Pagar'}
-        description="Preencha os dados da conta financeira. Os campos já vêm preenchidos com os dados do extrato."
-      >
-        <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
-          {extratoItem?.tipo_lancamento === 'credito' ? (
-            <ContasAReceberFormPanel
-              conta={{
-                descricao: extratoItem?.descricao || '',
-                valor: extratoItem?.valor ?? 0,
-                data_vencimento: extratoItem?.data_lancamento || '',
-              }}
-              onSaveSuccess={() => {
-                setShowQuickCreateConta(false);
-                onClose();
-              }}
-              onClose={() => setShowQuickCreateConta(false)}
-            />
-          ) : (
-            <ContasPagarFormPanel
-              conta={{
-                descricao: extratoItem?.descricao || '',
-                valor_total: extratoItem?.valor ?? 0,
-                data_vencimento: extratoItem?.data_lancamento || '',
-                documento_ref: extratoItem?.documento_ref || '',
-              }}
-              onSaveSuccess={() => {
-                setShowQuickCreateConta(false);
-                onClose();
-              }}
-              onClose={() => setShowQuickCreateConta(false)}
-            />
-          )}
-        </Suspense>
-      </SideSheet>
+        onSaveSuccess={() => { setShowQuickCreateConta(false); onClose(); }}
+      />
     </div>
+  );
+}
+
+/** Subcomponente isolado para evitar que re-renders do ConciliacaoDrawer
+ *  recriem o objeto `conta` inline e resetem o formulário. */
+function QuickCreateContaSideSheet({
+  isOpen,
+  extratoItem,
+  onClose,
+  onSaveSuccess,
+}: {
+  isOpen: boolean;
+  extratoItem: ExtratoItem | null;
+  onClose: () => void;
+  onSaveSuccess: () => void;
+}) {
+  const isCredito = extratoItem?.tipo_lancamento === 'credito';
+
+  const contaPagar = useMemo(() => ({
+    descricao: extratoItem?.descricao || '',
+    valor_total: extratoItem?.valor ?? 0,
+    data_vencimento: extratoItem?.data_lancamento || '',
+    documento_ref: extratoItem?.documento_ref || '',
+  }), [extratoItem?.descricao, extratoItem?.valor, extratoItem?.data_lancamento, extratoItem?.documento_ref]);
+
+  const contaReceber = useMemo(() => ({
+    descricao: extratoItem?.descricao || '',
+    valor: extratoItem?.valor ?? 0,
+    data_vencimento: extratoItem?.data_lancamento || '',
+  }), [extratoItem?.descricao, extratoItem?.valor, extratoItem?.data_lancamento]);
+
+  return (
+    <SideSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isCredito ? 'Criar Conta a Receber' : 'Criar Conta a Pagar'}
+      description="Preencha os dados da conta financeira. Os campos já vêm preenchidos com os dados do extrato."
+    >
+      <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin" size={24} /></div>}>
+        {isCredito ? (
+          <ContasAReceberFormPanel
+            conta={contaReceber}
+            onSaveSuccess={onSaveSuccess}
+            onClose={onClose}
+          />
+        ) : (
+          <ContasPagarFormPanel
+            conta={contaPagar}
+            onSaveSuccess={onSaveSuccess}
+            onClose={onClose}
+          />
+        )}
+      </Suspense>
+    </SideSheet>
   );
 }
