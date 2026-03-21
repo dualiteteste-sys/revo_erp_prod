@@ -551,7 +551,7 @@ CREATE OR REPLACE FUNCTION public.fiscal_nfce_get_for_pedido(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_emp uuid := public.current_empresa_id();
