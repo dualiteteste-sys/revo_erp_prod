@@ -27,6 +27,7 @@ import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import { useBillingGate } from '@/hooks/useBillingGate';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import { useAuth } from '@/contexts/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import PdvPaymentModal, { type PdvPagamento } from '@/components/vendas/PdvPaymentModal';
 import { checkNfceEnabled, createNfceDraftFromPdv, submitNfce, checkNfceStatus, calculateNfceTaxes, getNfceInfoForPedido, downloadDanfce, type NfceEmissaoInfo } from '@/services/fiscalNfceEmissoes';
 import DanfceReceipt, { buildDanfceHtml } from '@/components/vendas/DanfceReceipt';
@@ -45,7 +46,12 @@ function formatMoneyBRL(n: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
 }
 
-function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
+function buildReceiptHtml(
+  venda: VendaDetails,
+  contaNome?: string,
+  pagamentos?: Array<{ forma_pagamento: string; valor: number; troco?: number }>,
+  opts?: { logoUrl?: string | null; empresaNome?: string },
+) {
   const lines = (venda.itens || []).map((it) => {
     const total = Number(it.total || 0);
     return `<tr>
@@ -55,6 +61,22 @@ function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
       <td style="padding:6px 0;text-align:right">${formatMoneyBRL(total)}</td>
     </tr>`;
   });
+
+  const logoHtml = opts?.logoUrl
+    ? `<div style="text-align:center;margin-bottom:8px"><img src="${opts.logoUrl}" alt="Logo" style="max-height:48px;object-fit:contain" /></div>`
+    : '';
+  const empresaHtml = opts?.empresaNome
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:4px">${opts.empresaNome}</div>`
+    : '';
+
+  const totalTroco = (pagamentos || []).reduce((s, p) => s + Number(p.troco || 0), 0);
+  const paymentsHtml = (pagamentos || []).length > 0
+    ? `<div style="margin-top:14px;padding:8px;background:#f9f9f9;border-radius:4px">
+        <div style="font-weight:bold;font-size:11px;margin-bottom:4px">PAGAMENTO</div>
+        ${(pagamentos || []).map((p) => `<div style="display:flex;justify-content:space-between;font-size:12px"><span>${p.forma_pagamento}</span><span>${formatMoneyBRL(p.valor)}</span></div>`).join('')}
+        ${totalTroco > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-top:4px"><span>Troco:</span><span>${formatMoneyBRL(totalTroco)}</span></div>` : ''}
+       </div>`
+    : '';
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -74,6 +96,8 @@ function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
     </style>
   </head>
   <body>
+    ${logoHtml}
+    ${empresaHtml}
     <h1>Comprovante PDV</h1>
     <div class="muted">Pedido #${venda.numero} · Data: ${venda.data_emissao || ''}</div>
     ${contaNome ? `<div class="muted">Recebimento: ${contaNome}</div>` : ''}
@@ -95,7 +119,8 @@ function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
         </tr>
       </tfoot>
     </table>
-    <div class="muted" style="margin-top: 14px">Obrigado!</div>
+    ${paymentsHtml}
+    <div class="muted" style="margin-top: 14px">Obrigado pela preferência!</div>
     <button onclick="window.print()" style="margin-top: 18px; padding: 10px 14px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 8px">Imprimir</button>
   </body>
 </html>`;
@@ -105,7 +130,7 @@ export default function PdvPage() {
   const { addToast } = useToast();
   const { ensure } = useOnboardingGate();
   const billing = useBillingGate();
-  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PdvRow[]>([]);
@@ -135,7 +160,11 @@ export default function PdvPage() {
   const [paymentPedidoNumero, setPaymentPedidoNumero] = useState<number>(0);
   const [paymentTotalGeral, setPaymentTotalGeral] = useState<number>(0);
   const [nfceEnabled, setNfceEnabled] = useState(false);
+  const [logoSignedUrl, setLogoSignedUrl] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+
+  const manuallyClosedRef = useRef(false);
+  const receiptPedidoIdRef = useRef<string | null>(null);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'numero', defaultWidth: 120, minWidth: 100 },
@@ -154,6 +183,14 @@ export default function PdvPage() {
   useEffect(() => {
     lastEmpresaIdRef.current = activeEmpresaId;
   }, [activeEmpresaId]);
+
+  // Fetch logo signed URL when empresa changes
+  useEffect(() => {
+    if (!activeEmpresa?.logotipo_url) { setLogoSignedUrl(null); return; }
+    supabase.storage.from('company_logos').createSignedUrl(activeEmpresa.logotipo_url, 3600)
+      .then(({ data }) => setLogoSignedUrl(data?.signedUrl ?? null))
+      .catch(() => setLogoSignedUrl(null));
+  }, [activeEmpresa?.logotipo_url]);
 
   const refreshQueued = useCallback(() => setQueuedIds(getQueuedPdvFinalizeIds()), []);
 
@@ -211,7 +248,7 @@ export default function PdvPage() {
         (caixasData || []).find((c) => c.sessao_id) ||
         (caixasData || [])[0];
       const hasAnyOpen = (caixasData || []).some((c) => !!c.sessao_id);
-      if (selectedAfter && !hasAnyOpen && !selectedAfter.sessao_id) {
+      if (selectedAfter && !hasAnyOpen && !selectedAfter.sessao_id && !manuallyClosedRef.current) {
         if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         try {
           await openPdvCaixa({ caixaId: selectedAfter.id, saldoInicial: 0 });
@@ -367,14 +404,27 @@ export default function PdvPage() {
     setPaymentModalPedidoId(pedidoId);
   };
 
-  /** Async NFC-e emission pipeline (fire-and-forget, never blocks the sale). */
+  /** Async NFC-e emission pipeline (fire-and-forget, never blocks the sale).
+   *  After emission, updates the receipt if it's still open for this pedido. */
   const emitNfce = async (pedidoId: string) => {
+    const updateReceiptIfOpen = async () => {
+      // If the receipt for this pedido is still open, update with NFC-e info
+      if (receiptPedidoIdRef.current === pedidoId) {
+        try {
+          const nfceInfo = await getNfceInfoForPedido(pedidoId);
+          if (receiptPedidoIdRef.current === pedidoId && nfceInfo) {
+            setReceiptNfce(nfceInfo);
+          }
+        } catch { /* ignore — receipt will show without fiscal data */ }
+      }
+    };
     try {
       const emissaoId = await createNfceDraftFromPdv(pedidoId);
       await calculateNfceTaxes(emissaoId);
       const submitResult = await submitNfce(emissaoId);
       if (submitResult.ok && submitResult.status === 'autorizado') {
         addToast('NFC-e autorizada com sucesso.', 'success');
+        await updateReceiptIfOpen();
         return;
       }
       // Poll status (3s x 10 = 30s max)
@@ -383,6 +433,7 @@ export default function PdvPage() {
         const poll = await checkNfceStatus(emissaoId);
         if (poll.status === 'autorizado') {
           addToast('NFC-e autorizada com sucesso.', 'success');
+          await updateReceiptIfOpen();
           return;
         }
         if (poll.status === 'rejeitado' || poll.status === 'erro') {
@@ -416,6 +467,7 @@ export default function PdvPage() {
       addToast('PDV finalizado (financeiro + estoque).', 'success');
       setReceiptPagamentos(pagamentos);
       setReceiptNfce(null);
+      receiptPedidoIdRef.current = pedidoId;
       try {
         const venda = await getVendaDetails(pedidoId);
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -483,13 +535,17 @@ export default function PdvPage() {
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast('Caixa aberto.', 'success');
       } else {
+        manuallyClosedRef.current = true;
         const res = await closePdvCaixa({ caixaId, saldoFinal: saldoFinal ? Number(saldoFinal) : null, observacoes: caixaObs || null });
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(`Caixa fechado. Vendas: ${formatMoneyBRL(res.total_vendas)}.`, 'success');
         setCaixaCloseResult(res as any);
       }
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-      if (caixaMode === 'open') setIsCaixaModalOpen(false);
+      if (caixaMode === 'open') {
+        setIsCaixaModalOpen(false);
+        manuallyClosedRef.current = false; // reset on open
+      }
       await load();
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -567,9 +623,10 @@ export default function PdvPage() {
 
   const handlePrintReceipt = () => {
     if (!receiptVenda) return;
+    const printOpts = { logoUrl: logoSignedUrl, empresaNome: activeEmpresa?.razao_social || activeEmpresa?.nome_fantasia || undefined };
     const html = receiptNfce
-      ? buildDanfceHtml(receiptVenda, receiptNfce, receiptPagamentos)
-      : buildReceiptHtml(receiptVenda, contas.find((c) => c.id === contaCorrenteId)?.nome);
+      ? buildDanfceHtml(receiptVenda, receiptNfce, receiptPagamentos, printOpts)
+      : buildReceiptHtml(receiptVenda, contas.find((c) => c.id === contaCorrenteId)?.nome, receiptPagamentos, printOpts);
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -948,7 +1005,7 @@ export default function PdvPage() {
 
       <Modal
         isOpen={isReceiptOpen}
-        onClose={() => setIsReceiptOpen(false)}
+        onClose={() => { setIsReceiptOpen(false); receiptPedidoIdRef.current = null; }}
         title={receiptNfce ? `DANFCE #${receiptVenda?.numero || ''}` : receiptVenda?.numero ? `Comprovante PDV #${receiptVenda.numero}` : 'Comprovante PDV'}
         size="lg"
       >
@@ -956,9 +1013,15 @@ export default function PdvPage() {
           <div className="p-6 text-sm text-gray-600">Carregando comprovante…</div>
         ) : receiptNfce ? (
           <div className="p-6">
-            <DanfceReceipt venda={receiptVenda} nfce={receiptNfce} pagamentos={receiptPagamentos} />
+            <DanfceReceipt
+              venda={receiptVenda}
+              nfce={receiptNfce}
+              pagamentos={receiptPagamentos}
+              logoUrl={logoSignedUrl}
+              empresaNome={activeEmpresa?.razao_social || activeEmpresa?.nome_fantasia || undefined}
+            />
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setIsReceiptOpen(false)} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+              <button onClick={() => { setIsReceiptOpen(false); receiptPedidoIdRef.current = null; }} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
                 Fechar
               </button>
               {receiptNfce.status === 'autorizada' ? (
@@ -980,6 +1043,17 @@ export default function PdvPage() {
           </div>
         ) : (
           <div className="p-6">
+            {/* Company branding */}
+            {logoSignedUrl && (
+              <div className="text-center mb-3">
+                <img src={logoSignedUrl} alt="Logo" className="mx-auto max-h-12 object-contain" />
+              </div>
+            )}
+            {(activeEmpresa?.razao_social || activeEmpresa?.nome_fantasia) && (
+              <div className="text-center text-sm font-semibold text-gray-800 mb-2">
+                {activeEmpresa.razao_social || activeEmpresa.nome_fantasia}
+              </div>
+            )}
             <div className="text-sm text-gray-600">Data: {receiptVenda.data_emissao}</div>
             {receiptVenda.cliente_nome ? <div className="text-sm text-gray-600">Cliente: {receiptVenda.cliente_nome}</div> : null}
             <div className="mt-4 border rounded-lg overflow-hidden">
@@ -1013,8 +1087,27 @@ export default function PdvPage() {
               </table>
             </div>
 
+            {/* Pagamentos no comprovante genérico */}
+            {receiptPagamentos.length > 0 && (
+              <div className="mt-4 border rounded-lg overflow-hidden p-3 bg-gray-50">
+                <div className="text-xs font-semibold text-gray-700 mb-2">PAGAMENTO</div>
+                {receiptPagamentos.map((p, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-gray-700">{p.forma_pagamento}</span>
+                    <span className="font-medium">{formatMoneyBRL(p.valor)}</span>
+                  </div>
+                ))}
+                {receiptPagamentos.some((p) => p.troco && Number(p.troco) > 0) ? (
+                  <div className="flex justify-between text-sm text-gray-500 mt-1">
+                    <span>Troco:</span>
+                    <span>{formatMoneyBRL(receiptPagamentos.reduce((s, p) => s + Number(p.troco || 0), 0))}</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setIsReceiptOpen(false)} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+              <button onClick={() => { setIsReceiptOpen(false); receiptPedidoIdRef.current = null; }} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
                 Fechar
               </button>
               <button

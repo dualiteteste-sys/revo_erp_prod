@@ -7,7 +7,6 @@ function formatMoneyBRL(n: number | null | undefined): string {
 }
 
 function formatChaveAcesso(chave: string): string {
-  // Format 44-digit key in groups of 4
   return chave.replace(/(.{4})/g, '$1 ').trim();
 }
 
@@ -15,20 +14,22 @@ type DanfceReceiptProps = {
   venda: VendaDetails;
   nfce: NfceEmissaoInfo;
   pagamentos?: Array<{ forma_pagamento: string; valor: number; valor_recebido?: number | null; troco?: number | null }>;
+  logoUrl?: string | null;
+  empresaNome?: string;
 };
 
-/**
- * Renders an NFC-e receipt in DANFCE format (80mm thermal style).
- * Inline component — no QR code library required (QR code available via PDF download).
- */
-export default function DanfceReceipt({ venda, nfce, pagamentos }: DanfceReceiptProps) {
+export default function DanfceReceipt({ venda, nfce, pagamentos, logoUrl, empresaNome }: DanfceReceiptProps) {
   const isAutorizada = nfce.status === 'autorizada';
   const isProcessando = nfce.status === 'processando' || nfce.status === 'enfileirada';
 
   return (
     <div className="font-mono text-xs leading-tight max-w-[320px] mx-auto">
-      {/* Header */}
+      {/* Header with logo */}
       <div className="text-center border-b border-dashed border-gray-400 pb-2 mb-2">
+        {logoUrl && (
+          <img src={logoUrl} alt="Logo" className="mx-auto mb-2 max-h-12 object-contain" />
+        )}
+        {empresaNome && <div className="font-bold text-sm mb-0.5">{empresaNome}</div>}
         <div className="font-bold text-sm">DANFE NFC-e</div>
         <div className="text-[10px] text-gray-600">Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</div>
       </div>
@@ -99,9 +100,7 @@ export default function DanfceReceipt({ venda, nfce, pagamentos }: DanfceReceipt
             <div className="flex justify-between text-gray-600">
               <span>Troco:</span>
               <span>
-                {formatMoneyBRL(
-                  pagamentos.reduce((sum, p) => sum + Number(p.troco || 0), 0)
-                )}
+                {formatMoneyBRL(pagamentos.reduce((sum, p) => sum + Number(p.troco || 0), 0))}
               </span>
             </div>
           ) : null}
@@ -157,6 +156,7 @@ export function buildDanfceHtml(
   venda: VendaDetails,
   nfce: NfceEmissaoInfo,
   pagamentos?: Array<{ forma_pagamento: string; valor: number; valor_recebido?: number | null; troco?: number | null }>,
+  opts?: { logoUrl?: string | null; empresaNome?: string },
 ): string {
   const isAutorizada = nfce.status === 'autorizada';
   const totalTroco = (pagamentos || []).reduce((s, p) => s + Number(p.troco || 0), 0);
@@ -179,6 +179,13 @@ export function buildDanfceHtml(
     )
     .join('');
 
+  const logoHtml = opts?.logoUrl
+    ? `<div class="center" style="margin-bottom:4px"><img src="${opts.logoUrl}" alt="Logo" style="max-height:48px;object-fit:contain" /></div>`
+    : '';
+  const empresaHtml = opts?.empresaNome
+    ? `<div class="center bold" style="font-size:12px">${opts.empresaNome}</div>`
+    : '';
+
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -200,6 +207,8 @@ export function buildDanfceHtml(
   </style>
 </head>
 <body>
+  ${logoHtml}
+  ${empresaHtml}
   <div class="center bold" style="font-size:12px">DANFE NFC-e</div>
   <div class="center small">Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</div>
   <div class="divider"></div>
