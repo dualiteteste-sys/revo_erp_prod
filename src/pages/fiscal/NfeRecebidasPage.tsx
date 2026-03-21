@@ -586,7 +586,7 @@ export default function NfeRecebidasPage() {
 
       {/* Justificativa modal (for "Não Realizada") */}
       {showJustificativa && (
-        <div className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-bold text-gray-900 mb-2">Justificativa obrigatória</h3>
             <p className="text-sm text-gray-600 mb-4">

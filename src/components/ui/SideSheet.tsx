@@ -34,7 +34,7 @@ export default function SideSheet({
   return createPortal(
     <AnimatePresence>
       {isOpen ? (
-        <div className="fixed inset-0 z-[100000]">
+        <div className="fixed inset-0 z-50">
           <motion.button
             type="button"
             aria-label="Fechar"
