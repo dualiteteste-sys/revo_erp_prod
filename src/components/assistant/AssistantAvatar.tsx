@@ -24,7 +24,7 @@ type Props = {
 
 const SIZE_CLASSES = {
   sm: 'h-10 w-10',
-  md: 'h-[98px] w-[98px]',
+  md: 'h-[88px] w-[88px]',
   lg: 'h-[140px] w-[140px]',
 };
 
