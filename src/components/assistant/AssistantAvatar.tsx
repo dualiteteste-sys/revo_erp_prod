@@ -23,9 +23,9 @@ type Props = {
 };
 
 const SIZE_CLASSES = {
-  sm: 'h-[140px] w-[140px] text-base',
-  md: 'h-[140px] w-[140px] text-base',
-  lg: 'h-[140px] w-[140px] text-base',
+  sm: 'h-10 w-10',
+  md: 'h-[98px] w-[98px]',
+  lg: 'h-[140px] w-[140px]',
 };
 
 export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Props) {
@@ -56,7 +56,7 @@ export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Prop
         >
           <div className="absolute inset-x-0 -bottom-4 h-12 rounded-full bg-white/70 blur-md" />
           <div className="relative flex h-[72%] w-[72%] items-center justify-center rounded-full border border-white/80 bg-white/85 shadow-sm">
-            <UserRound className="h-12 w-12" />
+            <UserRound className="h-8 w-8" />
           </div>
         </div>
       )}
