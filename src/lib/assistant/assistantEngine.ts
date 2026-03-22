@@ -129,20 +129,19 @@ function classifyMessage(message: string): AssistantIntent {
     }
   }
 
+  // Data request — user asking about real-time status/data (before catalog fallback)
+  const DATA_DOMAIN_TERMS = /\b(saldo|titulo|pedido|extrato|nota|fatura|financeiro|estoque|caixa|vendas|receita|despesa|lucro|faturamento|inadimplencia|pendencia|vencido|atrasado|cobranca|comissao|meta)\b/;
+  const DATA_INQUIRY_TERMS = /\b(qual|quanto|quantos|quantas|meu|minha|ver|mostrar|listar|como esta|como estao|como vai|como anda|situacao|posicao|resumo|total|resultado)\b/;
+  if (DATA_DOMAIN_TERMS.test(normalized) && DATA_INQUIRY_TERMS.test(normalized)) {
+    return { kind: 'data_request' };
+  }
+
   // Simple topic mention (short messages — just a module name)
   if (normalized.length < 40) {
     const results = searchHelpCatalog(normalized, 1);
     if (results.length > 0) {
       return { kind: 'help_guide', guideQuery: normalized };
     }
-  }
-
-  // Data request
-  if (
-    /\b(saldo|titulo|pedido|extrato|nota|fatura)\b/.test(normalized) &&
-    /\b(qual|quanto|quantos|meu|minha|ver|mostrar|listar)\b/.test(normalized)
-  ) {
-    return { kind: 'data_request' };
   }
 
   // Capabilities / help
