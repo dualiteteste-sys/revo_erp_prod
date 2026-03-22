@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageSquareText, Sparkles, X, GripVertical } from 'lucide-react';
+import { MessageSquareText, Sparkles, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AssistantAvatar from '@/components/assistant/AssistantAvatar';
 import { cn } from '@/lib/utils';
@@ -218,47 +218,47 @@ export default function AssistantLauncher() {
     : { left: 24, bottom: 24 };
 
   return (
-    <motion.button
-      ref={launcherRef}
-      type="button"
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
+    <motion.div
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-      className={cn(
-        'fixed z-40 flex items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-[#f9fcff]/95 via-white/95 to-[#edf4ff]/95 shadow-xl backdrop-blur transition-shadow select-none',
-        'h-[98px] w-[98px] p-0',
-        isDragging.current ? 'cursor-grabbing shadow-2xl' : 'cursor-pointer hover:shadow-2xl',
-      )}
+      className="fixed z-40 group"
       style={posStyle}
-      aria-label="Abrir assistente Isa"
-      title="Arraste para mover · Clique para abrir · X para ocultar"
     >
-      {/* Avatar */}
-      <span className="relative inline-flex">
-        <AssistantAvatar state="neutral" size="md" />
-        <span className="absolute -right-2 -top-2 rounded-full border border-blue-200 bg-white p-1.5 shadow-sm">
-          <Sparkles className="h-4 w-4 text-blue-500" />
-        </span>
-      </span>
-
-      {/* Drag indicator */}
-      <span className="absolute -left-1 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        <GripVertical className="h-3 w-3 text-gray-400" />
-      </span>
-
-      {/* Close/hide button */}
-      <span
+      {/* Main launcher area */}
+      <div
+        ref={launcherRef as React.RefObject<HTMLDivElement>}
         role="button"
         tabIndex={0}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+        className={cn(
+          'flex items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-[#f9fcff]/95 via-white/95 to-[#edf4ff]/95 shadow-xl backdrop-blur transition-shadow select-none',
+          'h-[98px] w-[98px] p-0',
+          isDragging.current ? 'cursor-grabbing shadow-2xl' : 'cursor-pointer hover:shadow-2xl',
+        )}
+        aria-label="Abrir assistente Isa"
+        title="Arraste para mover · Clique para abrir"
+      >
+        <span className="relative inline-flex">
+          <AssistantAvatar state="neutral" size="md" />
+          <span className="absolute -right-2 -top-2 rounded-full border border-blue-200 bg-white p-1.5 shadow-sm">
+            <Sparkles className="h-4 w-4 text-blue-500" />
+          </span>
+        </span>
+      </div>
+
+      {/* Close/hide button — outside the main interactive area */}
+      <button
+        type="button"
         onClick={handleHide}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleHide(e as any); }}
-        className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm opacity-0 hover:opacity-100 hover:text-red-500 hover:border-red-200 transition-all"
+        className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm opacity-0 group-hover:opacity-100 hover:text-red-500 hover:border-red-200 transition-all"
         title="Ocultar Isa"
+        aria-label="Ocultar Isa"
       >
         <X className="h-3.5 w-3.5" />
-      </span>
-    </motion.button>
+      </button>
+    </motion.div>
   );
 }
