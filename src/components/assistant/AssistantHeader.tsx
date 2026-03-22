@@ -11,21 +11,21 @@ type Props = {
 
 export default function AssistantHeader({ context, avatarState }: Props) {
   return (
-    <div className="rounded-3xl border border-white/60 bg-gradient-to-br from-white via-slate-50 to-blue-50 p-4 shadow-sm">
+    <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-[#f9fcff] via-[#f4f9ff] to-[#eef5ff] p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <AssistantAvatar state={avatarState} size="lg" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <span>Isa</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              <Sparkles className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
               Assistente ERP
             </span>
           </div>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-500">
             {context.routeLabel} • {capabilityLevelLabel(context.capabilityLevel)}
           </p>
-          <p className="mt-3 text-sm leading-6 text-slate-700">{context.scopeText}</p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{context.scopeText}</p>
         </div>
       </div>
     </div>

@@ -21,7 +21,14 @@ export default function AssistantMessageList({ messages, onSuggestionClick }: Pr
               <AssistantAvatar state={message.state ?? 'neutral'} size="sm" />
             ) : null}
 
-            <div className={cn('max-w-[88%] rounded-3xl px-4 py-3 shadow-sm', isAssistant ? 'bg-white border border-slate-200 text-slate-800' : 'bg-slate-900 text-white')}>
+            <div
+              className={cn(
+                'max-w-[88%] rounded-3xl px-4 py-3 shadow-sm',
+                isAssistant
+                  ? 'border border-slate-200 bg-white/95 text-slate-700'
+                  : 'border border-blue-200 bg-gradient-to-br from-[#eaf3ff] to-[#dfeefe] text-blue-800',
+              )}
+            >
               <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide opacity-70">
                 {isAssistant ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
                 {isAssistant ? 'Isa' : 'Você'}

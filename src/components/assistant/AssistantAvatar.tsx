@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssistantAvatarState } from '@/lib/assistant/assistantTypes';
 
@@ -10,10 +11,10 @@ const AVATAR_PATHS: Record<AssistantAvatarState, string> = {
 };
 
 const FALLBACK_STYLES: Record<AssistantAvatarState, string> = {
-  neutral: 'from-slate-100 via-amber-50 to-slate-100',
-  analyzing: 'from-amber-100 via-white to-slate-100',
-  explaining: 'from-sky-100 via-white to-blue-50',
-  success: 'from-emerald-100 via-white to-teal-50',
+  neutral: 'from-[#eef4ff] via-[#f9fbff] to-[#e8f0ff]',
+  analyzing: 'from-[#fff3dd] via-[#fffaf2] to-[#f3f0ff]',
+  explaining: 'from-[#e7f7ff] via-[#f8fdff] to-[#edf6ff]',
+  success: 'from-[#e6f8ee] via-[#f5fff9] to-[#eafcf5]',
 };
 
 type Props = {
@@ -42,18 +43,21 @@ export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Prop
       {!hasError ? (
         <img
           src={src}
-          alt=""
+          alt="Avatar da Isa"
           className="h-full w-full object-cover"
           onError={() => setHasError(true)}
         />
       ) : (
         <div
           className={cn(
-            'flex h-full w-full items-center justify-center bg-gradient-to-br font-semibold text-slate-700',
+            'relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br text-slate-700',
             FALLBACK_STYLES[state],
           )}
         >
-          Isa
+          <div className="absolute inset-x-0 -bottom-4 h-12 rounded-full bg-white/70 blur-md" />
+          <div className="relative flex h-[72%] w-[72%] items-center justify-center rounded-full border border-white/80 bg-white/85 shadow-sm">
+            <UserRound className={cn(size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-7 w-7')} />
+          </div>
         </div>
       )}
     </div>
