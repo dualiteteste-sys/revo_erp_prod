@@ -571,13 +571,19 @@ export default function PdvSalePanel({
 
       {/* ── Action bar ── */}
       <div className="flex-shrink-0 border-t border-gray-200 px-4 py-3 flex justify-between items-center bg-white">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
-        >
-          Cancelar
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
+          >
+            Cancelar
+          </button>
+          <span className="hidden sm:flex items-center gap-3 text-[11px] text-gray-400">
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-500 font-mono">F2</kbd> Busca
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-500 font-mono">F9</kbd> Finalizar
+          </span>
+        </div>
         <button
           type="button"
           onClick={handleFinalize}

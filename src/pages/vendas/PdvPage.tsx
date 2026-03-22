@@ -28,6 +28,7 @@ import { useBillingGate } from '@/hooks/useBillingGate';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import { useAuth } from '@/contexts/AuthProvider';
 import { supabase } from '@/lib/supabase';
+import { useNumericField } from '@/hooks/useNumericField';
 import PdvPaymentModal, { type PdvPagamento } from '@/components/vendas/PdvPaymentModal';
 import { checkNfceEnabled, createNfceDraftFromPdv, submitNfce, checkNfceStatus, calculateNfceTaxes, getNfceInfoForPedido, downloadDanfce, type NfceEmissaoInfo } from '@/services/fiscalNfceEmissoes';
 import DanfceReceipt, { buildDanfceHtml } from '@/components/vendas/DanfceReceipt';
@@ -142,8 +143,8 @@ export default function PdvPage() {
   const [caixaId, setCaixaId] = useState<string>(() => (typeof window !== 'undefined' ? window.localStorage.getItem('pdv:caixaId') || '' : ''));
   const [isCaixaModalOpen, setIsCaixaModalOpen] = useState(false);
   const [caixaMode, setCaixaMode] = useState<'open' | 'close'>('open');
-  const [saldoInicial, setSaldoInicial] = useState<number>(0);
-  const [saldoFinal, setSaldoFinal] = useState<number>(0);
+  const [saldoInicial, setSaldoInicial] = useState<number | null>(0);
+  const [saldoFinal, setSaldoFinal] = useState<number | null>(0);
   const [caixaObs, setCaixaObs] = useState<string>('');
   const [caixaBusy, setCaixaBusy] = useState(false);
 
@@ -357,8 +358,23 @@ export default function PdvPage() {
     );
   }, [filteredRows, sort]);
 
+  const saldoInicialField = useNumericField(saldoInicial, (v) => setSaldoInicial(v ?? 0));
+  const saldoFinalField = useNumericField(saldoFinal, (v) => setSaldoFinal(v ?? 0));
+
   const openNew = () => setIsFormOpen(true);
   const close = () => setIsFormOpen(false);
+
+  // F2 global: abrir nova venda de qualquer tela do PDV
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F2' && !isFormOpen && !isCaixaModalOpen && !isReceiptOpen && !paymentModalPedidoId) {
+        e.preventDefault();
+        openNew();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isFormOpen, isCaixaModalOpen, isReceiptOpen, paymentModalPedidoId]);
 
   const handleFinalize = async (pedidoId: string) => {
     if (!billing.ensureCanWrite({ actionLabel: 'Finalizar PDV' })) return;
@@ -672,16 +688,17 @@ export default function PdvPage() {
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Store className="text-blue-600" /> PDV
           </h1>
-          <p className="text-gray-600 text-sm mt-1">Venda rápida: finaliza gerando movimentação (entrada) e baixa de estoque.</p>
+          <p className="text-gray-600 text-sm mt-1">Venda rápida: finaliza gerando movimentação (entrada) e baixa de estoque. <span className="text-gray-400">F2 = Nova venda · F9 = Finalizar</span></p>
         </div>
         <div className="flex items-center gap-2">
           <RoadmapButton contextKey="vendas" label="Assistente" title="Abrir assistente do PDV" />
           <button
             onClick={openNew}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            title="Atalho: F2"
           >
             <PlusCircle size={20} />
-            Nova venda
+            Nova venda (F2)
           </button>
         </div>
       </div>
@@ -795,11 +812,11 @@ export default function PdvPage() {
                   <div>
                     <label className="text-xs font-semibold text-gray-700">Saldo inicial</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={saldoInicial}
-                      onChange={(e) => setSaldoInicial(Number(e.target.value || 0))}
-                      className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                      type="text"
+                      inputMode="numeric"
+                      {...saldoInicialField}
+                      className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-right"
+                      placeholder="0,00"
                     />
                   </div>
                 ) : (
@@ -807,12 +824,11 @@ export default function PdvPage() {
                     <div>
                       <label className="text-xs font-semibold text-gray-700">Saldo final (contado)</label>
                       <input
-                        type="number"
-                        step="0.01"
-                        value={saldoFinal}
-                        onChange={(e) => setSaldoFinal(Number(e.target.value || 0))}
-                        className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                        placeholder="Opcional"
+                        type="text"
+                        inputMode="numeric"
+                        {...saldoFinalField}
+                        className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-right"
+                        placeholder="0,00"
                       />
                     </div>
                     <div>
