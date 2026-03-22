@@ -65,9 +65,12 @@ export interface AssistantIntent {
   kind:
     | 'scope'
     | 'help_current_page'
+    | 'help_guide'
     | 'integrated_modules'
     | 'prepare_action'
     | 'data_request'
     | 'capabilities'
     | 'unknown';
+  /** For help_guide: the search query extracted from the user message */
+  guideQuery?: string;
 }

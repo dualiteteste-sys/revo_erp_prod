@@ -23,9 +23,9 @@ type Props = {
 };
 
 const SIZE_CLASSES = {
-  sm: 'h-10 w-10 text-sm',
-  md: 'h-14 w-14 text-base',
-  lg: 'h-16 w-16 text-lg',
+  sm: 'h-10 w-10',
+  md: 'h-[98px] w-[98px]',
+  lg: 'h-[140px] w-[140px]',
 };
 
 export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Props) {
@@ -35,7 +35,7 @@ export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Prop
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-white/60 shadow-sm',
+        'relative overflow-hidden rounded-full border border-white/60 shadow-sm',
         SIZE_CLASSES[size],
       )}
       aria-hidden="true"
@@ -56,7 +56,7 @@ export default function AssistantAvatar({ state = 'neutral', size = 'md' }: Prop
         >
           <div className="absolute inset-x-0 -bottom-4 h-12 rounded-full bg-white/70 blur-md" />
           <div className="relative flex h-[72%] w-[72%] items-center justify-center rounded-full border border-white/80 bg-white/85 shadow-sm">
-            <UserRound className={cn(size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-7 w-7')} />
+            <UserRound className="h-8 w-8" />
           </div>
         </div>
       )}
