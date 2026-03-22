@@ -2096,3 +2096,42 @@ export function findHelpEntry(pathname: string): HelpEntry | null {
   if (matches.length) return matches.sort((a, b) => b.match.length - a.match.length)[0] ?? null;
   return buildFallbackEntry(pathname);
 }
+
+/**
+ * Searches the help catalog by keyword. Returns best matches (up to `limit`).
+ * Searches in: title, whatIs, steps, commonMistakes, fillPerfectly.
+ */
+export function searchHelpCatalog(query: string, limit = 3): HelpEntry[] {
+  const normalize = (s: string) =>
+    s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+  const tokens = normalize(query)
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+
+  if (tokens.length === 0) return [];
+
+  const scored = HELP_CATALOG.map((entry) => {
+    const haystack = normalize(
+      [
+        entry.title,
+        entry.whatIs,
+        ...(entry.steps || []),
+        ...(entry.commonMistakes || []),
+        ...(entry.fillPerfectly || []),
+      ].join(' '),
+    );
+
+    let score = 0;
+    for (const token of tokens) {
+      if (haystack.includes(token)) score += 1;
+      // Boost title matches
+      if (normalize(entry.title).includes(token)) score += 2;
+    }
+    return { entry, score };
+  })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, limit).map((r) => r.entry);
+}

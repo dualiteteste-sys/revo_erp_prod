@@ -19,7 +19,7 @@ export default function AssistantHeader({ context, avatarState }: Props) {
             <span>Isa</span>
             <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
               <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-              Assistente ERP
+              Assistente Ultria
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">

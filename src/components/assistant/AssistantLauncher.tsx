@@ -47,7 +47,7 @@ export default function AssistantLauncher() {
         'fixed z-40 flex items-center border border-white/60 bg-gradient-to-br from-[#f9fcff]/95 via-white/95 to-[#edf4ff]/95 shadow-xl backdrop-blur transition hover:-translate-y-0.5',
         isMobile
           ? 'bottom-24 right-4 left-4 justify-between gap-3 rounded-3xl px-3 py-3'
-          : 'bottom-6 right-6 h-14 w-14 justify-center rounded-full p-0',
+          : 'bottom-6 left-6 h-[140px] w-[140px] justify-center rounded-full p-0',
       )}
       aria-label="Abrir assistente Isa"
     >
@@ -70,9 +70,9 @@ export default function AssistantLauncher() {
         </>
       ) : (
         <span className="relative inline-flex">
-          <AssistantAvatar state="neutral" size="sm" />
-          <span className="absolute -right-1.5 -top-1.5 rounded-full border border-blue-200 bg-white p-1">
-            <Sparkles className="h-2.5 w-2.5 text-blue-500" />
+          <AssistantAvatar state="neutral" size="lg" />
+          <span className="absolute -right-3 -top-3 rounded-full border border-blue-200 bg-white p-2">
+            <Sparkles className="h-6 w-6 text-blue-500" />
           </span>
         </span>
       )}
