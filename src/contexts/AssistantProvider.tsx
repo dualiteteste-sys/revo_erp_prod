@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useAppContext } from '@/contexts/AppContextProvider';
@@ -15,6 +15,7 @@ type AssistantContextValue = {
   open: () => void;
   close: () => void;
   submitMessage: (value: string) => Promise<void>;
+  clearMessages: () => void;
 };
 
 const AssistantContextReact = createContext<AssistantContextValue | undefined>(undefined);
@@ -102,6 +103,10 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearMessages = useCallback(() => {
+    setMessages([createAssistantWelcomeMessage(context)]);
+  }, [context]);
+
   const value = useMemo<AssistantContextValue>(
     () => ({
       isOpen,
@@ -112,8 +117,9 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
       open: () => setIsOpen(true),
       close: () => setIsOpen(false),
       submitMessage,
+      clearMessages,
     }),
-    [context, currentAvatarState, isOpen, isThinking, messages],
+    [clearMessages, context, currentAvatarState, isOpen, isThinking, messages],
   );
 
   return <AssistantContextReact.Provider value={value}>{children}</AssistantContextReact.Provider>;

@@ -8,7 +8,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 
 const STORAGE_KEY_POS = 'isa:launcher-pos';
 const STORAGE_KEY_HIDDEN = 'isa:launcher-hidden';
-const LAUNCHER_SIZE = 98; // 70% of 140px
+const LAUNCHER_SIZE = 88; // ~63% of 140px
 
 type Position = { x: number; y: number };
 
@@ -18,6 +18,11 @@ function clampPosition(pos: Position): Position {
     x: Math.max(0, Math.min(pos.x, window.innerWidth - LAUNCHER_SIZE)),
     y: Math.max(0, Math.min(pos.y, window.innerHeight - LAUNCHER_SIZE)),
   };
+}
+
+function defaultTopRight(): Position {
+  if (typeof window === 'undefined') return { x: 24, y: 80 };
+  return { x: window.innerWidth - LAUNCHER_SIZE - 24, y: 80 };
 }
 
 function loadPosition(): Position | null {
@@ -51,13 +56,11 @@ export default function AssistantLauncher() {
   const dragMoved = useRef(false);
   const launcherRef = useRef<HTMLButtonElement>(null);
 
-  // Load saved position on mount
+  // Load saved position on mount (default: top-right)
   useEffect(() => {
     if (isMobile) return;
     const saved = loadPosition();
-    if (saved) {
-      setPosition(saved);
-    }
+    setPosition(saved ?? defaultTopRight());
   }, [isMobile]);
 
   // Clamp on resize
@@ -212,10 +215,10 @@ export default function AssistantLauncher() {
     );
   }
 
-  // Desktop: draggable circular launcher (98px = 70% of 140px)
+  // Desktop: draggable circular launcher (88px ≈ 63% of 140px)
   const posStyle: React.CSSProperties = position
     ? { left: position.x, top: position.y, bottom: 'auto', right: 'auto' }
-    : { left: 24, bottom: 24 };
+    : { right: 24, top: 80 };
 
   return (
     <motion.div
@@ -235,7 +238,7 @@ export default function AssistantLauncher() {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
         className={cn(
           'flex items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-[#f9fcff]/95 via-white/95 to-[#edf4ff]/95 shadow-xl backdrop-blur transition-shadow select-none',
-          'h-[98px] w-[98px] p-0',
+          'h-[88px] w-[88px] p-0',
           isDragging.current ? 'cursor-grabbing shadow-2xl' : 'cursor-pointer hover:shadow-2xl',
         )}
         aria-label="Abrir assistente Isa"
