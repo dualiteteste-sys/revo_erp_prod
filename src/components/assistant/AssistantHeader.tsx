@@ -13,7 +13,7 @@ export default function AssistantHeader({ context, avatarState }: Props) {
   return (
     <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-[#f9fcff] via-[#f4f9ff] to-[#eef5ff] p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <AssistantAvatar state={avatarState} size="lg" />
+        <AssistantAvatar state={avatarState} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <span>Isa</span>
