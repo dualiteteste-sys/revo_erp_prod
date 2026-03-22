@@ -377,7 +377,7 @@ export function createAssistantWelcomeMessage(context: AssistantContext): Assist
       ...(context.suggestedPrompts.slice(0, 2)),
     ],
     content: [
-      `Sou a Isa, sua assistente do ERP.`,
+      `Sou a Isa, sua assistente Ultria.`,
       `Você está em ${context.routeLabel}${context.activeEmpresaNome ? ` (${context.activeEmpresaNome})` : ''}. ${whatIs}`,
       'Pergunte sobre qualquer módulo do sistema — sei explicar todos em detalhe. Também posso mostrar o passo a passo de cada funcionalidade.',
     ].join('\n\n'),

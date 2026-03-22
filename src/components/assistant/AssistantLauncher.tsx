@@ -47,7 +47,7 @@ export default function AssistantLauncher() {
         'fixed z-40 flex items-center border border-white/60 bg-gradient-to-br from-[#f9fcff]/95 via-white/95 to-[#edf4ff]/95 shadow-xl backdrop-blur transition hover:-translate-y-0.5',
         isMobile
           ? 'bottom-24 right-4 left-4 justify-between gap-3 rounded-3xl px-3 py-3'
-          : 'bottom-6 right-6 h-[140px] w-[140px] justify-center rounded-full p-0',
+          : 'bottom-6 left-6 h-[140px] w-[140px] justify-center rounded-full p-0',
       )}
       aria-label="Abrir assistente Isa"
     >
