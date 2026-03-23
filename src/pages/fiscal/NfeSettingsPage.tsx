@@ -1079,7 +1079,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               </label>
             </div>
             <p className="text-xs text-violet-500 mt-3">
-              Quando desativado, os campos IBS/CBS ficam invisíveis nas telas e o motor fiscal ignora esses impostos. Nenhum dado é perdido ao desativar.
+              Quando ativado, os campos IBS/CBS aparecem em Naturezas de Operação e Regras Fiscais, e o motor fiscal calcula IBS e CBS automaticamente. Ao desativar, os campos ficam ocultos e o cálculo é ignorado. Nenhum dado é perdido ao desativar.
             </p>
           </GlassCard>
         </div>

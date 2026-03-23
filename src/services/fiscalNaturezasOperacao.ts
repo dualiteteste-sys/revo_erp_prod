@@ -20,6 +20,10 @@ export type NaturezaOperacaoRow = {
   cofins_aliquota: number;
   ipi_cst: string | null;
   ipi_aliquota: number;
+  ibs_cst_padrao: string | null;
+  ibs_aliquota_padrao: number;
+  cbs_aliquota_padrao: number;
+  c_class_trib_padrao: string | null;
   gera_financeiro: boolean;
   movimenta_estoque: boolean;
   finalidade_emissao: string;
@@ -51,6 +55,10 @@ export type NaturezaOperacaoSearchHit = {
   cofins_aliquota: number;
   ipi_cst: string | null;
   ipi_aliquota: number;
+  ibs_cst_padrao: string | null;
+  ibs_aliquota_padrao: number;
+  cbs_aliquota_padrao: number;
+  c_class_trib_padrao: string | null;
   finalidade_emissao: string;
   observacoes_padrao: string | null;
 };
