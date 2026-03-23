@@ -143,3 +143,18 @@ export async function conciliarExtratoComTitulosAlocados(params: {
     extrato_valor: typeof res?.extrato_valor === 'number' ? res.extrato_valor : res?.extrato_valor != null ? Number(res.extrato_valor) : null,
   };
 }
+
+export async function ajustarTituloAcrescimo(params: {
+  tituloId: string;
+  tipo: ConciliacaoTituloTipo;
+  juros?: number;
+  multa?: number;
+}): Promise<{ ok: boolean }> {
+  const res = await callRpc<{ ok: boolean }>('financeiro_titulo_ajustar_acrescimo', {
+    p_titulo_id: params.tituloId,
+    p_tipo: params.tipo,
+    p_juros: params.juros ?? 0,
+    p_multa: params.multa ?? 0,
+  });
+  return res ?? { ok: true };
+}
