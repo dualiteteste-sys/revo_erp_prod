@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw } from 'lucide-react';
-import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary } from '@/services/os';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2 } from 'lucide-react';
+import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary, getOsObservacoesPadrao, setOsObservacoesPadrao } from '@/services/os';
 import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '../ui/forms/Section';
@@ -110,6 +110,9 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [commsRegistering, setCommsRegistering] = useState(false);
   const [commsSort, setCommsSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
   const [parcelasSort, setParcelasSort] = useState<SortState<string>>({ column: 'numero', direction: 'asc' });
+  const [obsDialogOpen, setObsDialogOpen] = useState(false);
+  const [obsDialogText, setObsDialogText] = useState('');
+  const [obsSaving, setObsSaving] = useState(false);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const tenantVersionRef = useRef(0);
   const clientDetailsRequestRef = useRef(0);
@@ -232,6 +235,10 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setDocDescricao('');
       setContaReceberId(null);
       setContaVencimento('');
+      // Initialize client name from RPC (get_os_detail returns cliente_nome via JOIN)
+      if (os.cliente_nome) {
+        setClientName(os.cliente_nome);
+      }
       if (os.cliente_id) {
         const tenantVersionSnapshot = tenantVersionRef.current;
         const empresaSnapshot = activeEmpresaId ?? null;
@@ -260,6 +267,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setDocDescricao('');
       setContaReceberId(null);
       setContaVencimento('');
+      // Fetch default observations async and pre-fill
+      getOsObservacoesPadrao()
+        .then(obs => {
+          if (obs && typeof obs === 'string') {
+            setFormData(prev => ({ ...prev, observacoes: obs }));
+          }
+        })
+        .catch(() => { /* ignore */ });
     }
     return () => {
       if (clientDetailsRequestRef.current === requestId) {
@@ -1655,8 +1670,27 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         </Section>
 
         <Section title="Observações" description="Detalhes adicionais e anotações internas">
-            <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-3" disabled={readOnly} />
-            <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={3} className="sm:col-span-3" disabled={readOnly} />
+            <div className="sm:col-span-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">Observações</label>
+                <button
+                  type="button"
+                  className="text-gray-400 hover:text-gray-600 transition"
+                  title="Configurar texto padrão"
+                  onClick={async () => {
+                    try {
+                      const current = await getOsObservacoesPadrao();
+                      setObsDialogText(current || '');
+                    } catch { setObsDialogText(''); }
+                    setObsDialogOpen(true);
+                  }}
+                >
+                  <Settings2 size={15} />
+                </button>
+              </div>
+              <TextArea name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={5} disabled={readOnly} />
+            </div>
+            <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={5} className="sm:col-span-3" disabled={readOnly} />
         </Section>
 
         <Section title="Arquivos" description="Anexos enviados para o sistema (PDFs, fotos, comprovantes).">
@@ -2216,6 +2250,52 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             >
               {isGeneratingContasParcelas ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
               Gerar contas por parcelas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={obsDialogOpen} onOpenChange={setObsDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Observações padrão da OS</DialogTitle>
+            <DialogDescription>
+              Defina um texto padrão que será automaticamente preenchido ao criar uma nova Ordem de Serviço.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2">
+            <TextArea
+              name="obs_padrao"
+              value={obsDialogText}
+              onChange={(e) => setObsDialogText(e.target.value)}
+              rows={12}
+              placeholder="Digite o texto padrão para observações da OS..."
+              disabled={obsSaving}
+            />
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setObsDialogOpen(false)} disabled={obsSaving}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                setObsSaving(true);
+                try {
+                  await setOsObservacoesPadrao(obsDialogText);
+                  addToast('Observações padrão salvas com sucesso!', 'success');
+                  setObsDialogOpen(false);
+                } catch (e: any) {
+                  addToast(e?.message || 'Erro ao salvar observações padrão.', 'error');
+                } finally {
+                  setObsSaving(false);
+                }
+              }}
+              disabled={obsSaving}
+              className="gap-2"
+            >
+              {obsSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              Salvar padrão
             </Button>
           </div>
         </DialogContent>

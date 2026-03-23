@@ -141,6 +141,12 @@ export async function listOs(params: {
 }
 
 export async function getOs(id: string): Promise<OrdemServico> {
+  try {
+    const data = await callRpc<OrdemServico>('get_os_detail_for_current_user', { p_id: id });
+    if (data && (data as any).id) return data;
+  } catch {
+    // New RPC not available — fall through to legacy
+  }
   const data = await callRpc<OrdemServico>('get_os_by_id_for_current_user', { p_id: id });
   if (!data || !data.id) {
     throw new Error('Ordem de Serviço não encontrada.');
@@ -303,4 +309,14 @@ export async function setOsStatus(
     p_next: next,
     p_opts: opts ?? {},
   });
+}
+
+// --- Default Observations ---
+
+export async function getOsObservacoesPadrao(): Promise<string | null> {
+  return callRpc<string | null>('os_observacoes_padrao_get');
+}
+
+export async function setOsObservacoesPadrao(text: string): Promise<void> {
+  await callRpc('os_observacoes_padrao_set', { p_text: text });
 }

@@ -150,37 +150,43 @@ test('OS: upload de anexo (Storage) e listagem', async ({ page }) => {
     await route.fulfill({ json: [] });
   });
 
-  // OS details
+  // OS details (new RPC with cliente_nome via JOIN)
+  const osDetailPayload = {
+    id: 'os-1',
+    empresa_id: 'empresa-1',
+    numero: 1001,
+    cliente_id: 'cli-1',
+    descricao: 'Manutenção preventiva',
+    status: 'aberta',
+    data_inicio: '2025-01-02',
+    data_prevista: '2025-01-03',
+    hora: '08:00',
+    total_itens: 0,
+    desconto_valor: 0,
+    total_geral: 0,
+    custo_estimado: 0,
+    custo_real: 0,
+    forma_recebimento: null,
+    condicao_pagamento: null,
+    observacoes: null,
+    observacoes_internas: null,
+    anexos: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ordem: 1,
+    cliente_nome: 'Cliente Teste',
+    tecnico_nome: null,
+  };
+  await page.route('**/rest/v1/rpc/get_os_detail_for_current_user', async (route) => {
+    await route.fulfill({ json: osDetailPayload });
+  });
   await page.route('**/rest/v1/rpc/get_os_by_id_for_current_user', async (route) => {
-    const body = (await route.request().postDataJSON()) as any;
-    expect(body).toMatchObject({ p_id: 'os-1' });
-    await route.fulfill({
-      json: {
-        id: 'os-1',
-        empresa_id: 'empresa-1',
-        numero: 1001,
-        cliente_id: 'cli-1',
-        descricao: 'Manutenção preventiva',
-        status: 'aberta',
-        data_inicio: '2025-01-02',
-        data_prevista: '2025-01-03',
-        hora: '08:00',
-        total_itens: 0,
-        desconto_valor: 0,
-        total_geral: 0,
-        custo_estimado: 0,
-        custo_real: 0,
-        forma_recebimento: null,
-        condicao_pagamento: null,
-        observacoes: null,
-        observacoes_internas: null,
-        anexos: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        ordem: 1,
-        cliente_nome: 'Cliente Teste',
-      },
-    });
+    await route.fulfill({ json: osDetailPayload });
+  });
+
+  // Default observations (new OS creation pre-fill)
+  await page.route('**/rest/v1/rpc/os_observacoes_padrao_get', async (route) => {
+    await route.fulfill({ json: null });
   });
 
   await page.route('**/rest/v1/rpc/list_os_items_for_current_user', async (route) => {
