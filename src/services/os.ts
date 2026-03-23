@@ -205,9 +205,11 @@ export async function getOsDetails(id: string): Promise<OrdemServicoDetails> {
 }
 
 export async function saveOs(osData: Partial<OrdemServicoDetails>): Promise<OrdemServicoDetails> {
+  // Strip fields the RPC doesn't handle (itens are saved separately)
+  const { itens: _itens, ...payload } = osData as any;
   const saved: OrdemServico = osData.id
-    ? await callRpc<OrdemServico>('update_os_for_current_user', { p_id: osData.id, payload: osData })
-    : await callRpc<OrdemServico>('create_os_for_current_user', { payload: osData });
+    ? await callRpc<OrdemServico>('update_os_for_current_user', { p_id: osData.id, payload })
+    : await callRpc<OrdemServico>('create_os_for_current_user', { payload });
 
   if (!saved?.id) {
     throw new Error('A operação no banco de dados não retornou uma O.S. válida.');
