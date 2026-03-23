@@ -88,7 +88,7 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
           TARGET: ${{ steps.db.outputs.target }}
-          MODE: ${{ inputs.mode }}
+          MODE: ${{ inputs.mode || 'full' }}
           LABEL: ${{ inputs.label }}
         run: |
           ts="$(date -u +'%Y%m%d_%H%M%S')"
@@ -180,7 +180,7 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
           TARGET: ${{ steps.db.outputs.target }}
-          MODE: ${{ inputs.mode }}
+          MODE: ${{ inputs.mode || 'full' }}
           R2_BUCKET: ${{ env.R2_BUCKET }}
           R2_KEY: ${{ steps.r2.outputs.r2_key }}
           SHA256: ${{ steps.dump.outputs.sha256 }}
