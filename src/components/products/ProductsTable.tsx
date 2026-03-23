@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit, Trash2, Copy, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit, Trash2, Copy, ChevronDown, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -48,7 +48,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
 
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
-    { id: 'nome', defaultWidth: 360, minWidth: 220 },
+    { id: 'imagem', defaultWidth: 64, minWidth: 56, maxWidth: 72, resizable: false },
+    { id: 'nome', defaultWidth: 320, minWidth: 200 },
     { id: 'sku', defaultWidth: 160, minWidth: 120 },
     { id: 'preco_venda', defaultWidth: 160, minWidth: 140 },
     { id: 'unidade', defaultWidth: 140, minWidth: 110 },
@@ -83,6 +84,9 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                 />
               </th>
             ) : null}
+            <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <span className="sr-only">Imagem</span>
+            </th>
             <ResizableSortableTh columnId="nome" label="Nome" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
             <ResizableSortableTh columnId="sku" label="SKU" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
             <ResizableSortableTh columnId="preco_venda" label="Preço" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
@@ -112,6 +116,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
               const nome = row.nome ?? '';
               const atributosSummary = isVariant ? (row.atributos_summary ?? null) : null;
               const href = `/app/products?open=${encodeURIComponent(row.id)}`;
+              const imgUrl = (row as any).imagem_url as string | null | undefined;
               const wooListing = isParent ? wooListingByProductId?.get(row.id) : undefined;
               const wooStatus = String(wooListing?.listing_status ?? 'unlinked');
 
@@ -147,6 +152,22 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                     )}
                   </td>
                 ) : null}
+
+                {/* Image thumbnail */}
+                <td className="px-2 py-3">
+                  <button
+                    type="button"
+                    className="w-10 h-10 rounded-lg border border-gray-200/80 bg-gray-50 overflow-hidden flex items-center justify-center hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                    onClick={() => onEdit({ id: row.id })}
+                    title="Ver produto"
+                  >
+                    {imgUrl ? (
+                      <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={16} className="text-gray-300" />
+                    )}
+                  </button>
+                </td>
 
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">
                   <div className="flex items-center gap-2">
