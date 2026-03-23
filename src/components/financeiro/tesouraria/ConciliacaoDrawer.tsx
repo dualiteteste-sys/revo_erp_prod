@@ -50,13 +50,15 @@ function TituloAllocationRow(props: {
   disabled?: boolean;
 }) {
   const saldo = Number(props.titulo.saldo_aberto || 0);
+  const applied = props.applied ?? 0;
+  const exceedsSaldo = applied > saldo + 0.01;
   const field = useNumericField(props.applied ?? null, (v) => {
     if (v === null) return props.onChangeApplied(null);
-    props.onChangeApplied(clampMoney(v, 0, saldo));
+    props.onChangeApplied(Math.round(Math.max(0, v) * 100) / 100);
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-white p-3">
+    <div className={`flex flex-col gap-2 rounded-md border bg-white p-3 ${exceedsSaldo ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-gray-900 truncate">{props.titulo.pessoa_nome || '—'}</div>
@@ -64,6 +66,11 @@ function TituloAllocationRow(props: {
           <div className="mt-1 text-[11px] text-gray-500">
             Venc.: {formatDatePtBR(props.titulo.data_vencimento)} · Saldo: <span className="font-semibold">{formatBRL(saldo)}</span>
           </div>
+          {exceedsSaldo && (
+            <div className="mt-1 text-[11px] text-amber-700 font-medium">
+              Valor aplicado excede o saldo em {formatBRL(applied - saldo)}
+            </div>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <div className="text-[11px] uppercase font-semibold text-gray-500">Aplicar</div>
@@ -73,7 +80,7 @@ function TituloAllocationRow(props: {
             placeholder="0,00"
             {...field}
             disabled={props.disabled}
-            className="mt-1 w-[140px] rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+            className={`mt-1 w-[140px] rounded-md border px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 disabled:opacity-60 ${exceedsSaldo ? 'border-amber-400 focus:ring-amber-500/30' : 'border-gray-300 focus:ring-blue-500'}`}
           />
         </div>
       </div>
