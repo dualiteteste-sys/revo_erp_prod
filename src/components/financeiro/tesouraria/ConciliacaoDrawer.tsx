@@ -4,7 +4,7 @@ import { X, Loader2, Link2, Plus, FileText, SearchX, SlidersHorizontal } from 'l
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
-import { conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosAlocados, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
+import { ajustarTituloAcrescimo, conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosAlocados, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 import DatePicker from '@/components/ui/DatePicker';
 import { formatDatePtBR } from '@/lib/dateDisplay';
@@ -112,6 +112,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [showQuickCreateConta, setShowQuickCreateConta] = useState(false);
   const [titulosSearchTipo, setTitulosSearchTipo] = useState<'pagar' | 'receber' | 'ambos'>('pagar');
   const [titulosHasSearched, setTitulosHasSearched] = useState(false);
+  const [adjustingAndConciliating, setAdjustingAndConciliating] = useState(false);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -343,7 +344,9 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         addToast('Título tem saldo maior que o extrato. Use “Registrar parcial e conciliar”.', 'info');
         return;
       }
-      addToast('Valor do extrato é maior que o saldo do título. Selecione mais títulos ou crie movimentação/ajuste.', 'error');
+      // extrato > saldo: auto-select to show the overpay panel
+      setTitulosSelected({ [row.titulo_id]: row });
+      addToast(`Diferença de ${formatBRL(diff)} detectada. Use “Adicionar juros/multa” abaixo para ajustar e conciliar.`, 'info');
       return;
     }
     setLinkingId(row.titulo_id);
@@ -359,6 +362,38 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       addToast(e?.message || 'Erro ao conciliar título.', 'error');
     } finally {
       setLinkingId(null);
+    }
+  };
+
+  const handleAdjustAndConciliate = async (row: ConciliacaoTituloCandidate) => {
+    if (!extratoItem) return;
+    if (adjustingAndConciliating || !!linkingId) return;
+    const saldoTitulo = Number(row.saldo_aberto || 0);
+    const diff = extratoValor - saldoTitulo;
+    if (diff <= 0.01) return;
+
+    setAdjustingAndConciliating(true);
+    try {
+      // 1. Adjust juros on the título so saldo matches extrato
+      await ajustarTituloAcrescimo({
+        tituloId: row.titulo_id,
+        tipo: row.tipo,
+        juros: diff,
+      });
+
+      // 2. Now conciliate (backend reads the updated saldo)
+      await conciliarExtratoComTitulo({
+        extratoId: extratoItem.id,
+        tipo: row.tipo,
+        tituloId: row.titulo_id,
+      });
+
+      addToast(`Juros/multa de ${formatBRL(diff)} adicionados e título conciliado!`, 'success');
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao ajustar e conciliar.', 'error');
+    } finally {
+      setAdjustingAndConciliating(false);
     }
   };
 
@@ -384,6 +419,10 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     !!extratoItem &&
     selectedTitulosArray.length === 1 &&
     (Number(selectedTitulosArray[0]?.saldo_aberto || 0) - extratoValor) > 0.01;
+  const isOverpayCandidate =
+    !!extratoItem &&
+    selectedTitulosArray.length === 1 &&
+    (extratoValor - Number(selectedTitulosArray[0]?.saldo_aberto || 0)) > 0.01;
   const titulosSuggestionsExact = extratoItem
     ? (titulosSuggestions || []).filter((t) => Math.abs(Number(t.saldo_aberto || 0) - extratoValor) <= 0.01)
     : (titulosSuggestions || []);
@@ -744,6 +783,31 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                           >
                             {titulosParcialConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
                             Registrar parcial e conciliar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {isOverpayCandidate ? (
+                      <div className="mt-3 rounded-xl border border-blue-200/60 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 p-4 text-sm text-blue-900 shadow-sm">
+                        <div className="font-semibold text-blue-800">Diferença detectada</div>
+                        <div className="mt-1.5 text-xs text-blue-700 leading-relaxed">
+                          O extrato (<span className="font-semibold">{formatBRL(extratoValor)}</span>) é{' '}
+                          <span className="font-bold text-blue-900">{formatBRL(selectedTitulosDiff)}</span> maior que o título
+                          (<span className="font-semibold">{formatBRL(Number(selectedTitulosArray[0]?.saldo_aberto || 0))}</span>).
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <div className="text-xs text-blue-600">
+                            Será adicionado <span className="font-semibold">{formatBRL(selectedTitulosDiff)}</span> de juros/multa no título
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleAdjustAndConciliate(selectedTitulosArray[0])}
+                            disabled={adjustingAndConciliating || titulosBatchConciliando || titulosParcialConciliando || !!linkingId}
+                            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-blue-600 hover:to-blue-700 disabled:opacity-60 transition-all whitespace-nowrap"
+                          >
+                            {adjustingAndConciliating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
+                            Adicionar juros/multa e conciliar
                           </button>
                         </div>
                       </div>
