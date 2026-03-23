@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, Link2, Plus, FileText } from 'lucide-react';
+import { X, Loader2, Link2, Plus, FileText, SearchX, SlidersHorizontal } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
@@ -110,6 +110,8 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [createCreditoEmConta, setCreateCreditoEmConta] = useState(false);
   const [creditoPessoaId, setCreditoPessoaId] = useState<string | null>(null);
   const [showQuickCreateConta, setShowQuickCreateConta] = useState(false);
+  const [titulosSearchTipo, setTitulosSearchTipo] = useState<'pagar' | 'receber' | 'ambos'>('pagar');
+  const [titulosHasSearched, setTitulosHasSearched] = useState(false);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -130,17 +132,21 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     setAllocating(false);
     setCreateCreditoEmConta(false);
     setCreditoPessoaId(null);
+    setTitulosSearchTipo(extratoItem.tipo_lancamento === 'debito' ? 'pagar' : 'receber');
+    setTitulosHasSearched(false);
 
     const date = new Date(extratoItem.data_lancamento);
     const start = new Date(date);
-    start.setDate(date.getDate() - 10);
+    start.setDate(date.getDate() - 30);
     const end = new Date(date);
-    end.setDate(date.getDate() + 10);
+    end.setDate(date.getDate() + 30);
     setTitulosStartDate(start);
     setTitulosEndDate(end);
-    setTitulosValorEnabled(true);
+    setTitulosValorEnabled(false);
 
+    const initTipo = extratoItem.tipo_lancamento === 'debito' ? 'pagar' as const : 'receber' as const;
     void fetchTitulosSuggestions();
+    void fetchTitulosSearch(1, { tipo: initTipo, valorEnabled: false, startDate: start, endDate: end });
   }, [isOpen, extratoItem]);
 
   useEffect(() => {
@@ -274,23 +280,49 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
   };
 
-  const fetchTitulosSearch = async (page = 1) => {
+  const fetchTitulosSearch = async (page = 1, overrides?: {
+    tipo?: 'pagar' | 'receber' | 'ambos';
+    valorEnabled?: boolean;
+    startDate?: Date | null;
+    endDate?: Date | null;
+  }) => {
     if (!extratoItem) return;
     setTitulosSearching(true);
+    setTitulosHasSearched(true);
     try {
       const limit = 25;
       const offset = (page - 1) * limit;
-      const { data, count } = await searchTitulosParaConciliacao({
-        tipo: tipoTitulo,
-        valor: titulosValorEnabled ? extratoItem.valor : null,
-        startDate: titulosStartDate ? titulosStartDate.toISOString().slice(0, 10) : null,
-        endDate: titulosEndDate ? titulosEndDate.toISOString().slice(0, 10) : null,
+      const useValor = overrides?.valorEnabled ?? titulosValorEnabled;
+      const useTipo = overrides?.tipo ?? titulosSearchTipo;
+      const useStart = overrides?.startDate !== undefined ? overrides.startDate : titulosStartDate;
+      const useEnd = overrides?.endDate !== undefined ? overrides.endDate : titulosEndDate;
+      const baseParams = {
+        valor: useValor ? extratoItem.valor : null,
+        startDate: useStart ? useStart.toISOString().slice(0, 10) : null,
+        endDate: useEnd ? useEnd.toISOString().slice(0, 10) : null,
         q: titulosSearchTerm.trim() || null,
         limit,
         offset,
-      });
-      setTitulosResults(data);
-      setTitulosCount(count);
+      };
+
+      if (useTipo === 'ambos') {
+        const [rPagar, rReceber] = await Promise.all([
+          searchTitulosParaConciliacao({ ...baseParams, tipo: 'pagar' }),
+          searchTitulosParaConciliacao({ ...baseParams, tipo: 'receber' }),
+        ]);
+        const merged = [...rPagar.data, ...rReceber.data].sort(
+          (a, b) => (a.data_vencimento || '').localeCompare(b.data_vencimento || ''),
+        );
+        setTitulosResults(merged);
+        setTitulosCount(rPagar.count + rReceber.count);
+      } else {
+        const { data, count } = await searchTitulosParaConciliacao({
+          ...baseParams,
+          tipo: useTipo,
+        });
+        setTitulosResults(data);
+        setTitulosCount(count);
+      }
       setTitulosPage(page);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao buscar títulos.', 'error');
@@ -927,43 +959,72 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                   )}
                 </div>
 
-                <div className="rounded-lg border bg-white p-3">
-                  <div className="text-xs font-bold uppercase text-gray-600 mb-2">Buscar manualmente (fallback)</div>
+                <div className="rounded-2xl border border-slate-200/50 bg-white/60 p-4 shadow-sm backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500 mb-3">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Buscar títulos
+                  </div>
+
+                  {/* Tipo toggle — pagar / receber / ambos */}
+                  <div className="mb-3 flex rounded-xl border border-slate-200/60 bg-slate-50/50 p-0.5">
+                    {(['pagar', 'receber', 'ambos'] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => { setTitulosSearchTipo(opt); void fetchTitulosSearch(1, { tipo: opt }); }}
+                        className={`flex-1 rounded-[10px] px-3 py-1.5 text-xs font-medium transition-all ${
+                          titulosSearchTipo === opt
+                            ? 'bg-white text-blue-700 shadow-sm border border-blue-200/60'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {opt === 'pagar' ? 'A pagar' : opt === 'receber' ? 'A receber' : 'Ambos'}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-1 gap-2">
                     <input
                       value={titulosSearchTerm}
                       onChange={(e) => setTitulosSearchTerm(e.target.value)}
-                      placeholder="Buscar por nome/descrição/documento…"
-                      className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onKeyDown={(e) => { if (e.key === 'Enter') void fetchTitulosSearch(1); }}
+                      placeholder="Buscar por nome, descrição, documento…"
+                      className="w-full rounded-xl border border-gray-200/50 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 transition-all"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <DatePicker label="De" value={titulosStartDate} onChange={setTitulosStartDate} />
                       <DatePicker label="Até" value={titulosEndDate} onChange={setTitulosEndDate} />
                     </div>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 select-none">
-                      <input type="checkbox" checked={titulosValorEnabled} onChange={(e) => setTitulosValorEnabled(e.target.checked)} />
-                      Usar valor do extrato como filtro (R$ {extratoItem?.valor.toFixed(2)})
+                    <label className="flex items-center gap-2 text-xs text-slate-500 select-none cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={titulosValorEnabled}
+                        onChange={(e) => setTitulosValorEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      Filtrar por valor do extrato (R$ {extratoItem?.valor.toFixed(2)})
                     </label>
                     <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => void fetchTitulosSearch(1)}
                         disabled={titulosSearching || !!linkingId}
-                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-blue-600 hover:to-blue-700 disabled:opacity-60 transition-all"
                       >
                         {titulosSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                         Buscar
                       </button>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-400">
                         {titulosCount > 0 ? `${titulosCount} resultado(s)` : null}
                       </div>
                     </div>
                   </div>
 
+                  {/* Results */}
                   {titulosResults.length > 0 ? (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-4 space-y-2">
                       {titulosResults.map((t) => (
-                        <div key={t.titulo_id} className="border rounded-lg p-3">
+                        <div key={t.titulo_id} className="rounded-xl border border-slate-200/50 bg-white/80 p-3 shadow-sm transition-shadow hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2 min-w-0">
                               <label className="pt-0.5">
@@ -972,28 +1033,30 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                   checked={!!titulosSelected[t.titulo_id]}
                                   disabled={titulosBatchConciliando || !!linkingId}
                                   onChange={() => toggleTituloSelected(t)}
+                                  className="rounded"
                                 />
                               </label>
                               <div className="min-w-0">
-                                <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
-                                <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
-                                {t.documento_ref ? <div className="text-[11px] text-gray-400">Doc: {t.documento_ref}</div> : null}
+                                <div className="text-sm font-medium text-slate-800">{t.pessoa_nome || '—'}</div>
+                                <div className="text-xs text-slate-500">{t.descricao || '—'}</div>
+                                {t.documento_ref ? <div className="text-[11px] text-slate-400">Doc: {t.documento_ref}</div> : null}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-bold text-slate-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
+                              <div className="text-[11px] text-slate-400">{t.data_vencimento ? formatDatePtBR(t.data_vencimento) : ''}</div>
                             </div>
                           </div>
                           <div className="mt-2 flex items-center justify-between">
-                            <div className="text-[11px] text-gray-600 flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.tipo}</span>
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.status}</span>
+                            <div className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                              <span className="rounded-lg bg-slate-100/80 px-2 py-0.5 backdrop-blur-sm">{t.tipo === 'pagar' ? 'Pagar' : 'Receber'}</span>
+                              <span className="rounded-lg bg-slate-100/80 px-2 py-0.5 backdrop-blur-sm">{t.status}</span>
                             </div>
                             <button
                               type="button"
                               onClick={() => void handleConciliarComTitulo(t)}
                               disabled={!!linkingId}
-                              className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-60 transition-colors"
                             >
                               {linkingId === t.titulo_id ? 'Conciliando…' : 'Baixar e conciliar'}
                             </button>
@@ -1005,16 +1068,16 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                         <div className="flex items-center justify-between pt-2">
                           <button
                             type="button"
-                            className="text-xs text-blue-700 hover:underline disabled:opacity-60"
+                            className="text-xs text-blue-600 hover:underline disabled:opacity-60"
                             disabled={titulosPage <= 1 || titulosSearching}
                             onClick={() => void fetchTitulosSearch(Math.max(1, titulosPage - 1))}
                           >
                             Anterior
                           </button>
-                          <div className="text-xs text-gray-500">Página {titulosPage}</div>
+                          <div className="text-xs text-slate-400">Página {titulosPage}</div>
                           <button
                             type="button"
-                            className="text-xs text-blue-700 hover:underline disabled:opacity-60"
+                            className="text-xs text-blue-600 hover:underline disabled:opacity-60"
                             disabled={titulosSearching || titulosPage * 25 >= titulosCount}
                             onClick={() => void fetchTitulosSearch(titulosPage + 1)}
                           >
@@ -1022,6 +1085,47 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                           </button>
                         </div>
                       ) : null}
+                    </div>
+                  ) : titulosHasSearched && !titulosSearching ? (
+                    /* Empty state with actionable suggestions */
+                    <div className="mt-4 rounded-xl border-2 border-dashed border-slate-200/50 bg-slate-50/30 p-6 text-center">
+                      <SearchX className="mx-auto h-8 w-8 text-slate-300" />
+                      <div className="mt-2 text-sm font-medium text-slate-600">Nenhum título encontrado</div>
+                      <div className="mt-1 text-xs text-slate-400">Ajuste os filtros para ampliar a busca</div>
+                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                        {titulosValorEnabled ? (
+                          <button
+                            type="button"
+                            onClick={() => { setTitulosValorEnabled(false); void fetchTitulosSearch(1, { valorEnabled: false }); }}
+                            className="rounded-lg border border-blue-200/60 bg-blue-50/80 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100/80 transition-colors"
+                          >
+                            Remover filtro de valor
+                          </button>
+                        ) : null}
+                        {titulosSearchTipo !== 'ambos' ? (
+                          <button
+                            type="button"
+                            onClick={() => { setTitulosSearchTipo('ambos'); void fetchTitulosSearch(1, { tipo: 'ambos' }); }}
+                            className="rounded-lg border border-blue-200/60 bg-blue-50/80 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100/80 transition-colors"
+                          >
+                            Buscar pagar e receber
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const date = new Date(extratoItem!.data_lancamento);
+                            const wideStart = new Date(date); wideStart.setDate(date.getDate() - 90);
+                            const wideEnd = new Date(date); wideEnd.setDate(date.getDate() + 90);
+                            setTitulosStartDate(wideStart);
+                            setTitulosEndDate(wideEnd);
+                            void fetchTitulosSearch(1, { startDate: wideStart, endDate: wideEnd });
+                          }}
+                          className="rounded-lg border border-blue-200/60 bg-blue-50/80 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100/80 transition-colors"
+                        >
+                          Ampliar para ±90 dias
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
