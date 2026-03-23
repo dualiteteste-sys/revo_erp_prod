@@ -51,6 +51,21 @@ export async function updateVariantField(
   });
 }
 
+export type VincularResult = {
+  ok: boolean;
+  parent_id: string;
+  linked: number;
+  not_found: string[];
+  already_linked: string[];
+};
+
+export async function vincularFilhosPorSku(parentSku: string, childSkus: string[]): Promise<VincularResult> {
+  return callRpc<VincularResult>('produtos_vincular_filhos_por_sku', {
+    p_parent_sku: parentSku,
+    p_child_skus: childSkus,
+  });
+}
+
 export async function generateVariantes(params: {
   produtoPaiId: string;
   atributoId: string;
