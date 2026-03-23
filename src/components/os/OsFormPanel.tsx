@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2, Printer } from 'lucide-react';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2, Printer, ChevronDown } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary, getOsObservacoesPadrao, setOsObservacoesPadrao } from '@/services/os';
 import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -30,7 +30,8 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
-import { printOs } from '@/lib/os/printOs';
+import { printOs, type PrintOsMode } from '@/lib/os/printOs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
@@ -1096,7 +1097,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
   };
 
-  const handlePrint = (mode: 'cliente' | 'tecnico') => {
+  const handlePrint = (mode: PrintOsMode) => {
     if (!formData.id) return;
     const emp = activeEmpresa;
     const endParts = [
@@ -1871,16 +1872,26 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
-        <div className="flex gap-2">
+        <div>
           {formData.id && (
-            <>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handlePrint('cliente')}>
-                <Printer size={14} /> Via Cliente
-              </Button>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handlePrint('tecnico')}>
-                <Printer size={14} /> Via Técnico
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Printer size={14} /> Imprimir <ChevronDown size={12} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => handlePrint('cliente_precos')}>
+                  Via do Cliente (com preços)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePrint('cliente')}>
+                  Via do Cliente (sem preços)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePrint('tecnico')}>
+                  Via do Técnico
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
         <div className="flex gap-3">
