@@ -1,10 +1,16 @@
 /**
  * printOs — Impressão de Ordem de Serviço
- * Duas vias: "cliente" (com preços) e "tecnico" (sem preços, com obs internas).
+ * 3 vias:
+ *   - "cliente_precos"  → Via do Cliente com preços (orçamento/faturamento)
+ *   - "cliente"         → Via do Cliente sem preços (entregue na abertura)
+ *   - "tecnico"         → Via do Técnico (sem preços, com obs internas)
+ *
  * Padrão: window.open() + HTML self-contained + window.print().
  */
 
 import type { OrdemServicoDetails } from '@/services/os';
+
+export type PrintOsMode = 'cliente_precos' | 'cliente' | 'tecnico';
 
 export type PrintOsEmpresa = {
   nome: string;
@@ -24,7 +30,7 @@ export type PrintOsCliente = {
 
 export type PrintOsParams = {
   os: OrdemServicoDetails;
-  mode: 'cliente' | 'tecnico';
+  mode: PrintOsMode;
   empresa: PrintOsEmpresa;
   logoUrl: string | null;
   clientDetails: PrintOsCliente | null;
@@ -71,18 +77,25 @@ const statusLabels: Record<string, string> = {
   cancelada: 'Cancelada',
 };
 
+const viaLabels: Record<PrintOsMode, string> = {
+  cliente_precos: 'Via do Cliente',
+  cliente: 'Via do Cliente',
+  tecnico: 'Via do Técnico',
+};
+
 // ── Main ─────────────────────────────────────────────
 
 export function printOs(params: PrintOsParams): void {
   const { os, mode, empresa, logoUrl, clientDetails } = params;
-  const isCliente = mode === 'cliente';
+  const showPrices = mode === 'cliente_precos';
+  const isTecnico = mode === 'tecnico';
 
   const geradoEm = new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date());
 
-  const viaLabel = isCliente ? 'Via do Cliente' : 'Via do Técnico';
+  const viaLabel = viaLabels[mode];
 
   // ── Logo ──
   const logoHtml = logoUrl
@@ -102,7 +115,7 @@ export function printOs(params: PrintOsParams): void {
   if (clientDetails) {
     const docFmt = fmtCnpj(clientDetails.doc);
     const clienteLines = [
-      `<strong>${esc(clientDetails.nome)}</strong>`,
+      `<span class="medium">${esc(clientDetails.nome)}</span>`,
       docFmt ? `CPF/CNPJ: ${esc(docFmt)}` : '',
       clientDetails.endereco ? esc(clientDetails.endereco) : '',
       [clientDetails.telefone ? `Tel: ${esc(clientDetails.telefone)}` : '', clientDetails.email ? esc(clientDetails.email) : ''].filter(Boolean).join(' — '),
@@ -116,7 +129,7 @@ export function printOs(params: PrintOsParams): void {
 
   // ── OS info ──
   const osInfoLines = [
-    `<strong>O.S. Nº ${esc(String(os.numero))}</strong>`,
+    `<span class="medium">O.S. N\u00ba ${esc(String(os.numero))}</span>`,
     `Status: ${esc(statusLabels[os.status] ?? os.status)}`,
     os.tecnico_nome ? `Técnico: ${esc(os.tecnico_nome)}` : '',
     os.data_inicio ? `Data início: ${fmtDate(os.data_inicio)}` : '',
@@ -136,7 +149,7 @@ export function printOs(params: PrintOsParams): void {
   const itens = os.itens ?? [];
   let itemsHtml = '';
   if (itens.length > 0) {
-    if (isCliente) {
+    if (showPrices) {
       const rows = itens.map(it => `
         <tr>
           <td>${esc(it.codigo) || '—'}</td>
@@ -177,12 +190,12 @@ export function printOs(params: PrintOsParams): void {
     }
   }
 
-  // ── Totais (só via cliente) ──
+  // ── Totais (só via cliente com preços) ──
   let totaisHtml = '';
-  if (isCliente) {
+  if (showPrices) {
     const totaisLines = [
       `<div class="totais-row"><span>Subtotal itens:</span><span>${fmtBRL(os.total_itens)}</span></div>`,
-      os.desconto_valor ? `<div class="totais-row"><span>Desconto:</span><span class="val-neg">- ${fmtBRL(os.desconto_valor)}</span></div>` : '',
+      os.desconto_valor ? `<div class="totais-row"><span>Desconto:</span><span>- ${fmtBRL(os.desconto_valor)}</span></div>` : '',
       `<div class="totais-row total-geral"><span>Total:</span><span>${fmtBRL(os.total_geral)}</span></div>`,
       os.forma_recebimento ? `<div class="totais-row"><span>Forma de recebimento:</span><span>${esc(os.forma_recebimento)}</span></div>` : '',
       os.condicao_pagamento ? `<div class="totais-row"><span>Condição de pagamento:</span><span>${esc(os.condicao_pagamento)}</span></div>` : '',
@@ -194,7 +207,7 @@ export function printOs(params: PrintOsParams): void {
       </div>`;
   }
 
-  // ── Observações ──
+  // ── Observações (todas as vias) ──
   let obsHtml = '';
   if (os.observacoes) {
     obsHtml = `
@@ -206,7 +219,7 @@ export function printOs(params: PrintOsParams): void {
 
   // ── Observações internas (só via técnico) ──
   let obsInternasHtml = '';
-  if (!isCliente && os.observacoes_internas) {
+  if (isTecnico && os.observacoes_internas) {
     obsInternasHtml = `
       <div class="section">
         <div class="section-title">Observações Internas</div>
@@ -215,7 +228,7 @@ export function printOs(params: PrintOsParams): void {
   }
 
   // ── Assinatura ──
-  const sigLabel = isCliente ? 'Assinatura do Cliente' : 'Assinatura do Técnico';
+  const sigLabel = isTecnico ? 'Assinatura do Técnico' : 'Assinatura do Cliente';
   const sigHtml = `
     <div class="sig-block">
       <div class="sig-line"></div>
@@ -235,18 +248,20 @@ export function printOs(params: PrintOsParams): void {
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+      font-weight: 300;
       font-size: 9.5pt;
-      color: #111827;
+      color: #000;
       background: #fff;
     }
+    .medium { font-weight: 500; }
 
     /* ── Header ──────────────────────────── */
     .header {
       display: flex;
       align-items: flex-start;
       gap: 14pt;
-      border-bottom: 2px solid #1d4ed8;
+      border-bottom: 1.5pt solid #000;
       padding-bottom: 10pt;
       margin-bottom: 12pt;
     }
@@ -257,26 +272,26 @@ export function printOs(params: PrintOsParams): void {
     }
     .header-text { flex: 1; }
     .empresa-nome {
-      font-size: 13pt;
-      font-weight: 800;
-      color: #1d4ed8;
+      font-size: 14pt;
+      font-weight: 500;
+      color: #000;
       margin: 0 0 2pt 0;
     }
     .empresa-line {
       font-size: 8pt;
-      color: #374151;
+      color: #333;
+      font-weight: 300;
       margin: 0;
     }
     .via-badge {
       display: inline-block;
-      padding: 2pt 8pt;
+      padding: 3pt 10pt;
       font-size: 7.5pt;
-      font-weight: 700;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.5pt;
-      border-radius: 3pt;
-      color: #fff;
-      background: ${isCliente ? '#1d4ed8' : '#059669'};
+      letter-spacing: 0.6pt;
+      border: 1pt solid #000;
+      color: #000;
     }
 
     /* ── Info blocks ─────────────────────── */
@@ -287,23 +302,22 @@ export function printOs(params: PrintOsParams): void {
     }
     .info-block {
       flex: 1;
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 4pt;
+      border: 0.5pt solid #ccc;
       padding: 8pt 10pt;
     }
     .info-title {
-      font-size: 7.5pt;
-      font-weight: 700;
+      font-size: 7pt;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.4pt;
-      color: #6b7280;
+      letter-spacing: 0.5pt;
+      color: #555;
       margin-bottom: 4pt;
     }
     .info-line {
       font-size: 8.5pt;
-      color: #111827;
-      line-height: 1.5;
+      color: #000;
+      font-weight: 300;
+      line-height: 1.6;
     }
 
     /* ── Sections ────────────────────────── */
@@ -311,26 +325,26 @@ export function printOs(params: PrintOsParams): void {
       margin-bottom: 10pt;
     }
     .section-title {
-      font-size: 9pt;
-      font-weight: 700;
+      font-size: 8pt;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.3pt;
-      color: #1d4ed8;
-      border-bottom: 1px solid #dbeafe;
+      letter-spacing: 0.4pt;
+      color: #000;
+      border-bottom: 0.5pt solid #ccc;
       padding-bottom: 3pt;
       margin-bottom: 6pt;
     }
     .section-body {
       font-size: 9pt;
-      line-height: 1.5;
-      color: #374151;
+      font-weight: 300;
+      line-height: 1.6;
+      color: #222;
     }
     .obs-internas {
-      background: #fffbeb;
-      border: 1px dashed #fbbf24;
-      border-radius: 4pt;
+      background: #f7f7f7;
+      border: 0.5pt dashed #999;
       padding: 6pt 8pt;
-      color: #92400e;
+      color: #333;
     }
 
     /* ── Table ───────────────────────────── */
@@ -339,23 +353,24 @@ export function printOs(params: PrintOsParams): void {
       border-collapse: collapse;
     }
     thead tr {
-      background: #1d4ed8;
+      background: #000;
       color: #fff;
     }
     thead th {
       padding: 4pt 6pt;
-      font-size: 7.5pt;
-      font-weight: 600;
+      font-size: 7pt;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.3pt;
+      letter-spacing: 0.4pt;
       text-align: left;
     }
     thead th.num { text-align: right; }
-    tbody tr { border-bottom: 1px solid #f3f4f6; }
-    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr { border-bottom: 0.5pt solid #e5e5e5; }
+    tbody tr:nth-child(even) { background: #fafafa; }
     td {
       padding: 4pt 6pt;
       font-size: 8.5pt;
+      font-weight: 300;
       vertical-align: middle;
     }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -370,18 +385,18 @@ export function printOs(params: PrintOsParams): void {
       justify-content: space-between;
       padding: 3pt 0;
       font-size: 9pt;
-      border-bottom: 1px solid #f3f4f6;
+      font-weight: 300;
+      border-bottom: 0.5pt solid #e5e5e5;
     }
     .totais-row.total-geral {
-      font-weight: 800;
+      font-weight: 500;
       font-size: 11pt;
-      color: #1d4ed8;
-      border-top: 2px solid #1d4ed8;
+      color: #000;
+      border-top: 1.5pt solid #000;
       border-bottom: none;
       padding-top: 6pt;
       margin-top: 2pt;
     }
-    .val-neg { color: #991b1b; }
 
     /* ── Assinatura ──────────────────────── */
     .sig-block {
@@ -391,29 +406,31 @@ export function printOs(params: PrintOsParams): void {
     }
     .sig-line {
       width: 260pt;
-      border-bottom: 1px solid #111827;
+      border-bottom: 0.5pt solid #000;
       margin: 0 auto 4pt auto;
     }
     .sig-label {
-      font-size: 8.5pt;
-      font-weight: 600;
-      color: #374151;
+      font-size: 8pt;
+      font-weight: 500;
+      color: #333;
     }
     .sig-date {
-      font-size: 8pt;
-      color: #6b7280;
+      font-size: 7.5pt;
+      font-weight: 300;
+      color: #666;
       margin-top: 4pt;
     }
 
     /* ── Footer ──────────────────────────── */
     .report-footer {
       margin-top: 16pt;
-      border-top: 1px solid #e5e7eb;
+      border-top: 0.5pt solid #ccc;
       padding-top: 6pt;
       display: flex;
       justify-content: space-between;
       font-size: 7pt;
-      color: #9ca3af;
+      font-weight: 300;
+      color: #999;
     }
 
     @media print {
