@@ -143,20 +143,15 @@ export async function listOs(params: {
 export async function getOs(id: string): Promise<OrdemServico> {
   try {
     const data = await callRpc<OrdemServico>('get_os_detail_for_current_user', { p_id: id });
-    if (!data || !data.id) {
-      throw new Error('Ordem de Serviço não encontrada.');
-    }
-    return data;
-  } catch (e: any) {
-    if (e instanceof RpcError && e.status === 404) {
-      const data = await callRpc<OrdemServico>('get_os_by_id_for_current_user', { p_id: id });
-      if (!data || !data.id) {
-        throw new Error('Ordem de Serviço não encontrada.');
-      }
-      return data;
-    }
-    throw e;
+    if (data && (data as any).id) return data;
+  } catch {
+    // New RPC not available — fall through to legacy
   }
+  const data = await callRpc<OrdemServico>('get_os_by_id_for_current_user', { p_id: id });
+  if (!data || !data.id) {
+    throw new Error('Ordem de Serviço não encontrada.');
+  }
+  return data;
 }
 
 export async function deleteOs(id: string): Promise<void> {

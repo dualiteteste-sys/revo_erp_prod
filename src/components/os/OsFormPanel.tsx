@@ -257,16 +257,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         setClientDetails(null);
       }
     } else {
-      // New OS — fetch default observations
-      const initNewOs = async () => {
-        let defaultObs = '';
-        try {
-          const obs = await getOsObservacoesPadrao();
-          if (obs) defaultObs = obs;
-        } catch { /* ignore */ }
-        setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [], observacoes: defaultObs || '' });
-      };
-      initNewOs();
+      setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
       setClientDetails(null);
       setNovoAnexo('');
@@ -276,6 +267,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setDocDescricao('');
       setContaReceberId(null);
       setContaVencimento('');
+      // Fetch default observations async and pre-fill
+      getOsObservacoesPadrao()
+        .then(obs => {
+          if (obs && typeof obs === 'string') {
+            setFormData(prev => ({ ...prev, observacoes: obs }));
+          }
+        })
+        .catch(() => { /* ignore */ });
     }
     return () => {
       if (clientDetailsRequestRef.current === requestId) {
