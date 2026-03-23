@@ -703,7 +703,15 @@ export default function ImportProductsCsvModal(props: {
         ? await resolveEntities(validRows)
         : { marcaMap: new Map(), grupoMap: new Map(), skuMap: new Map() };
 
-      for (const row of preview) {
+      // Sort: parents first (no codigo_pai), children after — ensures parents
+      // exist in the DB (and in cache) before children reference them.
+      const importOrder = [...preview].sort((a, b) => {
+        const aIsChild = a.extra.codigo_pai ? 1 : 0;
+        const bIsChild = b.extra.codigo_pai ? 1 : 0;
+        return aIsChild - bIsChild;
+      });
+
+      for (const row of importOrder) {
         if (!row.payload) {
           failed += 1;
           continue;
@@ -728,6 +736,11 @@ export default function ImportProductsCsvModal(props: {
           const id = created?.id ? String(created.id) : null;
           if (id) {
             localCreated.push(id);
+
+            // Register in cache so children in the same batch can resolve this parent
+            if (row.sku) {
+              cache.skuMap.set(row.sku.toLowerCase(), id);
+            }
 
             // Post-creation: images
             if (row.extra.imagem_urls?.length) {
@@ -1084,10 +1097,24 @@ export default function ImportProductsCsvModal(props: {
                           onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
                           onResizeStart={startPreviewResize} className="px-3 py-2"
                         />
+                        {extraCounts.pais > 0 && (
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Pai</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {previewSorted.slice(0, 120).map((r) => (
+                      {previewSorted.slice(0, 120).map((r) => {
+                        const allSkus = new Set(preview.map((p) => p.sku?.toLowerCase()).filter(Boolean));
+                        let paiBadge: React.ReactNode = null;
+                        if (r.extra.codigo_pai) {
+                          const paiSku = r.extra.codigo_pai.toLowerCase();
+                          if (allSkus.has(paiSku)) {
+                            paiBadge = <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">Na planilha</span>;
+                          } else {
+                            paiBadge = <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium">Não encontrado</span>;
+                          }
+                        }
+                        return (
                         <tr key={r.line} className={r.errors.length ? 'bg-rose-50/40' : ''}>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.line}</td>
                           <td className="px-3 py-2">{r.nome || '—'}</td>
@@ -1095,8 +1122,12 @@ export default function ImportProductsCsvModal(props: {
                           <td className="px-3 py-2">{typeof r.preco === 'number' ? `R$ ${r.preco.toFixed(2)}` : '—'}</td>
                           <td className="px-3 py-2">{r.status}</td>
                           <td className="px-3 py-2 text-rose-700">{r.errors.join('; ') || '—'}</td>
+                          {extraCounts.pais > 0 && (
+                            <td className="px-3 py-2">{r.extra.codigo_pai ? <>{r.extra.codigo_pai} {paiBadge}</> : '—'}</td>
+                          )}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

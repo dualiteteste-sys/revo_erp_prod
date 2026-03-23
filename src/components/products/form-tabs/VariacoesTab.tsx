@@ -4,6 +4,7 @@ import {
   Check,
   ExternalLink,
   Image as ImageIcon,
+  Link2,
   Loader2,
   Package,
   Pencil,
@@ -19,6 +20,7 @@ import {
   listAtributos,
   listVariantes,
   updateVariantField,
+  vincularFilhosPorSku,
   type AtributoRow,
   type VariantRow,
 } from '@/services/productVariants';
@@ -160,6 +162,10 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
   const [valoresTags, setValoresTags] = useState<string[]>([]);
   const [skuSuffixMode, setSkuSuffixMode] = useState<'slug' | 'num'>('slug');
   const [barcodeVariant, setBarcodeVariant] = useState<VariantRow | null>(null);
+  const [vincularOpen, setVincularOpen] = useState(false);
+  const [vincularSkusRaw, setVincularSkusRaw] = useState('');
+  const [vincularTags, setVincularTags] = useState<string[]>([]);
+  const [vincularLoading, setVincularLoading] = useState(false);
 
   const canUse = !!produtoId && !produtoPaiId;
   const valores = useMemo(() => {
@@ -251,6 +257,58 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
     setValoresRaw('');
   };
   const removeTagAt = (i: number) => setValoresTags((prev) => prev.filter((_, idx) => idx !== i));
+
+  // ---- Vincular existentes helpers ----
+  const vincularSkus = useMemo(() => {
+    const fromRaw = splitValores(vincularSkusRaw);
+    const merged = [...vincularTags, ...fromRaw];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of merged) {
+      const clean = v.trim();
+      if (!clean) continue;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(clean);
+    }
+    return out;
+  }, [vincularSkusRaw, vincularTags]);
+
+  const commitVincularToTags = () => {
+    const tokens = splitValores(vincularSkusRaw).map((t) => t.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    setVincularTags((prev) => {
+      const next = [...prev];
+      const existing = new Set(prev.map((x) => x.toLowerCase()));
+      for (const t of tokens) { const key = t.toLowerCase(); if (!existing.has(key)) { existing.add(key); next.push(t); } }
+      return next;
+    });
+    setVincularSkusRaw('');
+  };
+  const removeVincularTagAt = (i: number) => setVincularTags((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleVincular = async () => {
+    if (!skuBase) { addToast('O produto pai precisa ter um SKU.', 'warning'); return; }
+    const childSkus = vincularSkus;
+    if (childSkus.length === 0) { addToast('Informe ao menos 1 SKU filho.', 'warning'); return; }
+    setVincularLoading(true);
+    try {
+      const result = await vincularFilhosPorSku(skuBase, childSkus);
+      const parts: string[] = [];
+      if (result.linked > 0) parts.push(`${result.linked} vinculado(s)`);
+      if (result.already_linked?.length) parts.push(`${result.already_linked.length} já vinculado(s)`);
+      if (result.not_found?.length) parts.push(`${result.not_found.length} não encontrado(s)`);
+      addToast(parts.join(', ') || 'Concluído.', result.linked > 0 ? 'success' : 'warning');
+      setVincularTags([]);
+      setVincularSkusRaw('');
+      if (result.linked > 0) await reload();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao vincular.', 'error');
+    } finally {
+      setVincularLoading(false);
+    }
+  };
 
   // ---- Empty states ----
   if (!produtoId) {
@@ -392,6 +450,73 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Vincular existentes card */}
+      <div className="rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setVincularOpen(!vincularOpen)}
+          className="w-full px-5 py-3.5 flex items-center gap-2 text-gray-900 font-semibold text-sm hover:bg-white/40 transition-colors"
+        >
+          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <Link2 size={16} />
+          </div>
+          Vincular produtos existentes
+          <span className={`ml-auto text-gray-400 text-xs transition-transform ${vincularOpen ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+
+        {vincularOpen && (
+          <div className="px-5 pb-5 border-t border-slate-100/80 pt-4">
+            <p className="text-xs text-gray-500 mb-3">
+              Informe os SKUs dos produtos já cadastrados que deseja vincular como variações deste produto pai (SKU: <span className="font-mono font-medium text-gray-700">{skuBase || '—'}</span>).
+            </p>
+            <div className="w-full px-3 py-2 border border-slate-200/60 rounded-xl bg-white/80 min-h-[52px] focus-within:ring-2 focus-within:ring-emerald-400/30 focus-within:border-emerald-300 transition">
+              <div className="flex flex-wrap gap-1.5">
+                {vincularTags.map((tag, idx) => (
+                  <button
+                    key={`${tag}:${idx}`}
+                    type="button"
+                    onClick={() => removeVincularTagAt(idx)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/80 text-emerald-700 text-xs font-medium font-mono border border-emerald-200/50 hover:bg-emerald-100/80 transition-colors"
+                    disabled={vincularLoading}
+                    title="Remover"
+                  >
+                    <span className="max-w-[200px] truncate">{tag}</span>
+                    <X size={12} className="text-emerald-400" />
+                  </button>
+                ))}
+                <input
+                  className="flex-1 min-w-[160px] px-1 py-1 text-sm font-mono outline-none bg-transparent"
+                  value={vincularSkusRaw}
+                  onChange={(e) => setVincularSkusRaw(e.target.value)}
+                  onBlur={() => commitVincularToTags()}
+                  onKeyDown={(e) => {
+                    if (e.key === ',' || e.key === 'Tab') { e.preventDefault(); commitVincularToTags(); return; }
+                    if (e.key === 'Backspace' && vincularSkusRaw.trim() === '' && vincularTags.length > 0) { e.preventDefault(); removeVincularTagAt(vincularTags.length - 1); }
+                    if (e.key === 'Enter' && vincularSkus.length > 0) { e.preventDefault(); void handleVincular(); }
+                  }}
+                  placeholder="SKU-FILHO-01, SKU-FILHO-02..."
+                  disabled={vincularLoading}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-[11px] text-gray-400">
+                {vincularSkus.length > 0 ? `${vincularSkus.length} SKU(s) para vincular` : 'Separar por vírgula, ponto-e-vírgula ou Enter'}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleVincular()}
+                disabled={vincularLoading || vincularSkus.length === 0 || !skuBase}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold text-sm shadow-sm hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 flex items-center gap-2 transition-all"
+              >
+                {vincularLoading ? <Loader2 className="animate-spin" size={16} /> : <Link2 size={16} />}
+                Vincular
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Variants table */}

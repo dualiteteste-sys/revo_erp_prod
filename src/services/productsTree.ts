@@ -11,6 +11,7 @@ export type ProductParentRow = {
   created_at: string | null;
   updated_at: string | null;
   children_count: number | null;
+  imagem_url: string | null;
 };
 
 export type ProductVariantRow = {
@@ -23,6 +24,7 @@ export type ProductVariantRow = {
   created_at: string | null;
   updated_at: string | null;
   atributos_summary: string | null;
+  imagem_url: string | null;
 };
 
 export async function getProductParents(options: {
