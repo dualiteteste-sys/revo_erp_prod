@@ -12,9 +12,13 @@ export type VariantRow = {
   id: string;
   nome: string;
   sku: string | null;
+  gtin: string | null;
   status: string;
   unidade: string;
   preco_venda: number;
+  estoque: number;
+  imagem_url: string | null;
+  atributos_summary: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -35,6 +39,16 @@ export async function ensureAtributo(params: { nome: string; tipo?: string }): P
 
 export async function listVariantes(produtoPaiId: string): Promise<VariantRow[]> {
   return callRpc<VariantRow[]>('produtos_variantes_list_for_current_user', { p_produto_pai_id: produtoPaiId });
+}
+
+export async function updateVariantField(
+  variantId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  await callRpc('update_product_for_current_user', {
+    p_id: variantId,
+    patch,
+  });
 }
 
 export async function generateVariantes(params: {
