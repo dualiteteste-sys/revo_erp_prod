@@ -197,20 +197,21 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     if (!open) return;
     const element = containerRef.current;
     if (!element || typeof window === "undefined" || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
+    const observer = new ResizeObserver(() => {
       const viewport = { w: window.innerWidth, h: window.innerHeight };
-      const w = element.clientWidth;
-      const h = element.clientHeight;
+      // Use getBoundingClientRect instead of clientWidth/clientHeight.
+      // clientWidth excludes CSS border (2px for `border` class), causing a
+      // systematic 2px shrink each cycle that the old < 2 guard didn't catch.
+      const rect = element.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
       const nextSize = normalizeSize({ w, h }, viewport);
-      // Ignore jitter < 2px to prevent shrinking feedback loop
       setSize((current) => {
-        if (Math.abs(current.w - nextSize.w) < 2 && Math.abs(current.h - nextSize.h) < 2) return current;
+        if (Math.abs(current.w - nextSize.w) < 4 && Math.abs(current.h - nextSize.h) < 4) return current;
         writeSize(nextSize);
+        setPos((p) => clampModalPosition(p, viewport, nextSize));
         return nextSize;
       });
-      setPos((current) => clampModalPosition(current, viewport, nextSize));
     });
     observer.observe(element);
     return () => observer.disconnect();
