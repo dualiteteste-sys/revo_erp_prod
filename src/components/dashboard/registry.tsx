@@ -535,7 +535,7 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                 </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0 px-2">
+            <div className="flex-1 w-full min-h-[180px] px-2">
                 {(loading || isLoading) ? (
                     <div className="w-full h-full flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3">
