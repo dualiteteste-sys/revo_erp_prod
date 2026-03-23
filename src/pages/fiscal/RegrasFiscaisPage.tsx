@@ -21,6 +21,7 @@ import {
   type FiscalRegraRow,
 } from '@/services/fiscalRegras';
 import { listProdutoGrupos, type ProdutoGrupo } from '@/services/produtoGrupos';
+import { useIbsCbsEnabled } from '@/hooks/useIbsCbsEnabled';
 import { logger } from '@/lib/logger';
 
 const UF_LIST = [
@@ -132,6 +133,7 @@ function rowToForm(r: FiscalRegraRow): FormData {
 const RegrasFiscaisPage: React.FC = () => {
   const { activeEmpresaId, loading: authLoading } = useAuth();
   const { addToast } = useToast();
+  const ibsCbsEnabled = useIbsCbsEnabled();
 
   const [rows, setRows] = useState<FiscalRegraRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -719,57 +721,59 @@ const RegrasFiscaisPage: React.FC = () => {
             </div>
           </fieldset>
 
-          {/* Overrides — IBS/CBS (2026) */}
-          <fieldset className="rounded-xl border border-violet-200 bg-violet-50/30 p-4">
-            <legend className="px-2 text-sm font-semibold text-violet-700">IBS / CBS (Reforma 2026)</legend>
-            <p className="text-xs text-violet-500 mb-3">Campos para a nova tributação IBS/CBS. Só são aplicados quando o flag IBS/CBS está ativo nas configurações da empresa.</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">CST IBS</label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
-                  value={form.ibs_cst}
-                  onChange={(e) => setForm(f => ({ ...f, ibs_cst: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                  placeholder="—"
-                  maxLength={3}
-                />
+          {/* Overrides — IBS/CBS (2026) — condicional */}
+          {ibsCbsEnabled && (
+            <fieldset className="rounded-xl border border-violet-200 bg-violet-50/30 p-4">
+              <legend className="px-2 text-sm font-semibold text-violet-700">Sobrescrever IBS / CBS (Reforma 2026)</legend>
+              <p className="text-xs text-violet-500 mb-3">Sobrescreve alíquotas IBS/CBS quando esta regra for aplicada. Deixe vazio para manter o valor da Natureza de Operação.</p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">CST IBS</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.ibs_cst}
+                    onChange={(e) => setForm(f => ({ ...f, ibs_cst: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                    placeholder="—"
+                    maxLength={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota IBS (%)</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.ibs_aliquota}
+                    onChange={(e) => setForm(f => ({ ...f, ibs_aliquota: e.target.value }))}
+                    placeholder="—"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota CBS (%)</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.cbs_aliquota}
+                    onChange={(e) => setForm(f => ({ ...f, cbs_aliquota: e.target.value }))}
+                    placeholder="—"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">cClassTrib</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.c_class_trib}
+                    onChange={(e) => setForm(f => ({ ...f, c_class_trib: e.target.value.slice(0, 20) }))}
+                    placeholder="—"
+                    maxLength={20}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota IBS (%)</label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
-                  value={form.ibs_aliquota}
-                  onChange={(e) => setForm(f => ({ ...f, ibs_aliquota: e.target.value }))}
-                  placeholder="—"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota CBS (%)</label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
-                  value={form.cbs_aliquota}
-                  onChange={(e) => setForm(f => ({ ...f, cbs_aliquota: e.target.value }))}
-                  placeholder="—"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">cClassTrib</label>
-                <input
-                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500"
-                  value={form.c_class_trib}
-                  onChange={(e) => setForm(f => ({ ...f, c_class_trib: e.target.value.slice(0, 20) }))}
-                  placeholder="—"
-                  maxLength={20}
-                />
-              </div>
-            </div>
-          </fieldset>
+            </fieldset>
+          )}
 
           {/* Status */}
           <fieldset className="rounded-xl border border-slate-200 p-4">

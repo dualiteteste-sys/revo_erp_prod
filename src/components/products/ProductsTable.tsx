@@ -8,6 +8,12 @@ import type { ProductsTreeRow } from '@/hooks/useProductsTree';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
+import { supabase } from '@/lib/supabaseClient';
+
+/** Convert a Storage key (from produto_imagens.url) to its public URL. */
+function storagePublicUrl(key: string): string {
+  return supabase.storage.from('product_images').getPublicUrl(key).data.publicUrl;
+}
 
 interface ProductsTableProps {
   rows: ProductsTreeRow[];
@@ -116,7 +122,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
               const nome = row.nome ?? '';
               const atributosSummary = isVariant ? (row.atributos_summary ?? null) : null;
               const href = `/app/products?open=${encodeURIComponent(row.id)}`;
-              const imgUrl = (row as any).imagem_url as string | null | undefined;
+              const imgKey = (row as any).imagem_url as string | null | undefined;
+              const imgUrl = imgKey ? storagePublicUrl(imgKey) : null;
               const wooListing = isParent ? wooListingByProductId?.get(row.id) : undefined;
               const wooStatus = String(wooListing?.listing_status ?? 'unlinked');
 

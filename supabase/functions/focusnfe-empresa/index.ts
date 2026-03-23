@@ -100,8 +100,18 @@ Deno.serve(async (req) => {
     if (revendaToken) {
       const revendaBaseUrl = "https://api.focusnfe.com.br"; // reseller API is production-only
 
+      // Read serie + proximo_numero from fiscal_nfe_numeracao
+      const { data: numeracao } = await admin
+        .from("fiscal_nfe_numeracao")
+        .select("serie, proximo_numero")
+        .eq("empresa_id", empresaId)
+        .eq("ativo", true)
+        .order("serie", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
       // Build empresa payload (Focus NFe docs: wrap in { empresa: { ... } })
-      const empresaPayload = {
+      const empresaPayload: Record<string, any> = {
         nome: emitente.razao_social,
         nome_fantasia: emitente.nome_fantasia || emitente.razao_social,
         cnpj,
@@ -120,6 +130,12 @@ Deno.serve(async (req) => {
         habilita_nfe: true,
         habilita_nfse: true,
       };
+
+      // Include serie + numero_inicial if configured
+      if (numeracao) {
+        empresaPayload.serie_nfe_producao = String(numeracao.serie);
+        empresaPayload.numero_inicial_nfe_producao = String(numeracao.proximo_numero);
+      }
 
       // If certificate exists, include it with correct field names
       if (emitente.certificado_storage_path && emitente.certificado_senha_encrypted) {

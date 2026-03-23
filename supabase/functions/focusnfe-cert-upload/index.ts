@@ -3,8 +3,6 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { aesGcmEncryptToString } from "../_shared/crypto.ts";
 import {
-  getFocusApiToken,
-  getFocusBaseUrl,
   focusFetch,
   json,
 } from "../_shared/focusnfe-api.ts";
@@ -122,17 +120,70 @@ Deno.serve(async (req) => {
     if (revendaToken) {
       const revendaBaseUrl = "https://api.focusnfe.com.br"; // reseller API is production-only
 
-      const { response, data } = await focusFetch(
+      const certPayload = {
+        arquivo_certificado_base64: pfxBase64,
+        senha_certificado: password.trim(),
+      };
+
+      // Check if empresa already exists on Focus NFe
+      const { response: getResp } = await focusFetch(
         `${revendaBaseUrl}/v2/empresas/${cnpj}`,
-        {
-          method: "PUT",
-          token: revendaToken,
-          body: JSON.stringify({
-            arquivo_certificado_base64: pfxBase64,
-            senha_certificado: password.trim(),
-          }),
-        },
+        { method: "GET", token: revendaToken },
       );
+
+      let response: Response;
+      let data: any;
+
+      if (getResp.status === 200) {
+        // Empresa exists → PUT cert directly
+        ({ response, data } = await focusFetch(
+          `${revendaBaseUrl}/v2/empresas/${cnpj}`,
+          { method: "PUT", token: revendaToken, body: JSON.stringify(certPayload) },
+        ));
+      } else {
+        // Read serie + proximo_numero for registration
+        const { data: numeracao } = await admin
+          .from("fiscal_nfe_numeracao")
+          .select("serie, proximo_numero")
+          .eq("empresa_id", empresaId)
+          .eq("ativo", true)
+          .order("serie", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        // Empresa not found → auto-register with emitente data + cert
+        const empresaPayload: Record<string, any> = {
+          nome: emitente.razao_social,
+          nome_fantasia: emitente.nome_fantasia || emitente.razao_social,
+          cnpj,
+          inscricao_estadual: emitente.ie || "",
+          inscricao_municipal: emitente.im || "",
+          regime_tributario: String(emitente.crt || 1),
+          logradouro: emitente.endereco_logradouro || "",
+          numero: emitente.endereco_numero || "S/N",
+          complemento: emitente.endereco_complemento || "",
+          bairro: emitente.endereco_bairro || "",
+          municipio: emitente.endereco_municipio || "",
+          uf: emitente.endereco_uf || "",
+          cep: (emitente.endereco_cep || "").replace(/\D/g, ""),
+          telefone: (emitente.telefone || "").replace(/\D/g, ""),
+          email: emitente.email || "",
+          habilita_nfe: true,
+          habilita_nfse: true,
+          ...certPayload,
+        };
+
+        // Include serie + numero_inicial if configured
+        if (numeracao) {
+          empresaPayload.serie_nfe_producao = String(numeracao.serie);
+          empresaPayload.numero_inicial_nfe_producao = String(numeracao.proximo_numero);
+        }
+
+        ({ response, data } = await focusFetch(
+          `${revendaBaseUrl}/v2/empresas`,
+          { method: "POST", token: revendaToken, body: JSON.stringify(empresaPayload) },
+        ));
+      }
 
       if (!response.ok) {
         const errorMsg = data?.mensagem || data?.message || `HTTP ${response.status}`;
@@ -152,29 +203,40 @@ Deno.serve(async (req) => {
         valid_until: data?.data_expiracao_certificado || null,
       };
 
-      // Update emitente with cert info
-      await admin.from("fiscal_nfe_emitente").update({
+      // Save per-company tokens if returned (from auto-registration)
+      const updatePayload: Record<string, any> = {
         certificado_senha_encrypted: encryptedPassword,
         certificado_validade: certInfo.valid_until || null,
         certificado_cnpj: certInfo.cnpj || null,
         focusnfe_registrada: true,
         focusnfe_registrada_em: new Date().toISOString(),
         focusnfe_ultimo_erro: null,
-      }).eq("empresa_id", empresaId);
+      };
+      const tokenProd = data?.token_producao || data?.token_producao_cnpj || null;
+      const tokenHml = data?.token_homologacao || data?.token_homologacao_cnpj || null;
+      if (tokenProd) updatePayload.focusnfe_token_producao = tokenProd;
+      if (tokenHml) updatePayload.focusnfe_token_homologacao = tokenHml;
+
+      await admin.from("fiscal_nfe_emitente").update(updatePayload).eq("empresa_id", empresaId);
 
       // Log
+      const autoRegistered = getResp.status !== 200;
       try { await admin.from("fiscal_nfe_provider_logs").insert({
         empresa_id: empresaId,
         provider: "focusnfe",
         level: "info",
-        message: `Certificado enviado para Focus NFe via API revenda (${ambiente})`,
-        payload: { cnpj, request_id: requestId },
+        message: autoRegistered
+          ? `Empresa auto-registrada + certificado enviado para Focus NFe (${ambiente})`
+          : `Certificado enviado para Focus NFe via API revenda (${ambiente})`,
+        payload: { cnpj, request_id: requestId, auto_registered: autoRegistered },
       }); } catch { /* ignore log failures */ }
 
       return json(200, {
         ok: true,
         cert_info: certInfo,
-        message: "Certificado enviado para Focus NFe com sucesso.",
+        message: autoRegistered
+          ? "Empresa registrada e certificado enviado para Focus NFe com sucesso."
+          : "Certificado enviado para Focus NFe com sucesso.",
       }, cors);
     }
 
