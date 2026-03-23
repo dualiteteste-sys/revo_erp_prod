@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2 } from 'lucide-react';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2, Printer } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary, getOsObservacoesPadrao, setOsObservacoesPadrao } from '@/services/os';
 import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -30,6 +30,8 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
+import { printOs } from '@/lib/os/printOs';
+import { useSupabase } from '@/providers/SupabaseProvider';
 
 type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
 
@@ -50,7 +52,8 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const { addToast } = useToast();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
-  const { activeEmpresaId, userId, loading: authLoading } = useAuth();
+  const { activeEmpresaId, userId, loading: authLoading, activeEmpresa } = useAuth();
+  const supabase = useSupabase();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permManage = useHasPermission('os', 'manage');
@@ -113,6 +116,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [obsDialogOpen, setObsDialogOpen] = useState(false);
   const [obsDialogText, setObsDialogText] = useState('');
   const [obsSaving, setObsSaving] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const tenantVersionRef = useRef(0);
   const clientDetailsRequestRef = useRef(0);
@@ -223,6 +227,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
     lastEmpresaIdRef.current = nextEmpresaId;
   }, [activeEmpresaId, addToast]);
+
+  // Fetch logo signed URL for print
+  useEffect(() => {
+    if (!activeEmpresa?.logotipo_url) { setLogoUrl(null); return; }
+    supabase.storage.from('company_logos')
+      .createSignedUrl(activeEmpresa.logotipo_url, 3600)
+      .then(({ data }) => setLogoUrl(data?.signedUrl ?? null))
+      .catch(() => setLogoUrl(null));
+  }, [activeEmpresa?.logotipo_url, supabase]);
 
   useEffect(() => {
     const requestId = ++clientDetailsRequestRef.current;
@@ -1083,6 +1096,46 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
   };
 
+  const handlePrint = (mode: 'cliente' | 'tecnico') => {
+    if (!formData.id) return;
+    const emp = activeEmpresa;
+    const endParts = [
+      emp?.endereco_logradouro,
+      emp?.endereco_numero ? `, ${emp.endereco_numero}` : '',
+      emp?.endereco_complemento ? ` — ${emp.endereco_complemento}` : '',
+      emp?.endereco_bairro ? ` — ${emp.endereco_bairro}` : '',
+      emp?.endereco_cidade ? ` — ${emp.endereco_cidade}` : '',
+      emp?.endereco_uf ? `/${emp.endereco_uf}` : '',
+      emp?.endereco_cep ? ` — CEP ${emp.endereco_cep}` : '',
+    ];
+    const empresaEndereco = emp?.endereco_logradouro ? endParts.join('') : null;
+
+    const addr = clientDetails?.enderecos?.[0];
+    const clienteEndereco = addr?.logradouro
+      ? [addr.logradouro, addr.numero ? `, ${addr.numero}` : '', addr.complemento ? ` — ${addr.complemento}` : '', addr.bairro ? ` — ${addr.bairro}` : '', addr.cidade ? ` — ${addr.cidade}` : '', addr.uf ? `/${addr.uf}` : '', addr.cep ? ` — CEP ${addr.cep}` : ''].join('')
+      : null;
+
+    printOs({
+      os: formData as OrdemServicoDetails,
+      mode,
+      empresa: {
+        nome: emp?.nome_fantasia || emp?.nome_razao_social || '',
+        cnpj: emp?.cnpj ?? null,
+        telefone: emp?.telefone ?? null,
+        email: emp?.email ?? null,
+        endereco: empresaEndereco,
+      },
+      logoUrl,
+      clientDetails: clientDetails ? {
+        nome: clientDetails.nome,
+        doc: clientDetails.doc_unico ?? null,
+        telefone: clientDetails.telefone || (clientDetails as any).celular || null,
+        email: clientDetails.email ?? null,
+        endereco: clienteEndereco,
+      } : null,
+    });
+  };
+
   const handleSave = async () => {
     if (readOnly) {
       addToast('Você não tem permissão para salvar esta O.S.', 'warning');
@@ -1817,7 +1870,19 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         ) : null}
       </div>
 
-      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
+      <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
+        <div className="flex gap-2">
+          {formData.id && (
+            <>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handlePrint('cliente')}>
+                <Printer size={14} /> Via Cliente
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handlePrint('tecnico')}>
+                <Printer size={14} /> Via Técnico
+              </Button>
+            </>
+          )}
+        </div>
         <div className="flex gap-3">
           <Button type="button" onClick={onClose} variant="outline">
             Cancelar
