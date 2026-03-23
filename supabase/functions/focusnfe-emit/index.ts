@@ -618,8 +618,24 @@ Deno.serve(async (req) => {
       return json(500, { ok: false, error: "MISSING_API_TOKEN", detail: `Token for ${ambiente} not configured` }, cors);
     }
 
+    // 5b. Read serie + proximo_numero from fiscal_nfe_numeracao
+    const { data: numeracao } = await admin
+      .from("fiscal_nfe_numeracao")
+      .select("id, serie, proximo_numero")
+      .eq("empresa_id", empresaId)
+      .eq("ativo", true)
+      .order("serie", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     // 6. Build Focus NFe payload
     const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens, transportadora);
+
+    // 6a. Inject serie + numero from numeracao (if configured)
+    if (numeracao) {
+      focusPayload.serie = String(numeracao.serie);
+      focusPayload.numero = String(numeracao.proximo_numero);
+    }
 
     // 6b. Pre-flight: validate cBenef on items that require it
     // CSTs that require cBenef (per NT 2019.001 / N12-85): 20,30,40,41,50,51,70,90
@@ -667,10 +683,19 @@ Deno.serve(async (req) => {
     const baseUrl = getFocusBaseUrl(ambiente);
     const url = `${baseUrl}/v2/nfe?ref=${ref}`;
 
-    // 8. Update status to 'processando'
+    // 8. Update status to 'processando' + save serie/numero
+    const emissaoUpdate: Record<string, any> = {
+      status: "processando",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    };
+    if (numeracao) {
+      emissaoUpdate.serie = numeracao.serie;
+      emissaoUpdate.numero = numeracao.proximo_numero;
+    }
     await admin
       .from("fiscal_nfe_emissoes")
-      .update({ status: "processando", last_error: null, updated_at: new Date().toISOString() })
+      .update(emissaoUpdate)
       .eq("id", emissao_id);
 
     // Log the submission (include cBenef values for each item for diagnostics)
@@ -777,6 +802,13 @@ Deno.serve(async (req) => {
           last_error: null,
           updated_at: new Date().toISOString(),
         }).eq("id", emissao_id);
+      }
+
+      // Increment proximo_numero on successful submission (not rejection)
+      if (numeracao && focusStatus !== "erro_autorizacao" && focusStatus !== "rejeitado") {
+        await admin.from("fiscal_nfe_numeracao").update({
+          proximo_numero: numeracao.proximo_numero + 1,
+        }).eq("id", numeracao.id);
       }
 
       return json(200, {
