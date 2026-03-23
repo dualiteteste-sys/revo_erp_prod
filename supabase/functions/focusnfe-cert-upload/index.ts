@@ -141,8 +141,18 @@ Deno.serve(async (req) => {
           { method: "PUT", token: revendaToken, body: JSON.stringify(certPayload) },
         ));
       } else {
+        // Read serie + proximo_numero for registration
+        const { data: numeracao } = await admin
+          .from("fiscal_nfe_numeracao")
+          .select("serie, proximo_numero")
+          .eq("empresa_id", empresaId)
+          .eq("ativo", true)
+          .order("serie", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
         // Empresa not found → auto-register with emitente data + cert
-        const empresaPayload = {
+        const empresaPayload: Record<string, any> = {
           nome: emitente.razao_social,
           nome_fantasia: emitente.nome_fantasia || emitente.razao_social,
           cnpj,
@@ -162,6 +172,12 @@ Deno.serve(async (req) => {
           habilita_nfse: true,
           ...certPayload,
         };
+
+        // Include serie + numero_inicial if configured
+        if (numeracao) {
+          empresaPayload.serie_nfe_producao = String(numeracao.serie);
+          empresaPayload.numero_inicial_nfe_producao = String(numeracao.proximo_numero);
+        }
 
         ({ response, data } = await focusFetch(
           `${revendaBaseUrl}/v2/empresas`,
