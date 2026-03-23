@@ -164,8 +164,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Check if empresa exists
-      const { response: getResp } = await focusFetch(
+      // Check if empresa exists (GET also returns cert info if configured)
+      const { response: getResp, data: getEmpresaData } = await focusFetch(
         `${revendaBaseUrl}/v2/empresas/${cnpj}`,
         { method: "GET", token: revendaToken },
       );
@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Success via reseller API — save per-company tokens if returned
+      // Success via reseller API — save per-company tokens + cert info if returned
       const tokenProd = result?.token_producao || result?.token_producao_cnpj || null;
       const tokenHml = result?.token_homologacao || result?.token_homologacao_cnpj || null;
 
@@ -218,6 +218,12 @@ Deno.serve(async (req) => {
       };
       if (tokenProd) updatePayload.focusnfe_token_producao = tokenProd;
       if (tokenHml) updatePayload.focusnfe_token_homologacao = tokenHml;
+      // Focus NFe returns: certificado_valido_ate, certificado_cnpj
+      // Fallback to GET response if PUT/POST doesn't return cert info
+      const certValidoAte = result?.certificado_valido_ate || getEmpresaData?.certificado_valido_ate || null;
+      const certCnpj = result?.certificado_cnpj || getEmpresaData?.certificado_cnpj || null;
+      if (certValidoAte) updatePayload.certificado_validade = certValidoAte;
+      if (certCnpj) updatePayload.certificado_cnpj = certCnpj;
 
       await admin.from("fiscal_nfe_emitente").update(updatePayload).eq("empresa_id", empresaId);
 
@@ -229,6 +235,8 @@ Deno.serve(async (req) => {
         payload: {
           cnpj, request_id: requestId,
           has_token_prod: !!tokenProd, has_token_hml: !!tokenHml,
+          has_cert: !!certValidoAte,
+          cert_valido_ate: certValidoAte,
           response_keys: Object.keys(result || {}),
         },
       }); } catch { /* ignore log failures */ }
@@ -237,6 +245,7 @@ Deno.serve(async (req) => {
         ok: true,
         message: "Empresa registrada na Focus NFe com sucesso.",
         tokens_saved: { producao: !!tokenProd, homologacao: !!tokenHml },
+        cert_info: { valido_ate: certValidoAte, cnpj: certCnpj },
         response_keys: Object.keys(result || {}),
       }, cors);
     }

@@ -198,9 +198,10 @@ Deno.serve(async (req) => {
       }
 
       // Extract cert info from Focus NFe response
+      // Focus NFe returns: certificado_valido_ate, certificado_valido_de, certificado_cnpj
       const certInfo = {
-        cnpj: data?.cnpj_certificado || cnpj,
-        valid_until: data?.data_expiracao_certificado || null,
+        cnpj: data?.certificado_cnpj || cnpj,
+        valid_until: data?.certificado_valido_ate || null,
       };
 
       // Save per-company tokens if returned (from auto-registration)
@@ -228,7 +229,12 @@ Deno.serve(async (req) => {
         message: autoRegistered
           ? `Empresa auto-registrada + certificado enviado para Focus NFe (${ambiente})`
           : `Certificado enviado para Focus NFe via API revenda (${ambiente})`,
-        payload: { cnpj, request_id: requestId, auto_registered: autoRegistered },
+        payload: {
+          cnpj, request_id: requestId, auto_registered: autoRegistered,
+          cert_valido_ate: certInfo.valid_until,
+          cert_cnpj: certInfo.cnpj,
+          response_keys: Object.keys(data || {}),
+        },
       }); } catch { /* ignore log failures */ }
 
       return json(200, {
