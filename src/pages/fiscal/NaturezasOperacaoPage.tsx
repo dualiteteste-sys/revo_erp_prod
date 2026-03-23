@@ -20,6 +20,7 @@ import {
   fiscalNaturezasOperacaoDelete,
   type NaturezaOperacaoRow,
 } from '@/services/fiscalNaturezasOperacao';
+import { useIbsCbsEnabled } from '@/hooks/useIbsCbsEnabled';
 import { logger } from '@/lib/logger';
 
 const FINALIDADE_LABELS: Record<string, string> = {
@@ -59,6 +60,10 @@ type FormData = {
   cofins_aliquota: string;
   ipi_cst: string;
   ipi_aliquota: string;
+  ibs_cst_padrao: string;
+  ibs_aliquota_padrao: string;
+  cbs_aliquota_padrao: string;
+  c_class_trib_padrao: string;
   gera_financeiro: boolean;
   movimenta_estoque: boolean;
   finalidade_emissao: string;
@@ -86,6 +91,10 @@ const EMPTY_FORM: FormData = {
   cofins_aliquota: '0',
   ipi_cst: '',
   ipi_aliquota: '0',
+  ibs_cst_padrao: '',
+  ibs_aliquota_padrao: '0',
+  cbs_aliquota_padrao: '0',
+  c_class_trib_padrao: '',
   gera_financeiro: true,
   movimenta_estoque: true,
   finalidade_emissao: '1',
@@ -115,6 +124,10 @@ function rowToForm(r: NaturezaOperacaoRow): FormData {
     cofins_aliquota: String(r.cofins_aliquota),
     ipi_cst: r.ipi_cst ?? '',
     ipi_aliquota: String(r.ipi_aliquota),
+    ibs_cst_padrao: r.ibs_cst_padrao ?? '',
+    ibs_aliquota_padrao: String(r.ibs_aliquota_padrao ?? 0),
+    cbs_aliquota_padrao: String(r.cbs_aliquota_padrao ?? 0),
+    c_class_trib_padrao: r.c_class_trib_padrao ?? '',
     gera_financeiro: r.gera_financeiro,
     movimenta_estoque: r.movimenta_estoque,
     finalidade_emissao: r.finalidade_emissao,
@@ -128,6 +141,7 @@ function rowToForm(r: NaturezaOperacaoRow): FormData {
 const NaturezasOperacaoPage: React.FC = () => {
   const { activeEmpresaId, loading: authLoading } = useAuth();
   const { addToast } = useToast();
+  const ibsCbsEnabled = useIbsCbsEnabled();
 
   const [rows, setRows] = useState<NaturezaOperacaoRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -230,6 +244,10 @@ const NaturezasOperacaoPage: React.FC = () => {
         cofins_aliquota: Number(form.cofins_aliquota) || 0,
         ipi_cst: form.ipi_cst.trim() || null,
         ipi_aliquota: Number(form.ipi_aliquota) || 0,
+        ibs_cst_padrao: form.ibs_cst_padrao.trim() || null,
+        ibs_aliquota_padrao: Number(form.ibs_aliquota_padrao) || 0,
+        cbs_aliquota_padrao: Number(form.cbs_aliquota_padrao) || 0,
+        c_class_trib_padrao: form.c_class_trib_padrao.trim() || null,
         gera_financeiro: form.gera_financeiro,
         movimenta_estoque: form.movimenta_estoque,
         finalidade_emissao: form.finalidade_emissao,
@@ -655,6 +673,60 @@ const NaturezasOperacaoPage: React.FC = () => {
               </div>
             </div>
           </fieldset>
+
+          {/* IBS / CBS (Reforma 2026) — condicional */}
+          {ibsCbsEnabled && (
+            <fieldset className="rounded-xl border border-violet-200 bg-violet-50/30 p-4">
+              <legend className="px-2 text-sm font-semibold text-violet-700">IBS / CBS (Reforma 2026)</legend>
+              <p className="text-xs text-violet-500 mb-3">Valores padrão de IBS/CBS para NF-e que usarem esta natureza. Alíquotas de teste 2026: IBS 0,1% / CBS 0,9%.</p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">CST IBS</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.ibs_cst_padrao}
+                    onChange={(e) => setForm(f => ({ ...f, ibs_cst_padrao: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                    placeholder="Ex: 00"
+                    maxLength={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota IBS (%)</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.ibs_aliquota_padrao}
+                    onChange={(e) => setForm(f => ({ ...f, ibs_aliquota_padrao: e.target.value }))}
+                    placeholder="0"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Alíquota CBS (%)</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.cbs_aliquota_padrao}
+                    onChange={(e) => setForm(f => ({ ...f, cbs_aliquota_padrao: e.target.value }))}
+                    placeholder="0"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">cClassTrib</label>
+                  <input
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-violet-500"
+                    value={form.c_class_trib_padrao}
+                    onChange={(e) => setForm(f => ({ ...f, c_class_trib_padrao: e.target.value.slice(0, 20) }))}
+                    placeholder="—"
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+            </fieldset>
+          )}
 
           {/* Flags */}
           <fieldset className="rounded-xl border border-slate-200 p-4">
