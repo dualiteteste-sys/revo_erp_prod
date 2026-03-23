@@ -2105,9 +2105,20 @@ export function searchHelpCatalog(query: string, limit = 3): HelpEntry[] {
   const normalize = (s: string) =>
     s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
+  const STOPWORDS = new Set([
+    'como', 'esta', 'esse', 'essa', 'este', 'nosso', 'nossa', 'nossos', 'nossas',
+    'meu', 'minha', 'meus', 'minhas', 'seu', 'sua', 'seus', 'suas',
+    'que', 'para', 'por', 'com', 'sem', 'uma', 'uns', 'umas',
+    'dos', 'das', 'nos', 'nas', 'aos', 'pela', 'pelo', 'pelas', 'pelos',
+    'tem', 'ter', 'pode', 'qual', 'quais', 'mais', 'muito', 'muita',
+    'todo', 'toda', 'todos', 'todas', 'bem', 'mal', 'vai', 'vou',
+    'esta', 'isto', 'isso', 'aqui', 'ali', 'onde', 'quando',
+    'sobre', 'entre', 'ainda', 'tambem', 'assim', 'entao',
+  ]);
+
   const tokens = normalize(query)
     .split(/\s+/)
-    .filter((t) => t.length > 2);
+    .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 
   if (tokens.length === 0) return [];
 
