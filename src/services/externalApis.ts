@@ -31,6 +31,14 @@ const HTTP_RETRY = {
 export const searchNcm = async (query: string): Promise<NcmResult[]> => {
   const q = (query ?? '').trim();
   if (q.length < 2) return [];
+
+  // If user typed a full 8-digit NCM code (with or without dots), fetch it directly first
+  const digitsOnly = q.replace(/\D/g, '');
+  if (digitsOnly.length === 8) {
+    const direct = await fetchNcmByCode(digitsOnly);
+    if (direct) return [direct];
+  }
+
   const { data } = await withRetry(
     async () =>
       http.get<NcmResult[] | NcmResult>(`https://brasilapi.com.br/api/ncm/v1?search=${encodeURIComponent(q)}`),

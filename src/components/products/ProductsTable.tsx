@@ -10,14 +10,15 @@ import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 import { supabase } from '@/lib/supabaseClient';
 
-/** Convert a Storage key (from produto_imagens.url) to its public URL. */
+/** Convert a Storage key (from produto_imagens.url) to its public URL, or pass through external URLs. */
 function storagePublicUrl(key: string): string {
+  if (/^https?:\/\//i.test(key)) return key;
   return supabase.storage.from('product_images').getPublicUrl(key).data.publicUrl;
 }
 
 interface ProductsTableProps {
   rows: ProductsTreeRow[];
-  onEdit: (product: { id: string }) => void;
+  onEdit: (product: { id: string; initialTab?: string }) => void;
   onDelete: (product: { id: string }) => void;
   onClone: (product: { id: string }) => void;
   sortBy: { column: 'nome'; ascending: boolean };
@@ -165,8 +166,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                   <button
                     type="button"
                     className="w-10 h-10 rounded-lg border border-gray-200/80 bg-gray-50 overflow-hidden flex items-center justify-center hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
-                    onClick={() => onEdit({ id: row.id })}
-                    title="Ver produto"
+                    onClick={() => onEdit({ id: row.id, initialTab: 'Mídia' })}
+                    title="Ver mídia do produto"
                   >
                     {imgUrl ? (
                       <img src={imgUrl} alt="" className="w-full h-full object-cover" />
