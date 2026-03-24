@@ -34,6 +34,7 @@ export type PrintOsParams = {
   empresa: PrintOsEmpresa;
   logoUrl: string | null;
   clientDetails: PrintOsCliente | null;
+  defaultObs?: string | null;
 };
 
 // ── Helpers ──────────────────────────────────────────
@@ -86,7 +87,7 @@ const viaLabels: Record<PrintOsMode, string> = {
 // ── Main ─────────────────────────────────────────────
 
 export function printOs(params: PrintOsParams): void {
-  const { os, mode, empresa, logoUrl, clientDetails } = params;
+  const { os, mode, empresa, logoUrl, clientDetails, defaultObs } = params;
   const showPrices = mode === 'cliente_precos';
   const isTecnico = mode === 'tecnico';
 
@@ -207,13 +208,14 @@ export function printOs(params: PrintOsParams): void {
       </div>`;
   }
 
-  // ── Observações (todas as vias) ──
+  // ── Observações (todas as vias — fallback para obs padrão da empresa) ──
+  const obsText = os.observacoes || defaultObs || '';
   let obsHtml = '';
-  if (os.observacoes) {
+  if (obsText) {
     obsHtml = `
       <div class="section">
         <div class="section-title">Observações</div>
-        <div class="section-body">${esc(os.observacoes).replace(/\n/g, '<br/>')}</div>
+        <div class="section-body">${esc(obsText).replace(/\n/g, '<br/>')}</div>
       </div>`;
   }
 
@@ -247,11 +249,12 @@ export function printOs(params: PrintOsParams): void {
     @page { size: A4 portrait; margin: 14mm 16mm; }
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
-      margin: 0; padding: 0;
+      margin: 0;
+      padding: 20pt 24pt;
       font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
-      font-weight: 300;
+      font-weight: 350;
       font-size: 9.5pt;
-      color: #000;
+      color: #333;
       background: #fff;
     }
     .medium { font-weight: 500; }
@@ -261,7 +264,7 @@ export function printOs(params: PrintOsParams): void {
       display: flex;
       align-items: flex-start;
       gap: 14pt;
-      border-bottom: 1.5pt solid #000;
+      border-bottom: 1.5pt solid #666;
       padding-bottom: 10pt;
       margin-bottom: 12pt;
     }
@@ -274,13 +277,13 @@ export function printOs(params: PrintOsParams): void {
     .empresa-nome {
       font-size: 14pt;
       font-weight: 500;
-      color: #000;
+      color: #222;
       margin: 0 0 2pt 0;
     }
     .empresa-line {
       font-size: 8pt;
-      color: #333;
-      font-weight: 300;
+      color: #555;
+      font-weight: 350;
       margin: 0;
     }
     .via-badge {
@@ -290,8 +293,8 @@ export function printOs(params: PrintOsParams): void {
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.6pt;
-      border: 1pt solid #000;
-      color: #000;
+      border: 1pt solid #666;
+      color: #444;
     }
 
     /* ── Info blocks ─────────────────────── */
@@ -310,13 +313,13 @@ export function printOs(params: PrintOsParams): void {
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.5pt;
-      color: #555;
+      color: #777;
       margin-bottom: 4pt;
     }
     .info-line {
       font-size: 8.5pt;
-      color: #000;
-      font-weight: 300;
+      color: #333;
+      font-weight: 350;
       line-height: 1.6;
     }
 
@@ -329,22 +332,24 @@ export function printOs(params: PrintOsParams): void {
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.4pt;
-      color: #000;
+      color: #444;
       border-bottom: 0.5pt solid #ccc;
       padding-bottom: 3pt;
       margin-bottom: 6pt;
     }
     .section-body {
       font-size: 9pt;
-      font-weight: 300;
+      font-weight: 350;
       line-height: 1.6;
-      color: #222;
+      color: #444;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .obs-internas {
       background: #f7f7f7;
-      border: 0.5pt dashed #999;
+      border: 0.5pt dashed #aaa;
       padding: 6pt 8pt;
-      color: #333;
+      color: #555;
     }
 
     /* ── Table ───────────────────────────── */
@@ -353,7 +358,7 @@ export function printOs(params: PrintOsParams): void {
       border-collapse: collapse;
     }
     thead tr {
-      background: #000;
+      background: #555;
       color: #fff;
     }
     thead th {
@@ -370,7 +375,7 @@ export function printOs(params: PrintOsParams): void {
     td {
       padding: 4pt 6pt;
       font-size: 8.5pt;
-      font-weight: 300;
+      font-weight: 350;
       vertical-align: middle;
     }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -385,14 +390,14 @@ export function printOs(params: PrintOsParams): void {
       justify-content: space-between;
       padding: 3pt 0;
       font-size: 9pt;
-      font-weight: 300;
+      font-weight: 350;
       border-bottom: 0.5pt solid #e5e5e5;
     }
     .totais-row.total-geral {
       font-weight: 500;
       font-size: 11pt;
-      color: #000;
-      border-top: 1.5pt solid #000;
+      color: #222;
+      border-top: 1.5pt solid #555;
       border-bottom: none;
       padding-top: 6pt;
       margin-top: 2pt;
@@ -406,7 +411,7 @@ export function printOs(params: PrintOsParams): void {
     }
     .sig-line {
       width: 260pt;
-      border-bottom: 0.5pt solid #000;
+      border-bottom: 0.5pt solid #555;
       margin: 0 auto 4pt auto;
     }
     .sig-label {
@@ -416,7 +421,7 @@ export function printOs(params: PrintOsParams): void {
     }
     .sig-date {
       font-size: 7.5pt;
-      font-weight: 300;
+      font-weight: 350;
       color: #666;
       margin-top: 4pt;
     }
@@ -429,11 +434,12 @@ export function printOs(params: PrintOsParams): void {
       display: flex;
       justify-content: space-between;
       font-size: 7pt;
-      font-weight: 300;
+      font-weight: 350;
       color: #999;
     }
 
     @media print {
+      html, body { padding: 0; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>

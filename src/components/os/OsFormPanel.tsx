@@ -118,6 +118,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [obsDialogText, setObsDialogText] = useState('');
   const [obsSaving, setObsSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [defaultObs, setDefaultObs] = useState<string | null>(null);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const tenantVersionRef = useRef(0);
   const clientDetailsRequestRef = useRef(0);
@@ -237,6 +238,13 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       .then(({ data }) => setLogoUrl(data?.signedUrl ?? null))
       .catch(() => setLogoUrl(null));
   }, [activeEmpresa?.logotipo_url, supabase]);
+
+  // Fetch default observations for print fallback
+  useEffect(() => {
+    getOsObservacoesPadrao()
+      .then(obs => setDefaultObs(typeof obs === 'string' ? obs : null))
+      .catch(() => setDefaultObs(null));
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     const requestId = ++clientDetailsRequestRef.current;
@@ -1134,6 +1142,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         email: clientDetails.email ?? null,
         endereco: clienteEndereco,
       } : null,
+      defaultObs,
     });
   };
 
