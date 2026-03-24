@@ -80,6 +80,11 @@ async function fetchPartnerEnderecos(pessoaId: string): Promise<EnderecoPayload[
   return Array.isArray(data) ? (data as EnderecoPayload[]) : [];
 }
 
+export async function getPartnerPrimaryUf(pessoaId: string): Promise<string | null> {
+  const enderecos = await fetchPartnerEnderecos(pessoaId);
+  return enderecos?.[0]?.uf || null;
+}
+
 async function fetchPartnerContatos(pessoaId: string): Promise<ContatoPayload[]> {
   const data = await callRpc<any>('partner_contatos_list', { p_pessoa_id: pessoaId });
   return Array.isArray(data) ? (data as ContatoPayload[]) : [];
