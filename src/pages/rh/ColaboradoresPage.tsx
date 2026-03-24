@@ -8,11 +8,13 @@ import {
   getColaboradorDetails,
   ColaboradorDetails,
   seedColaboradores,
+  saveColaborador,
 } from '@/services/rh';
-import { DatabaseBackup, LayoutGrid, List, PlusCircle, Users } from 'lucide-react';
+import { DatabaseBackup, FileUp, LayoutGrid, List, PlusCircle, Users } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import ColaboradorFormPanel from '@/components/rh/ColaboradorFormPanel';
+import ImportColaboradoresCsvModal from '@/components/rh/ImportColaboradoresCsvModal';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
@@ -40,6 +42,7 @@ export default function ColaboradoresPage() {
   const editLock = useEditLock('rh:colaboradores');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedColaborador, setSelectedColaborador] = useState<ColaboradorDetails | null>(null);
   const [editingColaboradorId, setEditingColaboradorId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -261,6 +264,16 @@ export default function ColaboradoresPage() {
               </Button>
             </div>
             <Button
+              onClick={() => setIsImportOpen(true)}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para importar colaboradores' : undefined}
+              variant="outline"
+              className="gap-2"
+            >
+              <FileUp size={16} />
+              Importar
+            </Button>
+            <Button
               onClick={handleNew}
               disabled={permsLoading || !canCreate}
               title={!canCreate ? 'Sem permissão para criar colaboradores' : undefined}
@@ -429,6 +442,13 @@ export default function ColaboradoresPage() {
           <ColaboradorFormPanel colaborador={selectedColaborador} onSaveSuccess={handleSaveSuccess} onClose={closeForm} />
         )}
       </Modal>
+
+      <ImportColaboradoresCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={() => { setIsImportOpen(false); fetchColaboradores(); }}
+        importFn={(payload) => saveColaborador(payload)}
+      />
     </div>
   );
 }

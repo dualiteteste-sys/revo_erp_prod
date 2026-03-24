@@ -64,6 +64,11 @@ export type FiscalNfeEmitente = {
   certificado_validade: string | null;
   certificado_cnpj: string | null;
   certificado_senha_encrypted: string | null;
+  // NFC-e columns
+  csc: string | null;
+  id_csc: string | null;
+  nfce_serie: number | null;
+  nfce_proximo_numero: number | null;
 };
 
 export async function getFiscalNfeEmitente() {

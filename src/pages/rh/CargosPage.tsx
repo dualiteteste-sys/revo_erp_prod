@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { listCargos, setCargoAtivo, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
-import { Briefcase, DatabaseBackup, LayoutGrid, List, PlusCircle } from 'lucide-react';
+import { listCargos, setCargoAtivo, Cargo, getCargoDetails, CargoDetails, seedCargos, saveCargo } from '@/services/rh';
+import { Briefcase, DatabaseBackup, FileUp, LayoutGrid, List, PlusCircle } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import CargoFormPanel from '@/components/rh/CargoFormPanel';
+import ImportCargosCsvModal from '@/components/rh/ImportCargosCsvModal';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
@@ -30,6 +31,7 @@ export default function CargosPage() {
   const editLock = useEditLock('rh:cargos');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedCargo, setSelectedCargo] = useState<CargoDetails | null>(null);
   const [editingCargoId, setEditingCargoId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -236,6 +238,16 @@ export default function CargosPage() {
               </Button>
             </div>
             <Button
+              onClick={() => setIsImportOpen(true)}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para importar cargos' : undefined}
+              variant="outline"
+              className="gap-2"
+            >
+              <FileUp size={16} />
+              Importar
+            </Button>
+            <Button
               onClick={handleNew}
               disabled={permsLoading || !canCreate}
               title={!canCreate ? 'Sem permissão para criar cargos' : undefined}
@@ -375,6 +387,13 @@ export default function CargosPage() {
           <CargoFormPanel cargo={selectedCargo} onSaveSuccess={handleSaveSuccess} onClose={closeForm} />
         )}
       </Modal>
+
+      <ImportCargosCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={() => { setIsImportOpen(false); fetchCargos(); }}
+        importFn={(payload) => saveCargo(payload)}
+      />
     </div>
   );
 }

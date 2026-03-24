@@ -7,7 +7,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin, ShieldAlert, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin, ShieldAlert, CheckCircle2, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { cnpjMask, cepMask } from '@/lib/masks';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
@@ -61,6 +61,11 @@ type NfeEmitente = {
   certificado_validade: string | null;
   certificado_cnpj: string | null;
   certificado_senha_encrypted: string | null;
+  // NFC-e
+  csc: string | null;
+  id_csc: string | null;
+  nfce_serie: number | null;
+  nfce_proximo_numero: number | null;
 };
 
 type NfeNumeracao = {
@@ -96,6 +101,8 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [deletingCert, setDeletingCert] = useState(false);
   const [certPassword, setCertPassword] = useState('');
   const [showCertPassword, setShowCertPassword] = useState(false);
+  const [showCsc, setShowCsc] = useState(false);
+  const [savingNfce, setSavingNfce] = useState(false);
   const [validatingCert, setValidatingCert] = useState(false);
 
   const [nfeEnabled, setNfeEnabled] = useState(false);
@@ -173,6 +180,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               certificado_validade: emitRow.certificado_validade ?? null,
               certificado_cnpj: emitRow.certificado_cnpj ?? null,
               certificado_senha_encrypted: emitRow.certificado_senha_encrypted ?? null,
+              csc: (emitRow as any).csc ?? null,
+              id_csc: (emitRow as any).id_csc ?? null,
+              nfce_serie: typeof (emitRow as any).nfce_serie === 'number' ? (emitRow as any).nfce_serie : 1,
+              nfce_proximo_numero: typeof (emitRow as any).nfce_proximo_numero === 'number' ? (emitRow as any).nfce_proximo_numero : 1,
             }
           : {
               empresa_id: empresaId,
@@ -197,6 +208,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               certificado_validade: null,
               certificado_cnpj: null,
               certificado_senha_encrypted: null,
+              csc: null,
+              id_csc: null,
+              nfce_serie: 1,
+              nfce_proximo_numero: 1,
             }
       );
 
@@ -866,6 +881,126 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                 </div>
               </div>
             </div>
+          </GlassCard>
+
+          {/* NFC-e Configuration */}
+          <GlassCard className="p-6 border border-emerald-200 bg-emerald-50/20">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Smartphone size={18} className="text-emerald-600" />
+                  <h2 className="text-lg font-bold text-slate-900">NFC-e — Modelo 65</h2>
+                </div>
+                <p className="text-sm text-slate-600 mt-1">
+                  Configure o CSC para emissão automática de NFC-e (cupom fiscal eletrônico) pelo PDV. O CSC é obtido no portal da SEFAZ do seu estado.
+                </p>
+              </div>
+              <Button
+                onClick={async () => {
+                  if (!empresaId || !emitente || !canAdmin) return;
+                  setSavingNfce(true);
+                  try {
+                    await upsertFiscalNfeEmitente({
+                      empresa_id: empresaId,
+                      csc: emitente.csc || null,
+                      id_csc: emitente.id_csc || null,
+                      nfce_serie: emitente.nfce_serie ?? 1,
+                      nfce_proximo_numero: emitente.nfce_proximo_numero ?? 1,
+                    } as any);
+                    addToast('Configuração NFC-e salva.', 'success');
+                    await fetchData();
+                  } catch (e: any) {
+                    addToast(e?.message || 'Erro ao salvar configuração NFC-e.', 'error');
+                  } finally {
+                    setSavingNfce(false);
+                  }
+                }}
+                disabled={savingNfce || !canAdmin}
+              >
+                {savingNfce ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                <span className="ml-2">Salvar</span>
+              </Button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">CSC (Código de Segurança do Contribuinte)</label>
+                <div className="relative">
+                  <input
+                    type={showCsc ? 'text' : 'password'}
+                    value={emitente?.csc ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, csc: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    placeholder="Cole o CSC da SEFAZ aqui"
+                    className="w-full p-3 pr-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCsc((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                    tabIndex={-1}
+                  >
+                    {showCsc ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Obrigatório para NFC-e. Obtenha no portal da SEFAZ (Contribuinte → CSC).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">ID do CSC</label>
+                <input
+                  type="text"
+                  value={emitente?.id_csc ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, id_csc: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  placeholder="Ex.: 1"
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Identificador numérico do CSC (geralmente "1" para produção).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Série NFC-e</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  step={1}
+                  value={String(emitente?.nfce_serie ?? 1)}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, nfce_serie: Number(e.target.value) || 1 } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Próximo Número NFC-e</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={String(emitente?.nfce_proximo_numero ?? 1)}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, nfce_proximo_numero: Number(e.target.value) || 1 } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {emitente?.csc ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-emerald-700">
+                <CheckCircle2 size={16} />
+                <span>CSC configurado — NFC-e habilitada no PDV.</span>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm text-amber-600">
+                Sem CSC configurado — NFC-e desabilitada. O PDV funciona normalmente, mas sem emissão de cupom fiscal.
+              </div>
+            )}
           </GlassCard>
 
           <GlassCard className="p-6">
