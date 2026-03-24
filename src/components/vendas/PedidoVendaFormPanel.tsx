@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, FileText, Wallet } from 'lucide-react';
+import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, FileText, Wallet, Printer, ChevronDown } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, fetchVendaDetails, getVendaDetails, aprovarVenda, concluirVendaPedido } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -32,6 +32,10 @@ import { saveProduct } from '@/services/products';
 import { useAuth } from '@/contexts/AuthProvider';
 import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 import { fiscalNfeGerarDePedido } from '@/services/fiscalNfeEmissoes';
+import { printPedido, type PrintPedidoMode } from '@/lib/vendas/printPedido';
+import { getPartnerDetails } from '@/services/partners';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useSupabase } from '@/providers/SupabaseProvider';
 
 interface Props {
   vendaId: string | null;
@@ -62,7 +66,8 @@ function formatMoneyBRL(n: number | null | undefined): string {
 export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
-  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
+  const supabase = useSupabase();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,6 +106,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
   const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
@@ -120,6 +126,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
     setTabelasPreco([]);
     lastEmpresaIdRef.current = activeEmpresaId;
   }, [activeEmpresaId]);
+
+  // Fetch logo signed URL for print
+  useEffect(() => {
+    if (!activeEmpresa?.logotipo_url) { setLogoUrl(null); return; }
+    supabase.storage.from('company_logos')
+      .createSignedUrl(activeEmpresa.logotipo_url, 3600)
+      .then(({ data }) => setLogoUrl(data?.signedUrl ?? null))
+      .catch(() => setLogoUrl(null));
+  }, [activeEmpresa?.logotipo_url, supabase]);
 
   useEffect(() => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
@@ -387,6 +402,55 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
 
   const handleHeaderChange = (field: keyof VendaPayload | 'cliente_nome', value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePrint = async (mode: PrintPedidoMode) => {
+    if (!formData.id) return;
+    const emp = activeEmpresa;
+    const endParts = [
+      emp?.endereco_logradouro,
+      emp?.endereco_numero ? `, ${emp.endereco_numero}` : '',
+      emp?.endereco_complemento ? ` — ${emp.endereco_complemento}` : '',
+      emp?.endereco_bairro ? ` — ${emp.endereco_bairro}` : '',
+      emp?.endereco_cidade ? ` — ${emp.endereco_cidade}` : '',
+      emp?.endereco_uf ? `/${emp.endereco_uf}` : '',
+      emp?.endereco_cep ? ` — CEP ${emp.endereco_cep}` : '',
+    ];
+    const empresaEndereco = emp?.endereco_logradouro ? endParts.join('') : null;
+
+    let clientPrintDetails: { nome: string; doc: string | null; telefone: string | null; email: string | null; endereco: string | null } | null = null;
+    if (formData.cliente_id) {
+      try {
+        const partner = await getPartnerDetails(formData.cliente_id);
+        if (partner) {
+          const addr = partner.enderecos?.[0];
+          const clienteEndereco = addr?.logradouro
+            ? [addr.logradouro, addr.numero ? `, ${addr.numero}` : '', addr.complemento ? ` — ${addr.complemento}` : '', addr.bairro ? ` — ${addr.bairro}` : '', addr.cidade ? ` — ${addr.cidade}` : '', addr.uf ? `/${addr.uf}` : '', addr.cep ? ` — CEP ${addr.cep}` : ''].join('')
+            : null;
+          clientPrintDetails = {
+            nome: partner.nome,
+            doc: partner.doc_unico ?? null,
+            telefone: partner.telefone || (partner as any).celular || null,
+            email: partner.email ?? null,
+            endereco: clienteEndereco,
+          };
+        }
+      } catch { /* print without client details */ }
+    }
+
+    printPedido({
+      pedido: formData as VendaDetails,
+      mode,
+      empresa: {
+        nome: emp?.nome_fantasia || emp?.nome_razao_social || '',
+        cnpj: emp?.cnpj ?? null,
+        telefone: emp?.telefone ?? null,
+        email: emp?.email ?? null,
+        endereco: empresaEndereco,
+      },
+      logoUrl,
+      clientDetails: clientPrintDetails,
+    });
   };
 
   const handleSaveHeader = async () => {
@@ -1421,9 +1485,28 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20 bg-gray-50">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
-          Fechar
-        </button>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
+            Fechar
+          </button>
+          {formData.id && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white text-sm">
+                  <Printer size={14} /> Imprimir <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => handlePrint('completo')}>
+                  Pedido Completo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePrint('simples')}>
+                  Separação (sem preços)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
         <div className="flex gap-3">
           {canConcluir && (
             <button
