@@ -1077,7 +1077,19 @@ export default function NfeEmissoesPage() {
     try {
       const result = await fiscalNfeFetchDocument(emissaoId, type);
       if (result.ok) {
-        window.open(result.url, '_blank');
+        if (type === 'xml') {
+          // Force download instead of opening in browser
+          const a = document.createElement('a');
+          a.href = result.url;
+          a.download = `nfe-${emissaoId}.xml`;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          window.open(result.url, '_blank');
+        }
       } else {
         addToast(result.error || 'Erro ao buscar documento.', 'error');
       }

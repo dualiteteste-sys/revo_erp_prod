@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useProductsTree } from '../../hooks/useProductsTree';
+import { useProductsTree, PRODUCTS_TREE_KEYS } from '../../hooks/useProductsTree';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
 import { ProductMobileCard } from '../../components/products/ProductMobileCard';
@@ -66,8 +67,10 @@ const ProductsPage: React.FC = () => {
     setSortBy,
   } = useProductsTree();
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formInitialTab, setFormInitialTab] = useState<string | undefined>(undefined);
   const [selectedProduct, setSelectedProduct] = useState<productsService.FullProduct | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<productsService.Product | null>(null);
@@ -230,7 +233,8 @@ const ProductsPage: React.FC = () => {
     setSearchTerm('');
   }, [setPage, setSearchTerm]);
 
-  const handleOpenForm = async (product: { id: string } | null = null) => {
+  const handleOpenForm = async (product: { id: string; initialTab?: string } | null = null) => {
+    setFormInitialTab(product?.initialTab);
     const needsUpdate = !!product?.id;
     if (!permsLoading && needsUpdate && !canUpdate) {
       addToast('Você não tem permissão para editar produtos.', 'warning');
@@ -311,6 +315,7 @@ const ProductsPage: React.FC = () => {
 
   const handleSaveSuccess = () => {
     handleCloseForm();
+    void queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
   };
 
   const handleOpenDeleteModal = (product: { id: string }) => {
@@ -671,6 +676,7 @@ const ProductsPage: React.FC = () => {
         ) : (
           <ProductFormPanel
             product={selectedProduct}
+            initialTab={formInitialTab}
             onSaveSuccess={handleSaveSuccess}
             onClose={handleCloseForm}
             saveProduct={async (payload) => {
