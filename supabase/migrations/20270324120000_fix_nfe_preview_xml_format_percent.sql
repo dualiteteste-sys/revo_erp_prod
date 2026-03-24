@@ -3,11 +3,11 @@
 --
 -- Root cause: format('...Assumindo 0%%.', ...) — PostgreSQL sees '%%' as
 -- escaped '%', then '.' as an invalid type specifier after '%'.
--- Fix: recreate function with string concatenation (||) replacing format()
--- on that specific line. This is a full CREATE OR REPLACE to avoid fragile
--- pattern-matching on pg_get_functiondef() output.
+-- Fix: recreate the UNDERLYING function (_fiscal_nfe_preview_xml, renamed
+-- by sec_mt02 guard wrapper) with string concatenation replacing format().
+-- The guard wrapper (fiscal_nfe_preview_xml) is preserved untouched.
 
-create or replace function public.fiscal_nfe_preview_xml(p_emissao_id uuid)
+create or replace function public._fiscal_nfe_preview_xml(p_emissao_id uuid)
 returns table (
   ok boolean,
   errors text[],
@@ -368,3 +368,8 @@ begin
   return;
 end;
 $$;
+
+-- Restore grants: underlying function is only callable by service_role
+-- (the public wrapper fiscal_nfe_preview_xml handles auth via require_permission_for_current_user)
+revoke all on function public._fiscal_nfe_preview_xml(uuid) from public, anon, authenticated;
+grant execute on function public._fiscal_nfe_preview_xml(uuid) to service_role, postgres;
