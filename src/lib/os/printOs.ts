@@ -252,7 +252,7 @@ export function printOs(params: PrintOsParams): void {
       margin: 0;
       padding: 20pt 24pt;
       font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
-      font-weight: 300;
+      font-weight: 350;
       font-size: 9.5pt;
       color: #333;
       background: #fff;
@@ -283,7 +283,7 @@ export function printOs(params: PrintOsParams): void {
     .empresa-line {
       font-size: 8pt;
       color: #555;
-      font-weight: 300;
+      font-weight: 350;
       margin: 0;
     }
     .via-badge {
@@ -319,7 +319,7 @@ export function printOs(params: PrintOsParams): void {
     .info-line {
       font-size: 8.5pt;
       color: #333;
-      font-weight: 300;
+      font-weight: 350;
       line-height: 1.6;
     }
 
@@ -339,7 +339,7 @@ export function printOs(params: PrintOsParams): void {
     }
     .section-body {
       font-size: 9pt;
-      font-weight: 300;
+      font-weight: 350;
       line-height: 1.6;
       color: #444;
       word-wrap: break-word;
@@ -375,7 +375,7 @@ export function printOs(params: PrintOsParams): void {
     td {
       padding: 4pt 6pt;
       font-size: 8.5pt;
-      font-weight: 300;
+      font-weight: 350;
       vertical-align: middle;
     }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -390,7 +390,7 @@ export function printOs(params: PrintOsParams): void {
       justify-content: space-between;
       padding: 3pt 0;
       font-size: 9pt;
-      font-weight: 300;
+      font-weight: 350;
       border-bottom: 0.5pt solid #e5e5e5;
     }
     .totais-row.total-geral {
@@ -421,7 +421,7 @@ export function printOs(params: PrintOsParams): void {
     }
     .sig-date {
       font-size: 7.5pt;
-      font-weight: 300;
+      font-weight: 350;
       color: #666;
       margin-top: 4pt;
     }
@@ -434,7 +434,7 @@ export function printOs(params: PrintOsParams): void {
       display: flex;
       justify-content: space-between;
       font-size: 7pt;
-      font-weight: 300;
+      font-weight: 350;
       color: #999;
     }
 
