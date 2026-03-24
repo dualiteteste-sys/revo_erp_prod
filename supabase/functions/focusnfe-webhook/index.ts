@@ -159,7 +159,7 @@ async function processEvent(
   // Try to find the emissão by id (ref = emissao_id in our system)
   const { data: emissao } = await admin
     .from("fiscal_nfe_emissoes")
-    .select("id, empresa_id, status")
+    .select("id, empresa_id, status, serie, numero")
     .eq("id", ref)
     .maybeSingle();
 
@@ -221,6 +221,26 @@ async function processEvent(
       last_error: errorMsg,
       updated_at: new Date().toISOString(),
     }).eq("id", emissao.id);
+
+    // Reclaim wasted number: decrement proximo_numero back so the rejected
+    // number can be reused. Only if the emissão has serie+numero assigned and
+    // the current proximo_numero is exactly numero+1 (no gap introduced).
+    const rejSerie = (emissao as any).serie;
+    const rejNumero = (emissao as any).numero;
+    if (rejSerie != null && rejNumero != null) {
+      const { data: numRow } = await admin
+        .from("fiscal_nfe_numeracao")
+        .select("id, proximo_numero")
+        .eq("empresa_id", empresaId)
+        .eq("serie", rejSerie)
+        .eq("ativo", true)
+        .maybeSingle();
+      if (numRow && numRow.proximo_numero === rejNumero + 1) {
+        await admin.from("fiscal_nfe_numeracao").update({
+          proximo_numero: rejNumero,
+        }).eq("id", numRow.id);
+      }
+    }
 
     return { processed: true, empresa_id: empresaId };
   }

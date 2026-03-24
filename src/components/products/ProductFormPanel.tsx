@@ -24,6 +24,7 @@ interface FormErrors {
 interface ProductFormPanelProps {
   product: ProductFormData | null;
   initialValues?: Partial<ProductFormData>;
+  initialTab?: string;
   onSaveSuccess: (savedProduct: ProductFormData) => void;
   onClose: () => void;
   saveProduct: (formData: ProductFormData) => Promise<ProductFormData>;
@@ -31,16 +32,20 @@ interface ProductFormPanelProps {
 
 const tabs = ['Dados Gerais', 'Fiscal', 'Canais / WooCommerce', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
 
-const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, onSaveSuccess, onClose, saveProduct }) => {
+const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, initialTab, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [formData, setFormData] = useState<ProductFormData>({});
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [activeTab, setActiveTab] = useState(initialTab && tabs.includes(initialTab) ? initialTab : tabs[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
+
+  useEffect(() => {
+    if (initialTab && tabs.includes(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     if (product) {

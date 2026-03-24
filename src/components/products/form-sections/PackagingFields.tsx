@@ -20,13 +20,14 @@ const packagingTypes: { value: tipo_embalagem; label: string }[] = [
 ];
 
 const PackagingFields: React.FC<PackagingFieldsProps> = ({ data, onChange }) => {
-  const pesoLiquidoProps = useNumericField(data.peso_liquido_kg, (v) => onChange('peso_liquido_kg', v));
-  const pesoBrutoProps = useNumericField(data.peso_bruto_kg, (v) => onChange('peso_bruto_kg', v));
-  
-  const alturaProps = useNumericField(data.altura_cm, (v) => onChange('altura_cm', v));
-  const larguraProps = useNumericField(data.largura_cm, (v) => onChange('largura_cm', v));
-  const comprimentoProps = useNumericField(data.comprimento_cm, (v) => onChange('comprimento_cm', v));
-  const diametroProps = useNumericField(data.diametro_cm, (v) => onChange('diametro_cm', v));
+  const dim3 = { decimalPlaces: 3 };
+  const pesoLiquidoProps = useNumericField(data.peso_liquido_kg, (v) => onChange('peso_liquido_kg', v), dim3);
+  const pesoBrutoProps = useNumericField(data.peso_bruto_kg, (v) => onChange('peso_bruto_kg', v), dim3);
+
+  const alturaProps = useNumericField(data.altura_cm, (v) => onChange('altura_cm', v), dim3);
+  const larguraProps = useNumericField(data.largura_cm, (v) => onChange('largura_cm', v), dim3);
+  const comprimentoProps = useNumericField(data.comprimento_cm, (v) => onChange('comprimento_cm', v), dim3);
+  const diametroProps = useNumericField(data.diametro_cm, (v) => onChange('diametro_cm', v), dim3);
 
   const type = data.tipo_embalagem || 'pacote_caixa';
 

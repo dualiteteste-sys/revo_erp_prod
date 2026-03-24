@@ -14,15 +14,17 @@ import { useState, useEffect, useCallback } from 'react';
 export const useNumericField = (
   initialValue: number | null | undefined,
   onChange: (value: number | null) => void,
-  options?: { allowNegative?: boolean }
+  options?: { allowNegative?: boolean; decimalPlaces?: number }
 ) => {
   const allowNegative = options?.allowNegative ?? false;
+  const decimals = options?.decimalPlaces ?? 2;
+  const divisor = Math.pow(10, decimals);
 
   const format = (num: number | null | undefined): string => {
     if (num === null || num === undefined) return '';
     return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     }).format(num);
   };
 
@@ -32,7 +34,7 @@ export const useNumericField = (
     const numericValue = parseFloat(numericString);
     return isNaN(numericValue) ? null : numericValue;
   };
-  
+
   const [stringValue, setStringValue] = useState<string>(() => format(initialValue));
 
   useEffect(() => {
@@ -61,21 +63,21 @@ export const useNumericField = (
       return;
     }
 
-    // 2. Convert the digits to a number (as cents)
+    // 2. Convert the digits to a number using the configured decimal places
     const numberValue = parseInt(digits, 10);
 
-    const signedNumber = isNegative ? -(numberValue / 100) : numberValue / 100;
+    const signedNumber = isNegative ? -(numberValue / divisor) : numberValue / divisor;
 
-    // 3. Format it back to a currency string
+    // 3. Format it back to the locale string
     const formattedAbsValue = new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 2,
-    }).format(numberValue / 100);
+      minimumFractionDigits: decimals,
+    }).format(numberValue / divisor);
 
     const formattedValue = isNegative ? `-${formattedAbsValue}` : formattedAbsValue;
 
     setStringValue(formattedValue);
     onChange(signedNumber);
-  }, [allowNegative, onChange]);
+  }, [allowNegative, onChange, decimals, divisor]);
 
   return {
     value: stringValue,
