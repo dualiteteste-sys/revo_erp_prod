@@ -5,11 +5,10 @@
 -- escaped '%', then '.' as an invalid type specifier after '%'.
 -- Fix: replace format() with string concatenation (||) for that line.
 
-do $$
+do $body$
 declare
-  _src text;
-  _old_pattern text := $$format('ICMS: alíquota não configurada (%s→%s). Assumindo 0%%.', upper(coalesce(v_emitente.endereco_uf,'')), upper(coalesce(v_dest_end.uf,'')))$$;
-  _new_pattern text := $$'ICMS: alíquota não configurada (' || upper(coalesce(v_emitente.endereco_uf,'')) || '→' || upper(coalesce(v_dest_end.uf,'')) || '). Assumindo 0%.'$$;
+  _old_pattern text := $pat$format('ICMS: alíquota não configurada (%s→%s). Assumindo 0%%.', upper(coalesce(v_emitente.endereco_uf,'')), upper(coalesce(v_dest_end.uf,'')))$pat$;
+  _new_pattern text := $pat$'ICMS: alíquota não configurada (' || upper(coalesce(v_emitente.endereco_uf,'')) || '→' || upper(coalesce(v_dest_end.uf,'')) || '). Assumindo 0%.'$pat$;
   _full_def text;
 begin
   select pg_get_functiondef(p.oid) into _full_def
@@ -34,4 +33,4 @@ begin
 
   raise notice 'fiscal_nfe_preview_xml: format%% bug patched';
 end;
-$$;
+$body$;
