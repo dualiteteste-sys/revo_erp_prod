@@ -1861,38 +1861,38 @@ export default function NfeEmissoesPage() {
                             />
                           </td>
                         </tr>
-                        {it.impostos && (
+                        {it.impostos?.icms && it.impostos?.pis && it.impostos?.cofins && (
                           <tr className="bg-blue-50/30">
                             <td colSpan={12} className="px-3 pb-2 pt-0.5">
                               <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
                                 <span className="inline-flex items-center gap-1">
                                   <span className="font-semibold text-slate-600">ICMS</span>
-                                  <span>{it.impostos.icms.aliquota}%</span>
+                                  <span>{it.impostos.icms.aliquota ?? 0}%</span>
                                   <span className="text-slate-400">=</span>
-                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.icms.valor)}</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.icms.valor ?? 0)}</span>
                                 </span>
                                 <span className="text-slate-300">|</span>
                                 <span className="inline-flex items-center gap-1">
                                   <span className="font-semibold text-slate-600">PIS</span>
-                                  <span>{it.impostos.pis.aliquota}%</span>
+                                  <span>{it.impostos.pis.aliquota ?? 0}%</span>
                                   <span className="text-slate-400">=</span>
-                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.pis.valor)}</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.pis.valor ?? 0)}</span>
                                 </span>
                                 <span className="text-slate-300">|</span>
                                 <span className="inline-flex items-center gap-1">
                                   <span className="font-semibold text-slate-600">COFINS</span>
-                                  <span>{it.impostos.cofins.aliquota}%</span>
+                                  <span>{it.impostos.cofins.aliquota ?? 0}%</span>
                                   <span className="text-slate-400">=</span>
-                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.cofins.valor)}</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.cofins.valor ?? 0)}</span>
                                 </span>
                                 {it.impostos.ipi && (
                                   <>
                                     <span className="text-slate-300">|</span>
                                     <span className="inline-flex items-center gap-1">
                                       <span className="font-semibold text-slate-600">IPI</span>
-                                      <span>{it.impostos.ipi.aliquota}%</span>
+                                      <span>{it.impostos.ipi.aliquota ?? 0}%</span>
                                       <span className="text-slate-400">=</span>
-                                      <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.ipi.valor)}</span>
+                                      <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.ipi.valor ?? 0)}</span>
                                     </span>
                                   </>
                                 )}
