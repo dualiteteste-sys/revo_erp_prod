@@ -30,7 +30,11 @@ import {
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
 import { getRejectionInfo, parseRejectionCode } from '@/lib/fiscal/nfe-rejection-catalog';
+import { calculateItemTax, type NaturezaFiscalConfig, type CalculatedImpostos } from '@/lib/fiscal/tax-calculator';
 import type { NaturezaOperacaoSearchHit } from '@/services/fiscalNaturezasOperacao';
+import { fiscalNaturezasOperacaoGet } from '@/services/fiscalNaturezasOperacao';
+import { getFiscalNfeEmitente } from '@/services/fiscalNfeSettings';
+import { getPartnerPrimaryUf } from '@/services/partners';
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 import { getCarriers, type CarrierListItem } from '@/services/carriers';
 import { fiscalNfeGerarDuplicatas, type DuplicataItem } from '@/services/fiscalNfeEmissoes';
@@ -92,6 +96,7 @@ type NfeItemForm = {
   csosn: string;
   informacoes_adicionais: string;
   codigo_beneficio_fiscal: string;
+  impostos?: CalculatedImpostos | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -269,6 +274,10 @@ export default function NfeEmissoesPage() {
   const [productToAddId, setProductToAddId] = useState<string | null>(null);
   const [productToAddName, setProductToAddName] = useState<string | undefined>(undefined);
   const [draftErrors, setDraftErrors] = useState<string[]>([]);
+  const [emitenteCrt, setEmitenteCrt] = useState<number | null>(null);
+  const [emitenteUf, setEmitenteUf] = useState<string | null>(null);
+  const [destinatarioUf, setDestinatarioUf] = useState<string | null>(null);
+  const [naturezaConfig, setNaturezaConfig] = useState<NaturezaFiscalConfig | null>(null);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -393,6 +402,26 @@ export default function NfeEmissoesPage() {
 
     return () => { cancelled = true; };
   }, [isModalOpen, empresaId]);
+
+  // Load emitter CRT + UF when modal opens (needed for tax calculation)
+  useEffect(() => {
+    if (!isModalOpen || !empresaId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const emitente = await getFiscalNfeEmitente();
+        if (!cancelled && emitente) {
+          setEmitenteCrt(emitente.crt ?? null);
+          setEmitenteUf(emitente.endereco_uf ?? null);
+        }
+      } catch { /* silent — tax preview won't work */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isModalOpen, empresaId]);
+
+  // Recalc all items when destinatário UF changes (CFOP intra↔inter)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (items.length > 0 && naturezaConfig) recalcAllItemImpostos(); }, [destinatarioUf]);
 
   const totals = useMemo(() => {
     const total = rows.length;
@@ -529,6 +558,8 @@ export default function NfeEmissoesPage() {
     setItems([]);
     setProductToAddId(null);
     setProductToAddName(undefined);
+    setNaturezaConfig(null);
+    setDestinatarioUf(null);
     setIsModalOpen(true);
   };
 
@@ -555,6 +586,38 @@ export default function NfeEmissoesPage() {
     setProductToAddId(null);
     setProductToAddName(undefined);
 
+    // Load natureza fiscal config for tax calculation
+    if (row.natureza_operacao_id) {
+      fiscalNaturezasOperacaoGet(row.natureza_operacao_id).then(nat => {
+        if (nat) {
+          setNaturezaConfig({
+            cfop_dentro_uf: nat.cfop_dentro_uf ?? null,
+            cfop_fora_uf: nat.cfop_fora_uf ?? null,
+            icms_cst: nat.icms_cst ?? null,
+            icms_csosn: nat.icms_csosn ?? null,
+            icms_aliquota: Number(nat.icms_aliquota) || 0,
+            icms_reducao_base: Number(nat.icms_reducao_base) || 0,
+            codigo_beneficio_fiscal: nat.codigo_beneficio_fiscal ?? null,
+            pis_cst: nat.pis_cst ?? null,
+            pis_aliquota: Number(nat.pis_aliquota) || 0,
+            cofins_cst: nat.cofins_cst ?? null,
+            cofins_aliquota: Number(nat.cofins_aliquota) || 0,
+            ipi_cst: nat.ipi_cst ?? null,
+            ipi_aliquota: Number(nat.ipi_aliquota) || 0,
+          });
+        }
+      }).catch(() => { /* silent */ });
+    } else {
+      setNaturezaConfig(null);
+    }
+
+    // Load destinatário UF for intra/inter-state CFOP
+    if (row.destinatario_pessoa_id) {
+      getPartnerPrimaryUf(row.destinatario_pessoa_id).then(uf => setDestinatarioUf(uf)).catch(() => setDestinatarioUf(null));
+    } else {
+      setDestinatarioUf(null);
+    }
+
     try {
       const data = await fiscalNfeEmissaoItensList(row.id);
       setItems(
@@ -572,6 +635,7 @@ export default function NfeEmissoesPage() {
           csosn: (it.csosn ?? '').toString(),
           informacoes_adicionais: (it.informacoes_adicionais ?? '').toString(),
           codigo_beneficio_fiscal: (it.codigo_beneficio_fiscal ?? '').toString(),
+          impostos: it.impostos || null,
         }))
       );
     } catch (e: any) {
@@ -592,8 +656,9 @@ export default function NfeEmissoesPage() {
     const frete = formFrete.trim() ? Number(String(formFrete).replace(',', '.')) : 0;
     const total_produtos = items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0);
     const total_descontos = items.reduce((acc, it) => acc + (it.valor_desconto || 0), 0);
-    const total_nfe = Math.max(0, total_produtos - total_descontos + (Number.isFinite(frete) ? frete : 0));
-    return { frete, total_produtos, total_descontos, total_nfe };
+    const total_impostos = items.reduce((acc, it) => acc + (it.impostos?.total || 0), 0);
+    const total_nfe = Math.max(0, total_produtos - total_descontos + (Number.isFinite(frete) ? frete : 0) + total_impostos);
+    return { frete, total_produtos, total_descontos, total_impostos, total_nfe };
   }, [items, formFrete]);
 
   const validateDraftLocal = useCallback(() => {
@@ -733,6 +798,37 @@ export default function NfeEmissoesPage() {
     return `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   };
 
+  // Build TaxContext from current state
+  const buildTaxCtx = useCallback(() => {
+    if (emitenteCrt === null) return null;
+    return {
+      isRegimeNormal: emitenteCrt === 3,
+      isIntrastate: !!(emitenteUf && destinatarioUf && emitenteUf.toUpperCase() === destinatarioUf.toUpperCase()),
+    };
+  }, [emitenteCrt, emitenteUf, destinatarioUf]);
+
+  // Recalc impostos for all items (used when natureza or destinatário changes)
+  const recalcAllItemImpostos = useCallback((natCfg?: NaturezaFiscalConfig | null) => {
+    const nat = natCfg ?? naturezaConfig;
+    if (!nat) return;
+    const ctx = buildTaxCtx();
+    if (!ctx) return;
+    setItems(prev => prev.map(it => {
+      const result = calculateItemTax(
+        { quantidade: it.quantidade, valor_unitario: it.valor_unitario, valor_desconto: it.valor_desconto },
+        nat, ctx,
+      );
+      return {
+        ...it,
+        cfop: result.cfop || it.cfop,
+        cst: result.cst || it.cst,
+        csosn: result.csosn || it.csosn,
+        codigo_beneficio_fiscal: result.codigo_beneficio_fiscal || it.codigo_beneficio_fiscal,
+        impostos: result.impostos,
+      };
+    }));
+  }, [naturezaConfig, buildTaxCtx]);
+
   const addItemFromProduct = async (productId: string, hit?: any) => {
     const nome = (hit?.nome || hit?.label || productToAddName || 'Produto').toString();
     const unidade = (hit?.unidade || 'un').toString();
@@ -749,30 +845,61 @@ export default function NfeEmissoesPage() {
       fiscalDefaults = {};
     }
 
-    setItems((prev) => [
-      ...prev,
-      {
-        id: newId(),
-        produto_id: productId,
-        produto_nome: nome,
-        unidade,
-        quantidade: 1,
-        valor_unitario: Number.isFinite(preco) ? preco : 0,
-        valor_desconto: 0,
-        ncm: (fiscalDefaults?.ncm ?? '').toString(),
-        cfop: (fiscalDefaults?.cfop_padrao ?? '').toString(),
-        cst: (fiscalDefaults?.cst_padrao ?? '').toString(),
-        csosn: (fiscalDefaults?.csosn_padrao ?? '').toString(),
-        informacoes_adicionais: '',
-        codigo_beneficio_fiscal: '',
-      },
-    ]);
+    const newItem: NfeItemForm = {
+      id: newId(),
+      produto_id: productId,
+      produto_nome: nome,
+      unidade,
+      quantidade: 1,
+      valor_unitario: Number.isFinite(preco) ? preco : 0,
+      valor_desconto: 0,
+      ncm: (fiscalDefaults?.ncm ?? '').toString(),
+      cfop: (fiscalDefaults?.cfop_padrao ?? '').toString(),
+      cst: (fiscalDefaults?.cst_padrao ?? '').toString(),
+      csosn: (fiscalDefaults?.csosn_padrao ?? '').toString(),
+      informacoes_adicionais: '',
+      codigo_beneficio_fiscal: '',
+    };
+
+    // Auto-calculate taxes if natureza is selected
+    if (naturezaConfig) {
+      const ctx = buildTaxCtx();
+      if (ctx) {
+        const result = calculateItemTax(
+          { quantidade: newItem.quantidade, valor_unitario: newItem.valor_unitario, valor_desconto: newItem.valor_desconto },
+          naturezaConfig, ctx,
+        );
+        newItem.cfop = result.cfop || newItem.cfop;
+        newItem.cst = result.cst || newItem.cst;
+        newItem.csosn = result.csosn || newItem.csosn;
+        newItem.codigo_beneficio_fiscal = result.codigo_beneficio_fiscal || newItem.codigo_beneficio_fiscal;
+        newItem.impostos = result.impostos;
+      }
+    }
+
+    setItems((prev) => [...prev, newItem]);
     setProductToAddId(null);
     setProductToAddName(undefined);
   };
 
   const updateItem = (id: string, patch: Partial<NfeItemForm>) => {
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+    setItems((prev) => prev.map((it) => {
+      if (it.id !== id) return it;
+      const updated = { ...it, ...patch };
+      // Recalc impostos if value-affecting fields changed
+      const valueChanged = 'quantidade' in patch || 'valor_unitario' in patch || 'valor_desconto' in patch;
+      if (valueChanged && naturezaConfig) {
+        const ctx = buildTaxCtx();
+        if (ctx) {
+          const result = calculateItemTax(
+            { quantidade: updated.quantidade, valor_unitario: updated.valor_unitario, valor_desconto: updated.valor_desconto },
+            naturezaConfig, ctx,
+          );
+          updated.impostos = result.impostos;
+        }
+      }
+      return updated;
+    }));
   };
 
   const removeItem = (id: string) => {
@@ -808,6 +935,7 @@ export default function NfeEmissoesPage() {
             csosn: it.csosn || '',
             informacoes_adicionais: it.informacoes_adicionais || '',
             codigo_beneficio_fiscal: it.codigo_beneficio_fiscal || '',
+            impostos: it.impostos || null,
           })));
         }
       } else {
@@ -1318,19 +1446,28 @@ export default function NfeEmissoesPage() {
                   if (hit) {
                     setFormNaturezaOperacao(hit.descricao);
                     setFormNaturezaOperacaoName(hit.descricao);
-                    // Auto-apply CFOP from natureza to all items
-                    if (hit.cfop_dentro_uf || hit.cfop_fora_uf) {
-                      const cfop = hit.cfop_dentro_uf || hit.cfop_fora_uf || '';
-                      setItems(prev => prev.map(it => ({
-                        ...it,
-                        cfop: cfop,
-                        cst: hit.icms_cst || it.cst,
-                        csosn: hit.icms_csosn || it.csosn,
-                      })));
-                    }
+                    // Store full natureza config and auto-calc taxes on all items
+                    const natCfg: NaturezaFiscalConfig = {
+                      cfop_dentro_uf: hit.cfop_dentro_uf,
+                      cfop_fora_uf: hit.cfop_fora_uf,
+                      icms_cst: hit.icms_cst,
+                      icms_csosn: hit.icms_csosn,
+                      icms_aliquota: hit.icms_aliquota,
+                      icms_reducao_base: hit.icms_reducao_base,
+                      codigo_beneficio_fiscal: hit.codigo_beneficio_fiscal,
+                      pis_cst: hit.pis_cst,
+                      pis_aliquota: hit.pis_aliquota,
+                      cofins_cst: hit.cofins_cst,
+                      cofins_aliquota: hit.cofins_aliquota,
+                      ipi_cst: hit.ipi_cst,
+                      ipi_aliquota: hit.ipi_aliquota,
+                    };
+                    setNaturezaConfig(natCfg);
+                    recalcAllItemImpostos(natCfg);
                   } else {
                     setFormNaturezaOperacao('');
                     setFormNaturezaOperacaoName(undefined);
+                    setNaturezaConfig(null);
                   }
                 }}
                 placeholder="Buscar natureza..."
@@ -1504,6 +1641,12 @@ export default function NfeEmissoesPage() {
                   <span>Frete</span>
                   <span className="font-semibold">{formatCurrency(totalsDraft.frete)}</span>
                 </div>
+                {totalsDraft.total_impostos > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Impostos (IPI)</span>
+                    <span className="font-semibold">{formatCurrency(totalsDraft.total_impostos)}</span>
+                  </div>
+                )}
                 <div className="pt-2 mt-2 border-t border-slate-200 flex items-center justify-between gap-4">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold">{formatCurrency(totalsDraft.total_nfe)}</span>
@@ -1515,9 +1658,15 @@ export default function NfeEmissoesPage() {
               <ClientAutocomplete
                 value={formDestinatarioId}
                 initialName={formDestinatarioName}
-                onChange={(id, name) => {
+                onChange={async (id, name) => {
                   setFormDestinatarioId(id);
                   setFormDestinatarioName(name);
+                  if (id) {
+                    const uf = await getPartnerPrimaryUf(id).catch(() => null);
+                    setDestinatarioUf(uf);
+                  } else {
+                    setDestinatarioUf(null);
+                  }
                 }}
                 placeholder="Nome/CPF/CNPJ..."
               />
@@ -1712,6 +1861,45 @@ export default function NfeEmissoesPage() {
                             />
                           </td>
                         </tr>
+                        {it.impostos && (
+                          <tr className="bg-blue-50/30">
+                            <td colSpan={12} className="px-3 pb-2 pt-0.5">
+                              <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="font-semibold text-slate-600">ICMS</span>
+                                  <span>{it.impostos.icms.aliquota}%</span>
+                                  <span className="text-slate-400">=</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.icms.valor)}</span>
+                                </span>
+                                <span className="text-slate-300">|</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="font-semibold text-slate-600">PIS</span>
+                                  <span>{it.impostos.pis.aliquota}%</span>
+                                  <span className="text-slate-400">=</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.pis.valor)}</span>
+                                </span>
+                                <span className="text-slate-300">|</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="font-semibold text-slate-600">COFINS</span>
+                                  <span>{it.impostos.cofins.aliquota}%</span>
+                                  <span className="text-slate-400">=</span>
+                                  <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.cofins.valor)}</span>
+                                </span>
+                                {it.impostos.ipi && (
+                                  <>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="inline-flex items-center gap-1">
+                                      <span className="font-semibold text-slate-600">IPI</span>
+                                      <span>{it.impostos.ipi.aliquota}%</span>
+                                      <span className="text-slate-400">=</span>
+                                      <span className="font-semibold text-slate-700">{formatCurrency(it.impostos.ipi.valor)}</span>
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
                         </React.Fragment>
                       );
                     })
