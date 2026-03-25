@@ -146,30 +146,36 @@ Deno.serve(async (req) => {
 
     log(`Updated cobrança ${cobranca.id}: ${previousStatus} → ${newStatus || situacao}`);
 
-    // ── Baixa automática ──
+    // ── Baixa automática (service_role — sem user context) ──
     if (situacao === "PAGO" && cobranca.conta_receber_id) {
       log("Triggering baixa automática for conta_receber:", cobranca.conta_receber_id);
       try {
-        // Set empresa context for the RPC
-        await svc.rpc("set_request_empresa_id", { p_empresa_id: empresaId });
+        const dataPgto = payload.dataPagamento || new Date().toISOString().split("T")[0];
+        const valorPago = payload.valorTotalRecebido || cobranca.valor_original;
 
-        await svc.rpc("financeiro_conta_a_receber_receber_v2", {
-          p_id: cobranca.conta_receber_id,
-          p_data_pagamento: payload.dataPagamento || new Date().toISOString().split("T")[0],
-          p_valor_pago: payload.valorTotalRecebido || cobranca.valor_original,
-          p_conta_corrente_id: null, // Will use default account
-        });
+        // Update conta a receber directly (service_role bypasses RLS)
+        const { error: updErr } = await svc
+          .from("contas_a_receber")
+          .update({
+            status: "pago",
+            data_pagamento: dataPgto,
+            valor_pago: valorPago,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", cobranca.conta_receber_id)
+          .eq("empresa_id", empresaId);
+
+        if (updErr) throw new Error(updErr.message);
 
         log("Baixa automática OK for conta_receber:", cobranca.conta_receber_id);
 
-        // Log event
         await svc.from("financeiro_cobrancas_bancarias_eventos").insert({
           empresa_id: empresaId,
           cobranca_id: cobranca.id,
           tipo_evento: "info",
           status_anterior: "liquidada",
           status_novo: "liquidada",
-          mensagem: `Baixa automática realizada na conta a receber vinculada.`,
+          mensagem: `Baixa automática: conta a receber marcada como paga (R$ ${Number(valorPago).toFixed(2)} em ${dataPgto}).`,
         });
       } catch (baixaErr: unknown) {
         const msg = baixaErr instanceof Error ? baixaErr.message : String(baixaErr);
