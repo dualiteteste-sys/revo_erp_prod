@@ -1,14 +1,17 @@
 -- verify_rpc_not_null_safety.sql
 -- Guard CI: detecta RPCs que atribuem (:=) casts de p_payload para numeric/int/boolean
--- sem COALESCE e sem check IS NULL — causa NOT NULL violation (23502) em runtime.
+-- sem COALESCE e sem awareness de NULL — causa NOT NULL violation (23502) em runtime.
 --
 -- Escopo: atribuições (:=) no corpo da função.
---   - Se a variável é checada com IS NULL depois (campo obrigatório), é considerada segura.
---   - UPDATE SET e INSERT VALUES diretos NÃO são checados (padrão diferente).
+--   Considerados SEGUROS (não flaggados):
+--   - COALESCE wrapping: coalesce((p_payload->>'x')::numeric, 0)
+--   - NULLIF wrapping:   nullif(p_payload->>'x','')::numeric  (intencional nullable)
+--   - IS NULL check:     IF v_xxx IS NULL THEN RAISE ...
+--   - IS NOT NULL check: IF v_xxx IS NOT NULL THEN ... (aware of nullability)
+--   - IS DISTINCT FROM:  IF v_xxx IS DISTINCT FROM v_old (aware of nullability)
+--   - Escape hatch:      -- notnull-safe
 --
 -- Incidente: 25/03/2026, vendas_upsert_pedido, comissao_percent → 23502
---
--- Escape hatch: `-- notnull-safe` na linha da atribuição
 --
 -- Padrão seguro (campo opcional):
 --   v_comissao numeric := coalesce((p_payload->>'comissao_percent')::numeric, 0);
@@ -41,15 +44,15 @@ begin
       proname,
       def,
       trim(line) as line,
-      -- Extrair nome da variável (v_xxx)
       (regexp_match(line, E'(v_\\w+)'))[1] as varname
     from payload_fns,
     lateral unnest(string_to_array(def, E'\n')) as line
     where
-      -- Atribuição com cast sem COALESCE
+      -- Atribuição com cast sem COALESCE nem NULLIF
       line ~ E':='
       and line ~* E'p_payload.*::\\s*(numeric|int|integer|bigint|smallint|boolean|real|double\\s+precision)'
       and line !~* E'coalesce'
+      and line !~* E'nullif'
       -- Ignorar comentários e escape hatch
       and line !~* E'^\\s*--'
       and line !~* E'notnull-safe'
@@ -58,9 +61,13 @@ begin
     select proname, line
     from candidate_lines
     where
-      -- Sem check IS NULL no corpo da função = vulnerável
       varname is null
-      or def !~* (varname || E'\\s+is\\s+null')
+      or (
+        -- Sem nenhum check de NULL no corpo da função para esta variável
+        def !~* (varname || E'\\s+is\\s+null')
+        and def !~* (varname || E'\\s+is\\s+not\\s+null')
+        and def !~* (varname || E'\\s+is\\s+distinct\\s+from')
+      )
   )
   select string_agg(
     format('  %s → %s', proname, line),
@@ -72,7 +79,7 @@ begin
   if v_bad is not null then
     raise exception using
       message = format(
-        E'RPC NOT NULL safety: atribuições com p_payload cast sem COALESCE nem IS NULL check (risco de 23502).\n\n%s',
+        E'RPC NOT NULL safety: atribuições com p_payload cast sem proteção contra NULL (risco de 23502).\n\n%s',
         v_bad
       ),
       hint = E'Fix: COALESCE((p_payload->>''field'')::numeric, 0)\nOu: IF v_xxx IS NULL THEN RAISE EXCEPTION ... END IF;\nOu: adicione "-- notnull-safe" se validado de outra forma.';
