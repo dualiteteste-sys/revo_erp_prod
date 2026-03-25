@@ -1297,6 +1297,41 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'servicos',
   },
   {
+    match: '/app/servicos/faturamento-mensal',
+    title: 'Guia Rápido de Faturamento Mensal',
+    whatIs:
+      'O Faturamento Mensal automatiza a emissão de boletos bancários (Banco Inter) e envio por email para todos os contratos de serviço ativos. Em vez de gerar boleto por boleto, você seleciona o mês, clica em "Carregar" e o sistema prepara tudo: agenda de cobrança, conta a receber e cobrança bancária. Depois, basta selecionar os contratos e clicar em "Emitir e Enviar" — cada boleto é registrado no Inter e enviado por email automaticamente.',
+    steps: [
+      'Selecione o mês e ano de competência e clique em "Carregar". O sistema gera a agenda, contas a receber e cobranças bancárias para todos os contratos ativos.',
+      'Revise a lista: verifique se todos os clientes têm email cadastrado (ícone de alerta aparece quando falta).',
+      'Selecione os contratos desejados (ou "Selecionar todos") e clique em "Emitir e Enviar".',
+      'Acompanhe a barra de progresso. Cada boleto é registrado no Banco Inter e o email com PDF anexo é enviado ao cliente.',
+      'Ao concluir, o status muda para "Enviada". Se o cliente pagar, o webhook do Inter marca automaticamente como "Liquidada".',
+      'Para reenviar um boleto (ex: cliente não recebeu), clique em "Reenviar" na linha desejada.',
+    ],
+    dependsOn: [
+      'Contratos de Serviço com regra de faturamento mensal configurada',
+      'Integração Banco Inter configurada (Configurações > Inter)',
+      'Email do cliente cadastrado no cadastro de Pessoas',
+      'Resend (email transacional) configurado no backend',
+      'Permissão: Serviços (view/update) e Contas a Receber (create)',
+    ],
+    connectsWith: ['Contratos', 'Contas a Receber', 'Cobranças Bancárias', 'Banco Inter', 'Email (Resend)'],
+    fillPerfectly: [
+      'Configure a regra de faturamento no contrato: tipo mensal, valor, dia de vencimento e primeira competência.',
+      'Mantenha o email do cliente sempre atualizado no cadastro.',
+      'Execute o faturamento no início do mês para dar tempo de pagamento.',
+      'Se falhar em algum contrato, re-execute: o sistema é idempotente (pula os já processados).',
+    ],
+    commonMistakes: [
+      'Contrato sem regra de faturamento: não aparece na lista.',
+      'Cliente sem email: aparece com alerta e é ignorado no envio em lote.',
+      'Inter não configurado: a emissão falha com erro de credencial.',
+      'Rodar para mês futuro sem schedule: o "Carregar" gera automaticamente.',
+    ],
+    roadmapKey: 'servicos',
+  },
+  {
     match: '/app/servicos/notas',
     title: 'Guia Rápido de Notas de Serviço',
     whatIs:
