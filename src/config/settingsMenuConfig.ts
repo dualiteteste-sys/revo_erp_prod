@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, ShieldCheck, ToggleLeft, Plug } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, ShieldCheck, ToggleLeft, Plug, Landmark } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -27,6 +27,7 @@ export const settingsMenuConfig: SettingsTab[] = [
     name: 'Integrações',
     menu: [
       { name: 'Integrações', icon: Plug, href: '/app/configuracoes/ecommerce/marketplaces' },
+      { name: 'Integrações Bancárias', icon: Landmark, href: '/app/configuracoes/integracoes/bancos' },
     ],
   },
   {

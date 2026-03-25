@@ -172,7 +172,13 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       try {
         const data = await listAuditLogsForTables(['rh_cargos', 'rh_cargo_competencias'], 300);
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
-        setAuditRows(data.filter((r) => r.record_id === cargo.id));
+        setAuditRows(data.filter((r) => {
+          if (r.table_name === 'rh_cargos') return r.record_id === cargo.id;
+          // For junction tables, check cargo_id inside old_data / new_data
+          const oldData = (r.old_data || {}) as Record<string, unknown>;
+          const newData = (r.new_data || {}) as Record<string, unknown>;
+          return oldData.cargo_id === cargo.id || newData.cargo_id === cargo.id;
+        }));
       } catch (e: any) {
         if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar histórico.', 'error');

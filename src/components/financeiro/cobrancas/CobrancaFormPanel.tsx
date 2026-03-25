@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Printer, Save } from 'lucide-react';
+import { Loader2, Printer, Save, Landmark, FileDown } from 'lucide-react';
 import { CobrancaBancaria, CobrancaPayload, getCobrancaDetails, saveCobranca } from '@/services/cobrancas';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -10,6 +10,7 @@ import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
 import { useContasCorrentes } from '@/hooks/useTesouraria';
 import { useAuth } from '@/contexts/AuthProvider';
+import { registerBoletoInter, getBoletoInterPdf, getInterConfig } from '@/services/interBanking';
 
 interface Props {
   cobranca: CobrancaBancaria | null;
@@ -30,11 +31,18 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose, on
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!cobranca);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [interActive, setInterActive] = useState(false);
   const [formData, setFormData] = useState<CobrancaPayload>(INITIAL_FORM_DATA);
   const { contas } = useContasCorrentes(); // Para selecionar conta bancária
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
+
+  useEffect(() => {
+    void getInterConfig().then((cfg) => setInterActive(cfg.is_active && cfg.configured)).catch(() => {});
+  }, []);
 
   const valorOriginalProps = useNumericField(formData.valor_original, (v) => {
     setFormData(prev => ({ ...prev, valor_original: v || 0, valor_atual: v || 0 }));
@@ -118,9 +126,45 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose, on
     }
   };
 
+  const handleRegisterInter = async () => {
+    if (!formData.id) return;
+    setIsRegistering(true);
+    try {
+      const result = await registerBoletoInter(formData.id);
+      addToast(`Boleto registrado no Inter! Nosso Nº: ${result.nossoNumero}`, 'success');
+      // Reload form data to show updated fields
+      void loadDetails(formData.id);
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao registrar no Inter.', 'error');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    const codigoSolicitacao = (formData as any).inter_codigo_solicitacao;
+    if (!codigoSolicitacao) return;
+    setIsDownloadingPdf(true);
+    try {
+      const pdfBase64 = await getBoletoInterPdf(codigoSolicitacao);
+      const byteChars = atob(pdfBase64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao baixar PDF.', 'error');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = ['liquidada', 'baixada', 'cancelada'].includes(formData.status || '');
+  const canRegisterInter = interActive && formData.id && formData.tipo_cobranca === 'boleto' && ['pendente_emissao', 'emitida'].includes(formData.status || '');
+  const hasInterRegistration = !!(formData as any).inter_codigo_solicitacao;
 
   return (
     <div className="flex flex-col h-full">
@@ -245,14 +289,34 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose, on
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20 bg-gray-50">
-        <div>
+        <div className="flex gap-2 flex-wrap">
           {onPrint && formData.id && formData.tipo_cobranca === 'boleto' ? (
             <button
               onClick={() => onPrint(formData as CobrancaBancaria)}
               className="flex items-center gap-2 rounded-md border border-emerald-300 bg-white py-2 px-4 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50"
             >
               <Printer size={18} />
-              Imprimir Boleto
+              Imprimir
+            </button>
+          ) : null}
+          {canRegisterInter ? (
+            <button
+              onClick={handleRegisterInter}
+              disabled={isRegistering}
+              className="flex items-center gap-2 rounded-md border border-orange-300 bg-white py-2 px-4 text-sm font-medium text-orange-700 shadow-sm hover:bg-orange-50 disabled:opacity-50"
+            >
+              {isRegistering ? <Loader2 className="animate-spin" size={18} /> : <Landmark size={18} />}
+              Registrar no Inter
+            </button>
+          ) : null}
+          {hasInterRegistration ? (
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="flex items-center gap-2 rounded-md border border-blue-300 bg-white py-2 px-4 text-sm font-medium text-blue-700 shadow-sm hover:bg-blue-50 disabled:opacity-50"
+            >
+              {isDownloadingPdf ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} />}
+              PDF Inter
             </button>
           ) : null}
         </div>
