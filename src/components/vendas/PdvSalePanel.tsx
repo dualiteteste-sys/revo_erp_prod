@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, ScanBarcode, Search, Trash2, PackageCheck } from 'lucide-react';
+import { Loader2, ScanBarcode, Search, Trash2, PackageCheck, UserRound } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { saveVenda, manageVendaItem, fetchVendaDetails, type VendaDetails } from '@/services/vendas';
 import { getUnitPrice } from '@/services/pricing';
 import { searchItemsForOs, type OsItemSearchResult } from '@/services/os';
 import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
+import { listVendedores, type Vendedor } from '@/services/vendedores';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+
+type DescontoTipo = 'R$' | '%';
 
 type PdvItem = {
   id: string;
@@ -20,6 +23,8 @@ type PdvItem = {
   quantidade: number;
   precoUnitario: number;
   desconto: number;
+  descontoTipo: DescontoTipo;
+  descontoInput: number; // the raw user input (R$ value or % value)
   total: number;
 };
 
@@ -44,6 +49,39 @@ function calcItemTotal(qty: number, price: number, discount: number): number {
   return Math.max(0, qty * price - discount);
 }
 
+function calcDiscount(tipo: DescontoTipo, input: number, qty: number, price: number): number {
+  if (tipo === '%') {
+    const pct = Math.min(100, Math.max(0, input));
+    return qty * price * (pct / 100);
+  }
+  return Math.max(0, input);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Inline discount toggle                                             */
+/* ------------------------------------------------------------------ */
+
+function DescontoTipoToggle({ value, onChange }: { value: DescontoTipo; onChange: (v: DescontoTipo) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs mr-1">
+      <button
+        type="button"
+        onClick={() => onChange('R$')}
+        className={`px-1.5 py-0.5 transition-colors ${value === 'R$' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+      >
+        R$
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('%')}
+        className={`px-1.5 py-0.5 transition-colors ${value === '%' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+      >
+        %
+      </button>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -61,7 +99,14 @@ export default function PdvSalePanel({
   const [creatingPedido, setCreatingPedido] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [globalDesconto, setGlobalDesconto] = useState(0);
+
+  /* Global discount */
+  const [globalDescontoTipo, setGlobalDescontoTipo] = useState<DescontoTipo>('R$');
+  const [globalDescontoInput, setGlobalDescontoInput] = useState(0);
+
+  /* Vendedor */
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [vendedorId, setVendedorId] = useState<string | null>(null);
 
   /* Search state */
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +122,7 @@ export default function PdvSalePanel({
   /* Editing state */
   const [editingCell, setEditingCell] = useState<{ idx: number; field: 'quantidade' | 'precoUnitario' | 'desconto' } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editDescontoTipo, setEditDescontoTipo] = useState<DescontoTipo>('R$');
 
   /* Refs */
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -84,16 +130,31 @@ export default function PdvSalePanel({
   const editInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pedidoIdRef = useRef<string | null>(null);
+  const vendedorIdRef = useRef<string | null>(null);
 
   /* Derived */
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.total, 0), [items]);
+  const globalDesconto = useMemo(() => {
+    if (globalDescontoTipo === '%') {
+      const pct = Math.min(100, Math.max(0, globalDescontoInput));
+      return subtotal * (pct / 100);
+    }
+    return Math.max(0, globalDescontoInput);
+  }, [globalDescontoTipo, globalDescontoInput, subtotal]);
   const totalGeral = useMemo(() => Math.max(0, subtotal - globalDesconto), [subtotal, globalDesconto]);
 
-  /* Keep ref in sync */
+  /* Keep refs in sync */
   useEffect(() => { pedidoIdRef.current = pedidoId; }, [pedidoId]);
+  useEffect(() => { vendedorIdRef.current = vendedorId; }, [vendedorId]);
 
   /* Auto-focus SKU on mount */
   useEffect(() => { skuInputRef.current?.focus(); }, []);
+
+  /* Load vendedores on mount */
+  useEffect(() => {
+    if (!activeEmpresaId) return;
+    listVendedores(undefined, true).then(setVendedores).catch(() => {});
+  }, [activeEmpresaId]);
 
   /* Focus edit input when editing */
   useEffect(() => {
@@ -101,6 +162,16 @@ export default function PdvSalePanel({
       setTimeout(() => editInputRef.current?.select(), 0);
     }
   }, [editingCell]);
+
+  /* ---------------------------------------------------------------- */
+  /*  Persist global discount to pedido header                         */
+  /* ---------------------------------------------------------------- */
+  const saveGlobalDesconto = useCallback(async (descontoValue: number) => {
+    if (!pedidoIdRef.current) return;
+    try {
+      await saveVenda({ id: pedidoIdRef.current, desconto: descontoValue });
+    } catch { /* non-critical — will be saved at finalize */ }
+  }, []);
 
   /* ---------------------------------------------------------------- */
   /*  Product search (debounced)                                       */
@@ -138,12 +209,16 @@ export default function PdvSalePanel({
     try {
       const clienteId = await ensurePdvDefaultClienteId();
       const today = new Date().toISOString().slice(0, 10);
-      const venda = await saveVenda({
+      const payload: Record<string, unknown> = {
         cliente_id: clienteId,
         data_emissao: today,
         data_entrega: today,
         status: 'orcamento',
-      });
+      };
+      if (vendedorIdRef.current) {
+        payload.vendedor_id = vendedorIdRef.current;
+      }
+      const venda = await saveVenda(payload as any);
       setPedidoId(venda.id);
       pedidoIdRef.current = venda.id;
       return venda.id;
@@ -180,6 +255,8 @@ export default function PdvSalePanel({
           quantidade: Number(it.quantidade),
           precoUnitario: Number(it.preco_unitario),
           desconto: Number(it.desconto),
+          descontoTipo: 'R$' as DescontoTipo,
+          descontoInput: Number(it.desconto),
           total: Number(it.total),
         })));
       }
@@ -238,7 +315,7 @@ export default function PdvSalePanel({
     const updated = { ...item };
     if (field === 'quantidade') {
       updated.quantidade = newVal;
-      // Re-price with fallback to current price (fixes the price-disappearing bug)
+      // Re-price with fallback to current price
       try {
         const pricing = await getUnitPrice({
           produtoId: item.produtoId,
@@ -247,10 +324,20 @@ export default function PdvSalePanel({
         });
         updated.precoUnitario = Number(pricing.preco_unitario);
       } catch { /* keep current price */ }
+      // Recalc discount if it was percentage-based
+      if (updated.descontoTipo === '%') {
+        updated.desconto = calcDiscount('%', updated.descontoInput, updated.quantidade, updated.precoUnitario);
+      }
     } else if (field === 'precoUnitario') {
       updated.precoUnitario = newVal;
+      // Recalc discount if it was percentage-based
+      if (updated.descontoTipo === '%') {
+        updated.desconto = calcDiscount('%', updated.descontoInput, updated.quantidade, updated.precoUnitario);
+      }
     } else if (field === 'desconto') {
-      updated.desconto = newVal;
+      updated.descontoTipo = editDescontoTipo;
+      updated.descontoInput = newVal;
+      updated.desconto = calcDiscount(editDescontoTipo, newVal, updated.quantidade, updated.precoUnitario);
     }
     updated.total = calcItemTotal(updated.quantidade, updated.precoUnitario, updated.desconto);
 
@@ -264,7 +351,7 @@ export default function PdvSalePanel({
     } finally {
       setIsSaving(false);
     }
-  }, [editingCell, editValue, items, pedidoId, addToast]);
+  }, [editingCell, editValue, editDescontoTipo, items, pedidoId, addToast]);
 
   /* ---------------------------------------------------------------- */
   /*  Remove item                                                      */
@@ -285,12 +372,29 @@ export default function PdvSalePanel({
   }, [items, pedidoId, addToast]);
 
   /* ---------------------------------------------------------------- */
+  /*  Vendedor change                                                  */
+  /* ---------------------------------------------------------------- */
+  const handleVendedorChange = useCallback(async (newId: string | null) => {
+    setVendedorId(newId);
+    vendedorIdRef.current = newId;
+    if (pedidoIdRef.current) {
+      try {
+        await saveVenda({ id: pedidoIdRef.current, vendedor_id: newId } as any);
+      } catch { /* non-critical */ }
+    }
+  }, []);
+
+  /* ---------------------------------------------------------------- */
   /*  Finalize (F9)                                                    */
   /* ---------------------------------------------------------------- */
-  const handleFinalize = useCallback(() => {
+  const handleFinalize = useCallback(async () => {
     if (!pedidoId || items.length === 0) return;
+    // Persist global discount before finalizing
+    if (globalDesconto > 0) {
+      await saveGlobalDesconto(globalDesconto);
+    }
     onSaleComplete(pedidoId);
-  }, [pedidoId, items.length, onSaleComplete]);
+  }, [pedidoId, items.length, globalDesconto, saveGlobalDesconto, onSaleComplete]);
 
   /* ---------------------------------------------------------------- */
   /*  Keyboard shortcuts                                               */
@@ -303,7 +407,7 @@ export default function PdvSalePanel({
       }
       if (e.key === 'F9' && pedidoId && items.length > 0 && !editingCell) {
         e.preventDefault();
-        handleFinalize();
+        void handleFinalize();
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -350,7 +454,12 @@ export default function PdvSalePanel({
           if (item) {
             setTimeout(() => {
               setEditingCell({ idx: editingCell.idx, field: nextField });
-              setEditValue(String(item[nextField]).replace('.', ','));
+              if (nextField === 'desconto') {
+                setEditDescontoTipo(item.descontoTipo);
+                setEditValue(String(item.descontoInput).replace('.', ','));
+              } else {
+                setEditValue(String(item[nextField]).replace('.', ','));
+              }
             }, 50);
           }
         }
@@ -362,7 +471,12 @@ export default function PdvSalePanel({
     const item = items[idx];
     if (!item) return;
     setEditingCell({ idx, field });
-    setEditValue(String(item[field]).replace('.', ','));
+    if (field === 'desconto') {
+      setEditDescontoTipo(item.descontoTipo);
+      setEditValue(String(item.descontoInput).replace('.', ','));
+    } else {
+      setEditValue(String(item[field]).replace('.', ','));
+    }
   };
 
   /* ---------------------------------------------------------------- */
@@ -393,45 +507,65 @@ export default function PdvSalePanel({
           {addingSku ? <Loader2 className="animate-spin text-blue-600 w-5 h-5" /> : null}
         </div>
 
-        {/* Name search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-            placeholder="Buscar produto por nome…"
-            className="w-full p-2.5 pl-9 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            tabIndex={2}
-          />
-          {searching ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-600 w-4 h-4" /> : null}
+        {/* Name search + Vendedor */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+              placeholder="Buscar produto por nome…"
+              className="w-full p-2.5 pl-9 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              tabIndex={2}
+            />
+            {searching ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-600 w-4 h-4" /> : null}
 
-          {/* Search dropdown */}
-          {showDropdown && searchResults.length > 0 ? (
-            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-              {searchResults.map((hit, i) => (
-                <button
-                  key={hit.id}
-                  type="button"
-                  onMouseDown={(e) => { e.preventDefault(); void handleAddProduct(hit); }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between items-center ${
-                    i === highlightIdx ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div>
-                    <div className="font-medium text-gray-900">{hit.descricao}</div>
-                    {hit.sku ? <div className="text-xs text-gray-500">SKU: {hit.sku}</div> : null}
-                  </div>
-                  <div className="text-sm font-semibold text-gray-700 whitespace-nowrap ml-4">
-                    {hit.preco_venda != null ? formatBRL(hit.preco_venda) : '—'}
-                  </div>
-                </button>
-              ))}
+            {/* Search dropdown */}
+            {showDropdown && searchResults.length > 0 ? (
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                {searchResults.map((hit, i) => (
+                  <button
+                    key={hit.id}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); void handleAddProduct(hit); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between items-center ${
+                      i === highlightIdx ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">{hit.descricao}</div>
+                      {hit.sku ? <div className="text-xs text-gray-500">SKU: {hit.sku}</div> : null}
+                    </div>
+                    <div className="text-sm font-semibold text-gray-700 whitespace-nowrap ml-4">
+                      {hit.preco_venda != null ? formatBRL(hit.preco_venda) : '—'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Vendedor select */}
+          {vendedores.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <UserRound size={16} className="text-gray-500" />
+              <select
+                value={vendedorId || ''}
+                onChange={(e) => void handleVendedorChange(e.target.value || null)}
+                className="p-2.5 border border-gray-300 rounded-lg text-sm min-w-[160px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex={3}
+              >
+                <option value="">Vendedor…</option>
+                {vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>{v.nome}</option>
+                ))}
+              </select>
             </div>
-          ) : null}
+          )}
         </div>
       </div>
 
@@ -449,7 +583,7 @@ export default function PdvSalePanel({
                 <th className="px-4 py-2.5">Produto</th>
                 <th className="px-4 py-2.5 w-24 text-right">Qtd</th>
                 <th className="px-4 py-2.5 w-28 text-right">Unit.</th>
-                <th className="px-4 py-2.5 w-24 text-right">Desc.</th>
+                <th className="px-4 py-2.5 w-32 text-right">Desc.</th>
                 <th className="px-4 py-2.5 w-28 text-right">Total</th>
                 <th className="px-4 py-2.5 w-10"></th>
               </tr>
@@ -508,18 +642,21 @@ export default function PdvSalePanel({
                       </button>
                     )}
                   </td>
-                  {/* Desconto */}
+                  {/* Desconto (R$ / %) */}
                   <td className="px-4 py-2 text-right">
                     {editingCell?.idx === idx && editingCell.field === 'desconto' ? (
-                      <input
-                        ref={editInputRef}
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={handleEditKeyDown}
-                        onBlur={() => void commitEdit()}
-                        className="w-20 p-1 border border-blue-400 rounded text-right text-sm focus:ring-1 focus:ring-blue-500"
-                        inputMode="decimal"
-                      />
+                      <div className="flex items-center justify-end gap-0.5">
+                        <DescontoTipoToggle value={editDescontoTipo} onChange={setEditDescontoTipo} />
+                        <input
+                          ref={editInputRef}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          onBlur={() => void commitEdit()}
+                          className="w-16 p-1 border border-blue-400 rounded text-right text-sm focus:ring-1 focus:ring-blue-500"
+                          inputMode="decimal"
+                        />
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -527,7 +664,11 @@ export default function PdvSalePanel({
                         className="w-full text-right hover:bg-blue-50 rounded px-1 py-0.5 cursor-text text-gray-500"
                         tabIndex={12 + idx * 3}
                       >
-                        {item.desconto > 0 ? formatBRL(item.desconto) : '—'}
+                        {item.desconto > 0
+                          ? item.descontoTipo === '%'
+                            ? `${item.descontoInput}%`
+                            : formatBRL(item.desconto)
+                          : '—'}
                       </button>
                     )}
                   </td>
@@ -557,12 +698,36 @@ export default function PdvSalePanel({
           <span>Subtotal ({items.length} {items.length === 1 ? 'item' : 'itens'})</span>
           <span>{formatBRL(subtotal)}</span>
         </div>
-        {globalDesconto > 0 ? (
-          <div className="flex justify-between text-sm text-red-600">
-            <span>Desconto</span>
-            <span>-{formatBRL(globalDesconto)}</span>
+
+        {/* Global discount input */}
+        {items.length > 0 && (
+          <div className="flex items-center justify-between mt-1.5 py-1.5">
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <span>Desconto</span>
+              <DescontoTipoToggle value={globalDescontoTipo} onChange={setGlobalDescontoTipo} />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={globalDescontoInput > 0 ? String(globalDescontoInput).replace('.', ',') : ''}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value.replace(',', '.')) || 0;
+                  setGlobalDescontoInput(v);
+                }}
+                onBlur={() => { if (globalDesconto > 0) void saveGlobalDesconto(globalDesconto); }}
+                placeholder="0,00"
+                className="w-24 p-1.5 border border-gray-300 rounded-lg text-right text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+              {globalDesconto > 0 && (
+                <span className="text-sm text-red-600 font-medium whitespace-nowrap">
+                  -{formatBRL(globalDesconto)}
+                </span>
+              )}
+            </div>
           </div>
-        ) : null}
+        )}
+
         <div className="flex justify-between text-xl font-bold text-gray-900 mt-1 pt-2 border-t border-gray-300">
           <span>TOTAL</span>
           <span>{formatBRL(totalGeral)}</span>
@@ -586,7 +751,7 @@ export default function PdvSalePanel({
         </div>
         <button
           type="button"
-          onClick={handleFinalize}
+          onClick={() => void handleFinalize()}
           disabled={items.length === 0 || busy}
           className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm transition-colors"
           title="Atalho: F9"
