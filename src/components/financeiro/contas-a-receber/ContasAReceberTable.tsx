@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaAReceber } from '@/services/contasAReceber';
-import { CheckCircle2, Edit, Trash2, Ban, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Edit, Trash2, Ban, RotateCcw, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
@@ -17,6 +17,7 @@ interface ContasAReceberTableProps {
   onCancel?: (conta: ContaAReceber) => void;
   onReverse?: (conta: ContaAReceber) => void;
   onDelete: (conta: ContaAReceber) => void;
+  onGenerateBoleto?: (conta: ContaAReceber) => void;
   sortBy: { column: string; ascending: boolean };
   onSort: (column: string) => void;
   selectedIds?: Set<string>;
@@ -43,6 +44,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
   onCancel,
   onReverse,
   onDelete,
+  onGenerateBoleto,
   sortBy,
   onSort,
   selectedIds,
@@ -205,6 +207,19 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                         className="text-gray-600 hover:text-gray-900"
                       >
                         <Ban size={18} />
+                      </Button>
+                    ) : null}
+                    {onGenerateBoleto && (conta.status === 'pendente' || conta.status === 'vencido') ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onGenerateBoleto(conta)}
+                        title="Gerar Boleto"
+                        aria-label="Gerar Boleto"
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Landmark size={18} />
                       </Button>
                     ) : null}
                     <Button

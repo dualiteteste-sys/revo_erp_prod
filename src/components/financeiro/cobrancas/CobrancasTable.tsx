@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CobrancaBancaria } from '@/services/cobrancas';
-import { Edit, Trash2, FileText, Barcode } from 'lucide-react';
+import { Edit, Trash2, FileText, Barcode, Printer } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
@@ -15,6 +15,7 @@ interface Props {
   cobrancas: CobrancaBancaria[];
   onEdit: (cobranca: CobrancaBancaria) => void;
   onDelete: (cobranca: CobrancaBancaria) => void;
+  onPrint?: (cobranca: CobrancaBancaria) => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -28,7 +29,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   erro: { label: 'Erro', color: 'bg-red-200 text-red-900' },
 };
 
-export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
+export default function CobrancasTable({ cobrancas, onEdit, onDelete, onPrint }: Props) {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
@@ -179,10 +180,15 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => onEdit(cobranca)} className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50">
+                    {onPrint && cobranca.tipo_cobranca === 'boleto' ? (
+                      <button onClick={() => onPrint(cobranca)} className="text-emerald-600 hover:text-emerald-800 p-1 rounded hover:bg-emerald-50" title="Imprimir Boleto">
+                        <Printer size={18} />
+                      </button>
+                    ) : null}
+                    <button onClick={() => onEdit(cobranca)} className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50" title="Editar">
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => onDelete(cobranca)} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50">
+                    <button onClick={() => onDelete(cobranca)} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50" title="Excluir">
                       <Trash2 size={18} />
                     </button>
                   </div>

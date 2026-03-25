@@ -3,6 +3,7 @@ import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
 import { CheckCheck, Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup, X } from 'lucide-react';
+import { saveCobranca } from '@/services/cobrancas';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
@@ -18,7 +19,7 @@ import MotivoModal from '@/components/financeiro/common/MotivoModal';
 import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DatePicker from '@/components/ui/DatePicker';
 import { isSeedEnabled } from '@/utils/seed';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -52,6 +53,7 @@ const ContasAReceberPage: React.FC = () => {
     refresh,
   } = useContasAReceber();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<contasAReceberService.ContaAReceber | null>(null);
@@ -282,6 +284,27 @@ const ContasAReceberPage: React.FC = () => {
     }
   };
 
+  const handleGerarBoleto = async (conta: contasAReceberService.ContaAReceber) => {
+    try {
+      const created = await saveCobranca({
+        conta_receber_id: conta.id,
+        cliente_id: conta.cliente_id,
+        cliente_nome: conta.cliente_nome,
+        descricao: conta.descricao,
+        valor_original: Number(conta.valor ?? 0),
+        valor_atual: Number(conta.valor ?? 0),
+        data_vencimento: conta.data_vencimento,
+        data_emissao: new Date().toISOString().split('T')[0],
+        tipo_cobranca: 'boleto',
+        status: 'pendente_emissao',
+      });
+      addToast('Boleto gerado com sucesso!', 'success');
+      navigate(`/app/financeiro/cobrancas?open=${created.id}`);
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao gerar boleto.', 'error');
+    }
+  };
+
   const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
   const effectiveError = empresaChanged ? null : error;
   const effectiveContas = empresaChanged ? [] : contas;
@@ -497,6 +520,7 @@ const ContasAReceberPage: React.FC = () => {
                   onCancel={handleOpenCancel}
                   onReverse={handleOpenEstorno}
                   onDelete={handleOpenDeleteModal}
+                  onGenerateBoleto={handleGerarBoleto}
                   sortBy={sortBy}
                   onSort={handleSort}
                   selectedIds={selectedIdsOnPage}
@@ -517,6 +541,7 @@ const ContasAReceberPage: React.FC = () => {
                   onCancel={() => handleOpenCancel(conta)}
                   onReverse={() => handleOpenEstorno(conta)}
                   onDelete={() => handleOpenDeleteModal(conta)}
+                  onGenerateBoleto={() => handleGerarBoleto(conta)}
                 />
               )}
             />

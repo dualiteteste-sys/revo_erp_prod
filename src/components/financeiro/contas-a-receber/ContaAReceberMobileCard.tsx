@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Edit, Trash2, MoreVertical, DollarSign, Calendar, User, CheckCircle2, Ban, RotateCcw } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, DollarSign, Calendar, User, CheckCircle2, Ban, RotateCcw, Landmark } from 'lucide-react';
 import { ContaAReceber } from '@/services/contasAReceber';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ interface ContaAReceberMobileCardProps {
     onCancel?: (conta: ContaAReceber) => void;
     onReverse?: (conta: ContaAReceber) => void;
     onDelete: (conta: ContaAReceber) => void;
+    onGenerateBoleto?: (conta: ContaAReceber) => void;
     selected?: boolean;
     onToggleSelect?: (id: string) => void;
 }
@@ -46,6 +47,7 @@ export function ContaAReceberMobileCard({
     onCancel,
     onReverse,
     onDelete,
+    onGenerateBoleto,
     selected,
     onToggleSelect,
 }: ContaAReceberMobileCardProps): React.ReactElement {
@@ -116,6 +118,12 @@ export function ContaAReceberMobileCard({
                                     <DropdownMenuItem onClick={() => onCancel(conta)}>
                                         <Ban className="w-4 h-4 mr-2" />
                                         Cancelar
+                                    </DropdownMenuItem>
+                                )}
+                                {onGenerateBoleto && canReceive && (
+                                    <DropdownMenuItem onClick={() => onGenerateBoleto(conta)}>
+                                        <Landmark className="w-4 h-4 mr-2 text-blue-600" />
+                                        Gerar Boleto
                                     </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
