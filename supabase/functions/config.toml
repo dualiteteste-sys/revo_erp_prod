@@ -13,6 +13,9 @@
 [functions.woocommerce-scheduler]
   verify_jwt = false
 
+[functions.inter-webhook]
+  verify_jwt = false
+
 [functions.manual-create-user]
   cors_origins = ["http://localhost:5173"]
   cors_methods = ["POST", "OPTIONS"]
