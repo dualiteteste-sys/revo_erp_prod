@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Edit, Trash2, MoreVertical, Receipt, Calendar, User, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, MoreVertical, Receipt, Calendar, User, CheckCircle, XCircle, Clock, AlertCircle, Printer } from 'lucide-react';
 import { CobrancaBancaria } from '@/services/cobrancas';
 import { cn } from '@/lib/utils';
 import {
@@ -20,6 +20,7 @@ interface CobrancaMobileCardProps {
     cobranca: CobrancaBancaria;
     onEdit: (cobranca: CobrancaBancaria) => void;
     onDelete: (cobranca: CobrancaBancaria) => void;
+    onPrint?: (cobranca: CobrancaBancaria) => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
@@ -45,6 +46,7 @@ export function CobrancaMobileCard({
     cobranca,
     onEdit,
     onDelete,
+    onPrint,
 }: CobrancaMobileCardProps): React.ReactElement {
     const config = statusConfig[cobranca.status] || statusConfig.pendente_emissao;
     const StatusIcon = config.Icon;
@@ -91,7 +93,13 @@ export function CobrancaMobileCard({
                                     <MoreVertical className="w-4 h-4 text-gray-400" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuContent align="end" className="w-44">
+                                {onPrint && cobranca.tipo_cobranca === 'boleto' ? (
+                                    <DropdownMenuItem onClick={() => onPrint(cobranca)}>
+                                        <Printer className="w-4 h-4 mr-2" />
+                                        Imprimir Boleto
+                                    </DropdownMenuItem>
+                                ) : null}
                                 <DropdownMenuItem onClick={() => onEdit(cobranca)}>
                                     <Edit className="w-4 h-4 mr-2" />
                                     Editar
