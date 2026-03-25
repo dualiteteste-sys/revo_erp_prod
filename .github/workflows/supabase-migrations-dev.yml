@@ -89,6 +89,14 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/verify_financeiro_rpc_first.sql
 
+      - name: Verify RPC NOT NULL safety (DEV remote)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/verify_rpc_not_null_safety.sql
+
       - name: Snapshot current schema (public) from DEV (remote)
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
