@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Printer, Save } from 'lucide-react';
 import { CobrancaBancaria, CobrancaPayload, getCobrancaDetails, saveCobranca } from '@/services/cobrancas';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -15,6 +15,7 @@ interface Props {
   cobranca: CobrancaBancaria | null;
   onSaveSuccess: () => void;
   onClose: () => void;
+  onPrint?: (cobranca: CobrancaBancaria) => void;
 }
 
 const INITIAL_FORM_DATA: CobrancaPayload = {
@@ -24,7 +25,7 @@ const INITIAL_FORM_DATA: CobrancaPayload = {
   valor_atual: 0,
 };
 
-export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: Props) {
+export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose, onPrint }: Props) {
   const { addToast } = useToast();
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!cobranca);
@@ -243,13 +244,24 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: 
         </Section>
       </div>
 
-      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20 bg-gray-50">
+      <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20 bg-gray-50">
+        <div>
+          {onPrint && formData.id && formData.tipo_cobranca === 'boleto' ? (
+            <button
+              onClick={() => onPrint(formData as CobrancaBancaria)}
+              className="flex items-center gap-2 rounded-md border border-emerald-300 bg-white py-2 px-4 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50"
+            >
+              <Printer size={18} />
+              Imprimir Boleto
+            </button>
+          ) : null}
+        </div>
         <div className="flex gap-3">
           <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
             Cancelar
           </button>
-          <button 
-            onClick={handleSave} 
+          <button
+            onClick={handleSave}
             disabled={isSaving || loading || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >

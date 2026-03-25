@@ -4,6 +4,9 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import * as cobrancasService from '@/services/cobrancas';
 import { Loader2, PlusCircle, Search, Landmark, DatabaseBackup, X } from 'lucide-react';
+import { getFiscalNfeEmitente } from '@/services/fiscalNfeSettings';
+import { getPartnerDetails } from '@/services/partners';
+import { buildBoletoParams, printBoleto } from '@/lib/financeiro/printBoleto';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
@@ -197,6 +200,21 @@ export default function CobrancasBancariasPage() {
     }
   };
 
+  const handlePrintBoleto = async (cobranca: cobrancasService.CobrancaBancaria) => {
+    try {
+      addToast('Preparando boleto para impressão...', 'info');
+      const [details, emitente, parceiro] = await Promise.all([
+        cobrancasService.getCobrancaDetails(cobranca.id),
+        getFiscalNfeEmitente().catch(() => null),
+        cobranca.cliente_id ? getPartnerDetails(cobranca.cliente_id).catch(() => null) : Promise.resolve(null),
+      ]);
+      const params = buildBoletoParams(details, emitente, parceiro);
+      printBoleto(params);
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao gerar boleto para impressão.', 'error');
+    }
+  };
+
   const clearDateFilters = () => {
     setStartVenc(null);
     setEndVenc(null);
@@ -337,6 +355,7 @@ export default function CobrancasBancariasPage() {
                   cobrancas={effectiveCobrancas}
                   onEdit={handleOpenForm}
                   onDelete={handleOpenDeleteModal}
+                  onPrint={handlePrintBoleto}
                 />
               }
               renderMobileCard={(cobranca) => (
@@ -345,6 +364,7 @@ export default function CobrancasBancariasPage() {
                   cobranca={cobranca}
                   onEdit={() => handleOpenForm(cobranca)}
                   onDelete={() => handleOpenDeleteModal(cobranca)}
+                  onPrint={() => handlePrintBoleto(cobranca)}
                 />
               )}
             />
@@ -368,7 +388,7 @@ export default function CobrancasBancariasPage() {
       ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCobranca ? 'Editar Cobrança' : 'Nova Cobrança'} size="4xl">
-        <CobrancaFormPanel cobranca={selectedCobranca} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
+        <CobrancaFormPanel cobranca={selectedCobranca} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} onPrint={handlePrintBoleto} />
       </Modal>
 
       <ConfirmationModal
