@@ -8,6 +8,7 @@ import UnidadesPage from '@/pages/settings/general/UnidadesPage';
 import UserProfilePage from '@/components/settings/user-profile/UserProfilePage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
 import WooConnectionPanel from '@/components/settings/ecommerce/WooConnectionPanel';
+import InterBankConfigPanel from '@/components/settings/banking/InterBankConfigPanel';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -34,6 +35,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return (
           <WooConnectionPanel />
         );
+      case 'Integrações Bancárias':
+        return <InterBankConfigPanel />;
       default:
         return (
           <div>
