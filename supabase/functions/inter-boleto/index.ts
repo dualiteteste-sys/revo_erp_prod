@@ -2,12 +2,14 @@
  * Edge Function: inter-boleto
  *
  * Authenticated endpoint for Banco Inter boleto operations:
- *   - action=register  → Register boleto in Inter API
- *   - action=status    → Query boleto status
- *   - action=pdf       → Download boleto PDF (base64)
- *   - action=cancel    → Cancel boleto
- *   - action=test      → Test Inter connection (diagnostics)
- *   - action=save-secrets → Save encrypted credentials (client_secret, cert, key)
+ *   - action=register              → Register boleto in Inter API
+ *   - action=register-and-get-pdf  → Register + get PDF (idempotent, for batch)
+ *   - action=send-email            → Send boleto by email via Resend
+ *   - action=status                → Query boleto status
+ *   - action=pdf                   → Download boleto PDF (base64)
+ *   - action=cancel                → Cancel boleto
+ *   - action=test                  → Test Inter connection (diagnostics)
+ *   - action=save-secrets          → Save encrypted credentials (client_secret, cert, key)
  *
  * Headers: Authorization (Bearer JWT), x-empresa-id
  */
@@ -133,6 +135,10 @@ Deno.serve(async (req) => {
       switch (action) {
         case "register":
           return await handleRegister(svc, empresaId, accessToken, httpClient, creds, body, CORS, log);
+        case "register-and-get-pdf":
+          return await handleRegisterAndGetPdf(svc, empresaId, accessToken, httpClient, creds, body, CORS, log);
+        case "send-email":
+          return await handleSendEmail(svc, empresaId, accessToken, httpClient, creds, body, CORS, log);
         case "status":
           return await handleStatus(svc, empresaId, accessToken, httpClient, creds, body, CORS, log);
         case "pdf":
@@ -425,6 +431,278 @@ async function handleCancel(
 
   log("Boleto cancelled:", codigoSolicitacao);
   return json(200, { ok: true }, CORS);
+}
+
+// ── Register + Get PDF (idempotent — for batch billing) ──────
+async function handleRegisterAndGetPdf(
+  svc: ReturnType<typeof createClient>,
+  empresaId: string,
+  accessToken: string,
+  httpClient: Deno.HttpClient,
+  creds: InterCredentials,
+  body: Record<string, unknown>,
+  CORS: Record<string, string>,
+  log: (...args: unknown[]) => void,
+) {
+  const cobrancaId = String(body.cobranca_id || "");
+  if (!cobrancaId) return json(400, { ok: false, error: "cobranca_id required" }, CORS);
+
+  const { data: cobranca } = await svc
+    .from("financeiro_cobrancas_bancarias")
+    .select("*, pessoas:cliente_id(nome, doc_unico, enderecos:pessoas_enderecos(logradouro, numero, complemento, bairro, cidade, uf, cep))")
+    .eq("id", cobrancaId)
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (!cobranca) return json(404, { ok: false, error: "COBRANCA_NOT_FOUND" }, CORS);
+
+  let codigoSolicitacao = cobranca.inter_codigo_solicitacao as string | null;
+  let nossoNumero = cobranca.nosso_numero || "";
+  let linhaDigitavel = cobranca.linha_digitavel || "";
+
+  // If not yet registered, do registration
+  if (!codigoSolicitacao || ["pendente_emissao", "erro"].includes(cobranca.status)) {
+    const pessoa = cobranca.pessoas as any;
+    const endereco = pessoa?.enderecos?.[0];
+    const docUnico = (pessoa?.doc_unico || "").replace(/\D/g, "");
+
+    const interPayload: InterCobrancaRequest = {
+      seuNumero: cobranca.documento_ref || cobrancaId.slice(0, 15),
+      valorNominal: Number(cobranca.valor_original || cobranca.valor_atual || 0),
+      dataVencimento: cobranca.data_vencimento,
+      numDiasAgenda: 60,
+      pagador: {
+        cpfCnpj: docUnico,
+        tipoPessoa: docUnico.length > 11 ? "JURIDICA" : "FISICA",
+        nome: pessoa?.nome || "Cliente",
+        endereco: endereco?.logradouro || undefined,
+        numero: endereco?.numero || undefined,
+        complemento: endereco?.complemento || undefined,
+        bairro: endereco?.bairro || undefined,
+        cidade: endereco?.cidade || undefined,
+        uf: endereco?.uf || undefined,
+        cep: (endereco?.cep || "").replace(/\D/g, "") || undefined,
+      },
+      mensagem: cobranca.descricao
+        ? { linha1: String(cobranca.descricao).slice(0, 78) }
+        : undefined,
+    };
+
+    log("register-and-get-pdf: registering boleto", interPayload.seuNumero);
+    const createRes = await registerBoleto(accessToken, httpClient, creds.ambiente, interPayload);
+    codigoSolicitacao = createRes.codigoSolicitacao;
+
+    await new Promise((r) => setTimeout(r, 1500));
+    const details = await getBoletoDetails(accessToken, httpClient, creds.ambiente, codigoSolicitacao);
+
+    nossoNumero = details.nossoNumero || "";
+    linhaDigitavel = details.linhaDigitavel || "";
+
+    await svc
+      .from("financeiro_cobrancas_bancarias")
+      .update({
+        provider: "inter",
+        inter_codigo_solicitacao: codigoSolicitacao,
+        inter_situacao: details.situacao,
+        nosso_numero: details.nossoNumero,
+        linha_digitavel: details.linhaDigitavel || null,
+        codigo_barras: details.codigoBarras || null,
+        status: "registrada",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cobrancaId)
+      .eq("empresa_id", empresaId);
+
+    await svc.from("financeiro_cobrancas_bancarias_eventos").insert({
+      empresa_id: empresaId,
+      cobranca_id: cobrancaId,
+      tipo_evento: "inter_registro",
+      status_anterior: cobranca.status,
+      status_novo: "registrada",
+      mensagem: `Boleto registrado no Banco Inter. Nosso N: ${details.nossoNumero}`,
+      detalhe_tecnico: JSON.stringify({ codigoSolicitacao, situacao: details.situacao }),
+    });
+  } else {
+    log("register-and-get-pdf: already registered, skipping registration", codigoSolicitacao);
+  }
+
+  // Get PDF
+  log("register-and-get-pdf: downloading PDF", codigoSolicitacao);
+  const pdfBase64 = await getBoletoPdf(accessToken, httpClient, creds.ambiente, codigoSolicitacao!);
+
+  return json(200, {
+    ok: true,
+    codigoSolicitacao,
+    nossoNumero,
+    linhaDigitavel,
+    pdfBase64,
+  }, CORS);
+}
+
+// ── Send boleto email via Resend ──────────────────────────────
+async function handleSendEmail(
+  svc: ReturnType<typeof createClient>,
+  empresaId: string,
+  accessToken: string,
+  httpClient: Deno.HttpClient,
+  creds: InterCredentials,
+  body: Record<string, unknown>,
+  CORS: Record<string, string>,
+  log: (...args: unknown[]) => void,
+) {
+  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+  if (!RESEND_API_KEY) {
+    return json(500, { ok: false, error: "RESEND_API_KEY not configured" }, CORS);
+  }
+
+  const cobrancaId = String(body.cobranca_id || "");
+  const clienteEmail = String(body.cliente_email || "");
+  const pdfFromBody = body.pdf_base64 ? String(body.pdf_base64) : null;
+
+  if (!cobrancaId) return json(400, { ok: false, error: "cobranca_id required" }, CORS);
+  if (!clienteEmail) return json(400, { ok: false, error: "cliente_email required" }, CORS);
+
+  // Load cobrança
+  const { data: cobranca } = await svc
+    .from("financeiro_cobrancas_bancarias")
+    .select("*")
+    .eq("id", cobrancaId)
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (!cobranca) return json(404, { ok: false, error: "COBRANCA_NOT_FOUND" }, CORS);
+
+  // Load empresa name
+  const { data: empresa } = await svc
+    .from("empresas")
+    .select("nome_fantasia, nome_razao_social")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  const empresaNome = empresa?.nome_fantasia || empresa?.nome_razao_social || "Empresa";
+
+  // Load cliente name
+  const { data: pessoa } = await svc
+    .from("pessoas")
+    .select("nome")
+    .eq("id", cobranca.cliente_id)
+    .maybeSingle();
+
+  const clienteNome = pessoa?.nome || "Cliente";
+
+  // Get PDF if not provided
+  let pdfBase64 = pdfFromBody;
+  if (!pdfBase64 && cobranca.inter_codigo_solicitacao) {
+    log("send-email: fetching PDF from Inter");
+    pdfBase64 = await getBoletoPdf(
+      accessToken, httpClient, creds.ambiente,
+      cobranca.inter_codigo_solicitacao,
+    );
+  }
+  if (!pdfBase64) {
+    return json(400, { ok: false, error: "PDF not available — register boleto first" }, CORS);
+  }
+
+  // Format values for email
+  const valor = Number(cobranca.valor_original || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+  const vencimento = cobranca.data_vencimento
+    ? cobranca.data_vencimento.split("-").reverse().join("/")
+    : "—";
+  const nossoNumero = cobranca.nosso_numero || "—";
+  const linhaDigitavel = cobranca.linha_digitavel || "";
+  const descricao = cobranca.descricao || "Boleto";
+
+  // Build HTML email
+  const linhaHtml = linhaDigitavel
+    ? `<p style="color:#6b7280;font-size:13px;margin:0 0 8px;">Linha digit&#225;vel:</p>
+       <div style="background:#f3f4f6;padding:12px;border-radius:6px;font-family:monospace;font-size:13px;word-break:break-all;text-align:center;color:#374151;margin:0 0 16px;">${linhaDigitavel}</div>`
+    : "";
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:20px;background:#f5f5f5;font-family:Arial,sans-serif;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;">
+  <tr><td style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:20px;">${empresaNome}</h1>
+  </td></tr>
+  <tr><td style="background:#fff;padding:24px;">
+    <p style="color:#374151;font-size:15px;margin:0 0 12px;">Prezado(a) <strong>${clienteNome}</strong>,</p>
+    <p style="color:#6b7280;font-size:14px;margin:0 0 20px;">Segue o boleto referente &#224; cobran&#231;a abaixo:</p>
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f0fdf4;border-radius:8px;margin:0 0 20px;">
+      <tr><td style="padding:20px;text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#166534;">R$ ${valor}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px;">Valor do boleto</div>
+      </td></tr>
+    </table>
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+      <tr><td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:14px;">Vencimento</td>
+          <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:14px;text-align:right;">${vencimento}</td></tr>
+      <tr><td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:14px;">Nosso N&#250;mero</td>
+          <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:14px;text-align:right;">${nossoNumero}</td></tr>
+      <tr><td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:14px;">Refer&#234;ncia</td>
+          <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-size:14px;text-align:right;">${descricao}</td></tr>
+    </table>
+    ${linhaHtml}
+    <p style="color:#6b7280;font-size:13px;margin:16px 0 0;">O boleto em PDF est&#225; anexo a este e-mail.</p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;font-size:12px;color:#9ca3af;border-radius:0 0 8px 8px;">
+    ${empresaNome} &#8212; Enviado automaticamente via Revo ERP
+  </td></tr>
+</table></body></html>`;
+
+  // Send via Resend
+  const emailFrom = Deno.env.get("BOLETO_EMAIL_FROM") || `${empresaNome} <boletos@revosp.com.br>`;
+  const subject = `Boleto - ${descricao} - Venc. ${vencimento}`;
+
+  log("send-email: sending to", clienteEmail);
+
+  const resendRes = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: emailFrom,
+      to: [clienteEmail],
+      subject,
+      html,
+      attachments: [{
+        filename: `boleto-${cobranca.nosso_numero || cobrancaId.slice(0, 8)}.pdf`,
+        content: pdfBase64,
+      }],
+    }),
+  });
+
+  if (!resendRes.ok) {
+    const errBody = await resendRes.text();
+    log("send-email: Resend error", resendRes.status, errBody);
+    return json(502, { ok: false, error: `Email send failed: ${errBody}` }, CORS);
+  }
+
+  const resendData = await resendRes.json();
+  log("send-email: sent OK, resend_id:", resendData.id);
+
+  // Update status to 'enviada'
+  const prevStatus = cobranca.status;
+  await svc
+    .from("financeiro_cobrancas_bancarias")
+    .update({ status: "enviada", updated_at: new Date().toISOString() })
+    .eq("id", cobrancaId)
+    .eq("empresa_id", empresaId);
+
+  // Log event
+  await svc.from("financeiro_cobrancas_bancarias_eventos").insert({
+    empresa_id: empresaId,
+    cobranca_id: cobrancaId,
+    tipo_evento: "email_enviado",
+    status_anterior: prevStatus,
+    status_novo: "enviada",
+    mensagem: `Boleto enviado por email para ${clienteEmail}`,
+    detalhe_tecnico: JSON.stringify({ resend_id: resendData.id, to: clienteEmail }),
+  });
+
+  return json(200, { ok: true, resend_id: resendData.id }, CORS);
 }
 
 async function handleRegisterWebhook(
