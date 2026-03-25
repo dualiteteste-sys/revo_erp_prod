@@ -138,10 +138,11 @@ const RelatoriosVendasPage = lazyImport(() => import("../pages/vendas/Relatorios
 // Cadastros extras
 const VendedoresPage = lazyImport(() => import("../pages/cadastros/VendedoresPage"));
 
-// Serviços (Contratos/Notas/Cobranças)
+// Serviços (Contratos/Notas/Cobranças/Faturamento)
 const ContratosServicosPage = lazyImport(() => import("../pages/servicos/ContratosPage"));
 const NotasServicoPage = lazyImport(() => import("../pages/servicos/NotasServicoPage"));
 const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/CobrancasServicosPage"));
+const FaturamentoMensalPage = lazyImport(() => import("../pages/servicos/FaturamentoMensalPage"));
 
 // Suporte
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
@@ -407,6 +408,16 @@ export const appRoutes: RouteObject[] = [
                 <PlanGuard feature="servicos">
                   <RequirePermission permission={{ domain: "servicos", action: "view" }}>
                     <Suspense fallback={<PageLoader />}><CobrancasServicosPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/faturamento-mensal",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><FaturamentoMensalPage /></Suspense>
                   </RequirePermission>
                 </PlanGuard>
               ),

@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard, Filter
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard, Filter, Send
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -132,6 +132,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Contratos', icon: FileText, href: '/app/servicos/contratos', permission: { domain: 'servicos', action: 'view' } },
       { name: 'Notas de Serviço', icon: Receipt, href: '/app/servicos/notas', permission: { domain: 'servicos', action: 'view' } },
       { name: 'Cobranças', icon: Banknote, href: '/app/servicos/cobrancas', permission: { domain: 'servicos', action: 'view' } },
+      { name: 'Faturamento Mensal', icon: Send, href: '/app/servicos/faturamento-mensal', permission: { domain: 'servicos', action: 'view' } },
       { name: 'Relatórios', icon: BarChart2, href: '/app/servicos/relatorios', permission: { domain: 'relatorios_servicos', action: 'view' } },
     ]
   },
