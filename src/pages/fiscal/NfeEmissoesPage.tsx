@@ -7,7 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { AlertTriangle, Calculator, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
+import { AlertTriangle, Ban, Calculator, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import NaturezaOperacaoAutocomplete from '@/components/common/NaturezaOperacaoAutocomplete';
@@ -19,6 +19,7 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   fiscalNfeAuditTimelineList,
+  fiscalNfeCancelar,
   fiscalNfeConsultaStatus,
   fiscalNfeEmissaoDraftUpsert,
   fiscalNfeEmissaoDelete,
@@ -232,6 +233,9 @@ export default function NfeEmissoesPage() {
   const [deleting, setDeleting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<NfeEmissao | null>(null);
+  const [cancelJust, setCancelJust] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'checkbox', defaultWidth: 48, minWidth: 40 },
@@ -533,6 +537,26 @@ export default function NfeEmissoesPage() {
     setSelected(new Set());
     setBulkDeleting(false);
     await fetchList();
+  };
+
+  const handleCancelNfe = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      const res = await fiscalNfeCancelar(cancelTarget.id, cancelJust.trim());
+      if (res.ok) {
+        addToast('NF-e cancelada com sucesso junto à SEFAZ.', 'success');
+        setCancelTarget(null);
+        setCancelJust('');
+        await fetchList();
+      } else {
+        addToast(res.detail || res.error || 'Erro ao cancelar NF-e.', 'error');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao cancelar NF-e.', 'error');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const openNew = async () => {
@@ -1408,6 +1432,16 @@ export default function NfeEmissoesPage() {
                             XML
                           </button>
                         ) : null}
+                        {row.status === 'autorizada' ? (
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-800 hover:bg-red-200"
+                            onClick={() => { setCancelTarget(row); setCancelJust(''); }}
+                            title="Cancelar NF-e junto à SEFAZ"
+                          >
+                            <Ban size={14} />
+                            Cancelar
+                          </button>
+                        ) : null}
                         {isDeletable ? (
                           <button
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100"
@@ -2083,6 +2117,98 @@ export default function NfeEmissoesPage() {
             >
               {bulkDeleting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
               Excluir {selectedCount}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Cancel NF-e confirmation */}
+      <Modal
+        isOpen={!!cancelTarget}
+        onClose={() => { if (!cancelling) { setCancelTarget(null); setCancelJust(''); } }}
+        title={`Cancelar NF-e${cancelTarget?.numero ? ` nº ${cancelTarget.numero}` : ''}`}
+        size="md"
+      >
+        <div className="p-6 space-y-4">
+          <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-red-900">
+              <AlertTriangle size={16} />
+              Esta ação é irreversível
+            </div>
+            <p className="text-sm text-red-800">
+              A NF-e será cancelada junto à SEFAZ. Após o cancelamento, o número não poderá ser reutilizado.
+            </p>
+          </div>
+
+          {cancelTarget && (() => {
+            const hoursAgo = (Date.now() - new Date(cancelTarget.created_at).getTime()) / (1000 * 60 * 60);
+            return hoursAgo > 24 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <AlertTriangle size={16} />
+                  NF-e autorizada há mais de 24 horas
+                </div>
+                <p className="text-sm text-amber-800 mt-1">
+                  O cancelamento pode ser recusado pela SEFAZ. O prazo padrão é de 24 horas após a autorização.
+                </p>
+              </div>
+            ) : null;
+          })()}
+
+          {cancelTarget ? (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-slate-500">Número / Série:</span>{' '}
+                <span className="font-semibold text-slate-900">{cancelTarget.numero ?? '—'} / {cancelTarget.serie ?? '—'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Valor:</span>{' '}
+                <span className="font-semibold text-slate-900">{formatCurrency(cancelTarget.valor_total)}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-slate-500">Destinatário:</span>{' '}
+                <span className="font-semibold text-slate-900">{cancelTarget.destinatario_nome || '—'}</span>
+              </div>
+              {cancelTarget.chave_acesso ? (
+                <div className="col-span-2">
+                  <span className="text-slate-500">Chave:</span>{' '}
+                  <span className="font-mono text-xs text-slate-700">{cancelTarget.chave_acesso}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              Justificativa <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full rounded-xl border border-slate-300 bg-white/80 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+              rows={3}
+              maxLength={255}
+              placeholder="Motivo do cancelamento (mínimo 15 caracteres)"
+              value={cancelJust}
+              onChange={(e) => setCancelJust(e.target.value)}
+              disabled={cancelling}
+            />
+            <div className="text-xs text-slate-400 text-right mt-1">{cancelJust.length}/255</div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => { setCancelTarget(null); setCancelJust(''); }}
+              disabled={cancelling}
+            >
+              Voltar
+            </Button>
+            <Button
+              onClick={() => void handleCancelNfe()}
+              disabled={cancelling || cancelJust.trim().length < 15}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {cancelling ? <Loader2 size={16} className="animate-spin mr-2" /> : <Ban size={16} className="mr-2" />}
+              Cancelar NF-e
             </Button>
           </div>
         </div>
