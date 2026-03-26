@@ -82,6 +82,7 @@ const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage
 const NfeSettingsPage = lazyImport(() => import("../pages/fiscal/NfeSettingsPage"));
 const NfeRecebidasPage = lazyImport(() => import("../pages/fiscal/NfeRecebidasPage"));
 const NfseEmissoesPage = lazyImport(() => import("../pages/fiscal/NfseEmissoesPage"));
+const NfeInutilizacaoPage = lazyImport(() => import("../pages/fiscal/NfeInutilizacaoPage"));
 const NaturezasOperacaoPage = lazyImport(() => import("../pages/fiscal/NaturezasOperacaoPage"));
 const RegrasFiscaisPage = lazyImport(() => import("../pages/fiscal/RegrasFiscaisPage"));
 const FiscalDashboardPage = lazyImport(() => import("../pages/fiscal/FiscalDashboardPage"));
@@ -456,6 +457,7 @@ export const appRoutes: RouteObject[] = [
             { path: "fiscal/naturezas-operacao", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NaturezasOperacaoPage /></Suspense></RequirePermission> },
             { path: "fiscal/regras", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><RegrasFiscaisPage /></Suspense></RequirePermission> },
             { path: "fiscal/dashboard", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><FiscalDashboardPage /></Suspense></RequirePermission> },
+            { path: "fiscal/inutilizacao", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeInutilizacaoPage /></Suspense></RequirePermission> },
 
             // Financeiro
             {
