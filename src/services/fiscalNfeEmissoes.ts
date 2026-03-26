@@ -283,3 +283,118 @@ export async function fiscalNfeEmissaoChangeStatus(emissaoId: string, newStatus:
   });
 }
 
+// ── Cancelamento de NF-e ────────────────────────────────────
+
+export type NfeCancelResult = {
+  ok: boolean;
+  status?: string;
+  message?: string;
+  error?: string;
+  detail?: string;
+};
+
+export async function fiscalNfeCancelar(
+  emissaoId: string,
+  justificativa: string,
+): Promise<NfeCancelResult> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-cancel', {
+    body: { emissao_id: emissaoId, justificativa },
+  });
+
+  if (error) {
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx instanceof Response) {
+        const body = await ctx.json();
+        if (body && typeof body === 'object') return body as NfeCancelResult;
+      }
+    } catch { /* response body already consumed or not JSON */ }
+
+    try {
+      const msg = (error as any)?.message;
+      if (msg && msg.startsWith('{')) {
+        const parsed = JSON.parse(msg);
+        if (parsed && typeof parsed === 'object') return parsed as NfeCancelResult;
+      }
+    } catch { /* not JSON */ }
+
+    return {
+      ok: false,
+      error: 'EDGE_ERROR',
+      detail: (error as any)?.message || String(error),
+    };
+  }
+
+  return data as NfeCancelResult;
+}
+
+// ── Inutilização de Numeração NF-e ──────────────────────────
+
+export type NfeInutilizacaoResult = {
+  ok: boolean;
+  status_sefaz?: string;
+  mensagem_sefaz?: string;
+  protocolo?: string;
+  error?: string;
+  detail?: string;
+};
+
+export async function fiscalNfeInutilizar(params: {
+  serie: number;
+  numero_inicial: number;
+  numero_final: number;
+  justificativa: string;
+}): Promise<NfeInutilizacaoResult> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-inutilizacao', {
+    body: params,
+  });
+
+  if (error) {
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx instanceof Response) {
+        const body = await ctx.json();
+        if (body && typeof body === 'object') return body as NfeInutilizacaoResult;
+      }
+    } catch { /* response body already consumed or not JSON */ }
+
+    try {
+      const msg = (error as any)?.message;
+      if (msg && msg.startsWith('{')) {
+        const parsed = JSON.parse(msg);
+        if (parsed && typeof parsed === 'object') return parsed as NfeInutilizacaoResult;
+      }
+    } catch { /* not JSON */ }
+
+    return {
+      ok: false,
+      error: 'EDGE_ERROR',
+      detail: (error as any)?.message || String(error),
+    };
+  }
+
+  return data as NfeInutilizacaoResult;
+}
+
+export type InutilizacaoRow = {
+  id: string;
+  ambiente: string;
+  serie: number;
+  numero_inicial: number;
+  numero_final: number;
+  justificativa: string;
+  status: string;
+  status_sefaz: string | null;
+  mensagem_sefaz: string | null;
+  protocolo: string | null;
+  xml_url: string | null;
+  created_at: string;
+};
+
+export async function fiscalNfeInutilizacoesList(params?: { limit?: number; offset?: number }) {
+  return callRpc<InutilizacaoRow[]>('fiscal_nfe_inutilizacoes_list', {
+    p_limit: params?.limit ?? 100,
+    p_offset: params?.offset ?? 0,
+  });
+}
+
