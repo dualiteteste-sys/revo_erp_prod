@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, ScanBarcode, Search, Trash2, PackageCheck, UserRound } from 'lucide-react';
+import { Loader2, Search, Trash2, PackageCheck, UserRound } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
-import { saveVenda, manageVendaItem, fetchVendaDetails, type VendaDetails } from '@/services/vendas';
+import { saveVenda, manageVendaItem, fetchVendaDetails } from '@/services/vendas';
 import { getUnitPrice } from '@/services/pricing';
-import { searchItemsForOs, type OsItemSearchResult } from '@/services/os';
+import { type OsItemSearchResult } from '@/services/os';
 import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
+import { usePdvOmnibox } from '@/hooks/usePdvOmnibox';
+import PdvCustomerBar from './PdvCustomerBar';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -24,7 +26,7 @@ type PdvItem = {
   precoUnitario: number;
   desconto: number;
   descontoTipo: DescontoTipo;
-  descontoInput: number; // the raw user input (R$ value or % value)
+  descontoInput: number;
   total: number;
 };
 
@@ -108,16 +110,10 @@ export default function PdvSalePanel({
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [vendedorId, setVendedorId] = useState<string | null>(null);
 
-  /* Search state */
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<OsItemSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [highlightIdx, setHighlightIdx] = useState(0);
-
-  /* SKU state */
-  const [skuQuery, setSkuQuery] = useState('');
-  const [addingSku, setAddingSku] = useState(false);
+  /* Customer / CPF */
+  const [cpfConsumidor, setCpfConsumidor] = useState('');
+  const [clienteId, setClienteId] = useState<string | null>(null);
+  const [clienteNome, setClienteNome] = useState<string | null>(null);
 
   /* Editing state */
   const [editingCell, setEditingCell] = useState<{ idx: number; field: 'quantidade' | 'precoUnitario' | 'desconto' } | null>(null);
@@ -125,12 +121,11 @@ export default function PdvSalePanel({
   const [editDescontoTipo, setEditDescontoTipo] = useState<DescontoTipo>('R$');
 
   /* Refs */
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const skuInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pedidoIdRef = useRef<string | null>(null);
   const vendedorIdRef = useRef<string | null>(null);
+  const clienteIdRef = useRef<string | null>(null);
+  const cpfConsumidorRef = useRef('');
 
   /* Derived */
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.total, 0), [items]);
@@ -146,9 +141,8 @@ export default function PdvSalePanel({
   /* Keep refs in sync */
   useEffect(() => { pedidoIdRef.current = pedidoId; }, [pedidoId]);
   useEffect(() => { vendedorIdRef.current = vendedorId; }, [vendedorId]);
-
-  /* Auto-focus SKU on mount */
-  useEffect(() => { skuInputRef.current?.focus(); }, []);
+  useEffect(() => { clienteIdRef.current = clienteId; }, [clienteId]);
+  useEffect(() => { cpfConsumidorRef.current = cpfConsumidor; }, [cpfConsumidor]);
 
   /* Load vendedores on mount */
   useEffect(() => {
@@ -174,49 +168,26 @@ export default function PdvSalePanel({
   }, []);
 
   /* ---------------------------------------------------------------- */
-  /*  Product search (debounced)                                       */
-  /* ---------------------------------------------------------------- */
-  useEffect(() => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    const q = searchQuery.trim();
-    if (q.length < 2) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
-    }
-    setSearching(true);
-    searchDebounceRef.current = setTimeout(async () => {
-      try {
-        const results = await searchItemsForOs(q, 10, true, 'product');
-        setSearchResults(results || []);
-        setShowDropdown(true);
-        setHighlightIdx(0);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
-    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [searchQuery]);
-
-  /* ---------------------------------------------------------------- */
   /*  Lazy pedido creation                                             */
   /* ---------------------------------------------------------------- */
   const ensurePedido = useCallback(async (): Promise<string> => {
     if (pedidoIdRef.current) return pedidoIdRef.current;
     setCreatingPedido(true);
     try {
-      const clienteId = await ensurePdvDefaultClienteId();
+      const cId = clienteIdRef.current || await ensurePdvDefaultClienteId();
       const today = new Date().toISOString().slice(0, 10);
       const payload: Record<string, unknown> = {
-        cliente_id: clienteId,
+        cliente_id: cId,
         data_emissao: today,
         data_entrega: today,
         status: 'orcamento',
       };
       if (vendedorIdRef.current) {
         payload.vendedor_id = vendedorIdRef.current;
+      }
+      const rawCpf = cpfConsumidorRef.current.replace(/\D/g, '');
+      if (rawCpf.length === 11) {
+        payload.cpf_consumidor = rawCpf;
       }
       const venda = await saveVenda(payload as any);
       setPedidoId(venda.id);
@@ -243,7 +214,6 @@ export default function PdvSalePanel({
       const precoUnit = Number(pricing.preco_unitario ?? hit.preco_venda ?? 0);
       await manageVendaItem(pid, null, hit.id, 1, precoUnit, 0, 'add');
 
-      // Reload details to get the real item ID
       const details = await fetchVendaDetails(pid);
       if (details) {
         setItems(details.itens.map((it) => ({
@@ -265,36 +235,46 @@ export default function PdvSalePanel({
       addToast(e?.message || 'Falha ao adicionar produto.', 'error');
     } finally {
       setAddingProduct(false);
-      setSearchQuery('');
-      setSearchResults([]);
-      setShowDropdown(false);
-      skuInputRef.current?.focus();
     }
   }, [activeEmpresaId, addingProduct, addToast, ensurePedido]);
 
   /* ---------------------------------------------------------------- */
-  /*  Add by SKU / barcode                                             */
+  /*  Omnibox hook                                                     */
   /* ---------------------------------------------------------------- */
-  const handleAddSku = useCallback(async () => {
-    const sku = skuQuery.trim();
-    if (!sku || addingSku) return;
-    setAddingSku(true);
-    try {
-      const results = await searchItemsForOs(sku, 5, true, 'product');
-      const hit = results?.find((r) => r.sku === sku || r.codigo === sku) || results?.[0];
-      if (!hit) {
-        addToast('SKU não encontrado.', 'warning');
-        return;
-      }
-      await handleAddProduct(hit);
-    } catch (e: any) {
-      addToast(e?.message || 'Falha ao adicionar SKU.', 'error');
-    } finally {
-      setAddingSku(false);
-      setSkuQuery('');
-      skuInputRef.current?.focus();
+  const omnibox = usePdvOmnibox({
+    onProductFound: (hit) => {
+      void handleAddProduct(hit);
+    },
+    onNotFound: (q) => addToast(`"${q}" não encontrado.`, 'warning'),
+    disabled: addingProduct,
+  });
+
+  /* Auto-focus omnibox on mount */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { omnibox.inputRef.current?.focus(); }, []);
+
+  /* ---------------------------------------------------------------- */
+  /*  Customer / CPF handlers                                          */
+  /* ---------------------------------------------------------------- */
+  const handleCpfChange = useCallback((cpf: string) => {
+    setCpfConsumidor(cpf);
+    const rawCpf = cpf.replace(/\D/g, '');
+    if (pedidoIdRef.current && rawCpf.length === 11) {
+      saveVenda({ id: pedidoIdRef.current, cpf_consumidor: rawCpf } as any).catch(() => {});
     }
-  }, [skuQuery, addingSku, addToast, handleAddProduct]);
+  }, []);
+
+  const handleClienteChange = useCallback(async (id: string | null, nome?: string) => {
+    setClienteId(id);
+    setClienteNome(nome || null);
+    clienteIdRef.current = id;
+
+    if (id && pedidoIdRef.current) {
+      try {
+        await saveVenda({ id: pedidoIdRef.current, cliente_id: id } as any);
+      } catch { /* non-critical */ }
+    }
+  }, []);
 
   /* ---------------------------------------------------------------- */
   /*  Update item (qty, price, discount)                               */
@@ -315,7 +295,6 @@ export default function PdvSalePanel({
     const updated = { ...item };
     if (field === 'quantidade') {
       updated.quantidade = newVal;
-      // Re-price with fallback to current price
       try {
         const pricing = await getUnitPrice({
           produtoId: item.produtoId,
@@ -324,13 +303,11 @@ export default function PdvSalePanel({
         });
         updated.precoUnitario = Number(pricing.preco_unitario);
       } catch { /* keep current price */ }
-      // Recalc discount if it was percentage-based
       if (updated.descontoTipo === '%') {
         updated.desconto = calcDiscount('%', updated.descontoInput, updated.quantidade, updated.precoUnitario);
       }
     } else if (field === 'precoUnitario') {
       updated.precoUnitario = newVal;
-      // Recalc discount if it was percentage-based
       if (updated.descontoTipo === '%') {
         updated.desconto = calcDiscount('%', updated.descontoInput, updated.quantidade, updated.precoUnitario);
       }
@@ -389,9 +366,14 @@ export default function PdvSalePanel({
   /* ---------------------------------------------------------------- */
   const handleFinalize = useCallback(async () => {
     if (!pedidoId || items.length === 0) return;
-    // Persist global discount before finalizing
     if (globalDesconto > 0) {
       await saveGlobalDesconto(globalDesconto);
+    }
+    const rawCpf = cpfConsumidorRef.current.replace(/\D/g, '');
+    if (rawCpf.length === 11) {
+      try {
+        await saveVenda({ id: pedidoId, cpf_consumidor: rawCpf } as any);
+      } catch { /* will still finalize */ }
     }
     onSaleComplete(pedidoId);
   }, [pedidoId, items.length, globalDesconto, saveGlobalDesconto, onSaleComplete]);
@@ -403,7 +385,7 @@ export default function PdvSalePanel({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
-        skuInputRef.current?.focus();
+        omnibox.inputRef.current?.focus();
       }
       if (e.key === 'F9' && pedidoId && items.length > 0 && !editingCell) {
         e.preventDefault();
@@ -412,25 +394,7 @@ export default function PdvSalePanel({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pedidoId, items.length, editingCell, handleFinalize]);
-
-  /* ---------------------------------------------------------------- */
-  /*  Search keyboard nav                                              */
-  /* ---------------------------------------------------------------- */
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (!showDropdown || searchResults.length === 0) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightIdx((prev) => Math.min(prev + 1, searchResults.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightIdx((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const hit = searchResults[highlightIdx];
-      if (hit) void handleAddProduct(hit);
-    }
-  };
+  }, [pedidoId, items.length, editingCell, handleFinalize, omnibox.inputRef]);
 
   /* ---------------------------------------------------------------- */
   /*  Edit cell keyboard                                               */
@@ -444,7 +408,6 @@ export default function PdvSalePanel({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       void commitEdit();
-      // Move to next editable field
       if (editingCell) {
         const fields: Array<'quantidade' | 'precoUnitario' | 'desconto'> = ['quantidade', 'precoUnitario', 'desconto'];
         const curFieldIdx = fields.indexOf(editingCell.field);
@@ -482,58 +445,39 @@ export default function PdvSalePanel({
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
-  const busy = creatingPedido || addingProduct || addingSku || isSaving;
+  const busy = creatingPedido || addingProduct || omnibox.isSearching || isSaving;
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* ── Search bar ── */}
-      <div className="flex-shrink-0 p-4 pb-2 space-y-2 border-b border-gray-200">
-        {/* SKU / barcode input */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-gray-600 font-semibold text-sm whitespace-nowrap">
-            <ScanBarcode size={16} />
-            <span>SKU</span>
-          </div>
-          <input
-            ref={skuInputRef}
-            value={skuQuery}
-            onChange={(e) => setSkuQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAddSku(); } }}
-            placeholder="Código de barras ou SKU (Enter p/ adicionar) — F2 foca aqui"
-            disabled={addingSku}
-            className="flex-grow p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            tabIndex={1}
-          />
-          {addingSku ? <Loader2 className="animate-spin text-blue-600 w-5 h-5" /> : null}
-        </div>
-
-        {/* Name search + Vendedor */}
+      {/* ── Omnibox search bar ── */}
+      <div className="flex-shrink-0 p-4 pb-2 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-              placeholder="Buscar produto por nome…"
+              ref={omnibox.inputRef}
+              value={omnibox.query}
+              onChange={omnibox.handleChange}
+              onKeyDown={omnibox.handleKeyDown}
+              onFocus={() => { if (omnibox.results.length > 0) omnibox.setShowDropdown(true); }}
+              onBlur={() => setTimeout(() => omnibox.setShowDropdown(false), 200)}
+              placeholder="Código de barras, SKU ou nome do produto — F2 foca aqui"
+              disabled={omnibox.disabled}
               className="w-full p-2.5 pl-9 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              tabIndex={2}
+              tabIndex={1}
             />
-            {searching ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-600 w-4 h-4" /> : null}
+            {omnibox.isSearching ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-600 w-4 h-4" /> : null}
 
             {/* Search dropdown */}
-            {showDropdown && searchResults.length > 0 ? (
+            {omnibox.showDropdown && omnibox.results.length > 0 ? (
               <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-                {searchResults.map((hit, i) => (
+                {omnibox.results.map((hit, i) => (
                   <button
                     key={hit.id}
                     type="button"
                     onMouseDown={(e) => { e.preventDefault(); void handleAddProduct(hit); }}
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between items-center ${
-                      i === highlightIdx ? 'bg-blue-50' : ''
+                      i === omnibox.highlightIdx ? 'bg-blue-50' : ''
                     }`}
                   >
                     <div>
@@ -557,7 +501,7 @@ export default function PdvSalePanel({
                 value={vendedorId || ''}
                 onChange={(e) => void handleVendedorChange(e.target.value || null)}
                 className="p-2.5 border border-gray-300 rounded-lg text-sm min-w-[160px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                tabIndex={3}
+                tabIndex={2}
               >
                 <option value="">Vendedor…</option>
                 {vendedores.map((v) => (
@@ -568,6 +512,16 @@ export default function PdvSalePanel({
           )}
         </div>
       </div>
+
+      {/* ── Customer / CPF bar ── */}
+      <PdvCustomerBar
+        cpf={cpfConsumidor}
+        onCpfChange={handleCpfChange}
+        clienteId={clienteId}
+        clienteNome={clienteNome}
+        onClienteChange={handleClienteChange}
+        disabled={busy}
+      />
 
       {/* ── Items table ── */}
       <div className="flex-grow overflow-auto min-h-0">
@@ -746,6 +700,7 @@ export default function PdvSalePanel({
           </button>
           <span className="hidden sm:flex items-center gap-3 text-[11px] text-gray-400">
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-500 font-mono">F2</kbd> Busca
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-500 font-mono">F4</kbd> Cliente
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-500 font-mono">F9</kbd> Finalizar
           </span>
         </div>

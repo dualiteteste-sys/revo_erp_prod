@@ -22,6 +22,7 @@ export type VendaPedido = {
   condicao_pagamento: string | null;
   observacoes: string | null;
   tabela_preco_id?: string | null;
+  cpf_consumidor?: string | null;
   total_count?: number;
 };
 
