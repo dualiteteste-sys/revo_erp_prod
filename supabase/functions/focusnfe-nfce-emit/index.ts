@@ -275,6 +275,16 @@ function buildNfcePayload(
     // For NFC-e, address is NOT required even when CPF/CNPJ is present
   }
 
+  // Fallback: CPF avulso do payload do pedido (CPF na Nota sem cliente cadastrado)
+  if (!payload.cpf_destinatario && !payload.cnpj_destinatario) {
+    const cpfAvulso = (emissao.payload?.cpf_consumidor || "").replace(/\D/g, "");
+    if (cpfAvulso.length === 11) {
+      payload.cpf_destinatario = cpfAvulso;
+      payload.nome_destinatario = "";
+      payload.indicador_inscricao_estadual_destinatario = "9";
+    }
+  }
+
   return payload;
 }
 
