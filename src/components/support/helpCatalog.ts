@@ -814,12 +814,14 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/vendas/pdv',
     title: 'Guia Rápido do PDV',
     whatIs:
-      'PDV é a tela de venda rápida: busque o produto, veja o total, finalize com F9. Por baixo, gera movimentação financeira, baixa estoque e emite NFC-e (se configurado). O foco é: velocidade com controle.',
+      'PDV é a tela de venda rápida: busque o produto, veja o total, finalize com F9. Por baixo, gera movimentação financeira, baixa estoque e emite NFC-e (se configurado). Suporta CPF na Nota e identificação de cliente. O foco é: velocidade com controle.',
     steps: [
       'Garanta que existe uma conta corrente de recebimentos selecionada.',
       'Selecione o caixa e confirme que está aberto (o sistema abre automaticamente se possível).',
       'Clique “Nova venda” para abrir a tela de venda.',
-      'Escaneie o código de barras no campo SKU (F2 foca no campo) ou busque por nome.',
+      'Use o campo unificado de busca (F2): escaneie o código de barras (detectado automaticamente) ou digite o nome do produto.',
+      'CPF na Nota: clique em “Cliente / CPF na Nota” (ou F4) e digite o CPF do consumidor — ele será incluído automaticamente na NFC-e.',
+      'Cliente: opcionalmente, selecione ou cadastre um cliente no campo ao lado do CPF — o CPF será preenchido automaticamente a partir do cadastro.',
       'Ajuste quantidade, preço ou desconto clicando diretamente no campo (Tab navega entre campos).',
       'Pressione F9 ou clique em “Finalizar” para abrir o modal de pagamento.',
       'Escolha a forma de pagamento: Dinheiro, Pix, Cartão de Crédito, Cartão de Débito ou outra.',
@@ -837,7 +839,8 @@ export const HELP_CATALOG: HelpEntry[] = [
     fillPerfectly: [
       'Conta de recebimento correta (evita caixa “furado”).',
       'Forma de pagamento correta (obrigatória para NFC-e e para relatório de fechamento de caixa).',
-      'Usar leitor de código de barras para agilizar.',
+      'Usar leitor de código de barras para agilizar (o campo unificado detecta scanner vs digitação).',
+      'Sempre pedir CPF ao cliente (programas estaduais: Nota Paulista, Nota Gaúcha etc.).',
       'Encerrar o caixa ao final do dia para conferir saldo.',
       'Para NFC-e: configure o CSC e certificado digital em Fiscal → Configurações.',
     ],
