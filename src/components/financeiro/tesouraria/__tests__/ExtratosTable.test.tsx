@@ -17,6 +17,8 @@ function buildExtrato(overrides: Partial<ExtratoItem> = {}): ExtratoItem {
     movimentacao_data: null,
     movimentacao_descricao: null,
     movimentacao_valor: null,
+    ignorado: false,
+    motivo_ignorado: null,
     ...overrides,
   };
 }
@@ -46,7 +48,7 @@ describe('ExtratosTable - assistência de transferência interna', () => {
 
     expect(screen.getByText(/Transferência interna detectada/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Vincular transferência/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Transf\./i }));
 
     expect(onQuickLinkTransfer).toHaveBeenCalledWith(extrato, 'mov-123');
     expect(onConciliate).not.toHaveBeenCalled();
