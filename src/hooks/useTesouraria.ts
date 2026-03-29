@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDebounce } from './useDebounce';
 import * as treasuryService from '../services/treasury';
 import { useAuth } from '../contexts/AuthProvider';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 
 export const TESOURARIA_KEYS = {
   contas: {
@@ -21,6 +21,7 @@ export const TESOURARIA_KEYS = {
 
 export const useContasCorrentes = () => {
   const { activeEmpresa } = useAuth();
+  const queryClient = useQueryClient();
   const empresaId = activeEmpresa?.id ?? null;
   const lastEmpresaIdRef = useRef<string | null>(empresaId);
   const empresaChanged = lastEmpresaIdRef.current !== empresaId;
@@ -42,7 +43,7 @@ export const useContasCorrentes = () => {
     ativo: filterAtivo,
   };
 
-  const { data, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: TESOURARIA_KEYS.contas.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa) return { data: [], count: 0 };
@@ -53,6 +54,10 @@ export const useContasCorrentes = () => {
     staleTime: 2 * 60 * 1000, // 2 min — contas correntes mudam pouco
     enabled: !!empresaId,
   });
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: TESOURARIA_KEYS.contas.all });
+  }, [queryClient]);
 
   return {
     contas: data?.data ?? [],
@@ -66,12 +71,13 @@ export const useContasCorrentes = () => {
     setPage,
     setSearchTerm,
     setFilterAtivo,
-    refresh: refetch,
+    refresh,
   };
 };
 
 export const useMovimentacoes = (contaCorrenteId: string | null) => {
   const { activeEmpresa } = useAuth();
+  const queryClient = useQueryClient();
   const empresaId = activeEmpresa?.id ?? null;
   const lastEmpresaIdRef = useRef<string | null>(empresaId);
   const empresaChanged = lastEmpresaIdRef.current !== empresaId;
@@ -102,7 +108,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     pageSize,
   };
 
-  const { data, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error: queryError } = useQuery({
     queryKey: TESOURARIA_KEYS.movimentacoes.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa || !contaCorrenteId) return { data: [], count: 0 };
@@ -113,6 +119,10 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     staleTime: 30 * 1000, // 30s — movimentações podem mudar com frequência
     enabled: !!empresaId && !!contaCorrenteId,
   });
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: TESOURARIA_KEYS.movimentacoes.all });
+  }, [queryClient]);
 
   return {
     movimentacoes: data?.data ?? [],
@@ -132,12 +142,13 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     setStartDate,
     setEndDate,
     setTipoMov,
-    refresh: refetch,
+    refresh,
   };
 };
 
 export const useExtratos = (contaCorrenteId: string | null) => {
   const { activeEmpresa } = useAuth();
+  const queryClient = useQueryClient();
   const empresaId = activeEmpresa?.id ?? null;
   const lastEmpresaIdRef = useRef<string | null>(empresaId);
   const empresaChanged = lastEmpresaIdRef.current !== empresaId;
@@ -166,7 +177,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     pageSize,
   };
 
-  const { data, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: TESOURARIA_KEYS.extratos.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa || !contaCorrenteId) return { data: [], count: 0 };
@@ -177,6 +188,10 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     staleTime: 60 * 1000, // 1 min — extratos importados mudam menos que movimentações
     enabled: !!empresaId && !!contaCorrenteId,
   });
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: TESOURARIA_KEYS.extratos.all });
+  }, [queryClient]);
 
   return {
     extratos: data?.data ?? [],
@@ -197,6 +212,6 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     setEndDate,
     setFilterConciliado,
     setFilterIgnorado,
-    refresh: refetch,
+    refresh,
   };
 };

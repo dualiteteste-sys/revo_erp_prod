@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDebounce } from './useDebounce';
 import * as partnersService from '../services/partners';
 import { useAuth } from '../contexts/AuthProvider';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 
 export const PARTNERS_KEYS = {
   all: ['partners'] as const,
@@ -12,6 +12,7 @@ export const PARTNERS_KEYS = {
 
 export const usePartners = () => {
   const { activeEmpresa } = useAuth();
+  const queryClient = useQueryClient();
 
   // Local state for filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +37,7 @@ export const usePartners = () => {
   };
 
   // Fetch partners using TanStack Query
-  const { data, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: PARTNERS_KEYS.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
     queryFn: () => {
       if (!activeEmpresa) return { data: [], count: 0 };
@@ -46,6 +47,10 @@ export const usePartners = () => {
     staleTime: 5 * 60 * 1000, // 5 min — cadastro de parceiros muda pouco
     enabled: !!activeEmpresa,
   });
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: PARTNERS_KEYS.all });
+  }, [queryClient]);
 
   return {
     partners: data?.data ?? [],
@@ -64,6 +69,6 @@ export const usePartners = () => {
     setFilterType,
     setStatusFilter,
     setSortBy,
-    refresh: refetch,
+    refresh,
   };
 };
