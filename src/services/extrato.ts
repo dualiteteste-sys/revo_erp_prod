@@ -17,6 +17,8 @@ export type ExtratoLancamento = {
   movimentacao_tipo: string | null;
   movimentacao_descricao: string | null;
   movimentacao_valor: number | null;
+  ignorado: boolean;
+  motivo_ignorado: string | null;
   total_count?: number;
 };
 
@@ -37,9 +39,10 @@ export async function listExtrato(options: {
   endDate?: Date | null;
   tipoLancamento?: 'credito' | 'debito' | null;
   conciliado?: boolean | null;
+  ignorado?: boolean | null;
   searchTerm?: string;
 }): Promise<{ data: ExtratoLancamento[]; count: number }> {
-  const { page, pageSize, contaCorrenteId, startDate, endDate, tipoLancamento, conciliado, searchTerm } = options;
+  const { page, pageSize, contaCorrenteId, startDate, endDate, tipoLancamento, conciliado, ignorado, searchTerm } = options;
   const offset = (page - 1) * pageSize;
 
   try {
@@ -52,6 +55,7 @@ export async function listExtrato(options: {
       p_q: searchTerm || null,
       p_limit: pageSize,
       p_offset: offset,
+      p_ignorado: ignorado,
     });
 
     if (!data || data.length === 0) {

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExtratoLancamento } from '@/services/extrato';
 import { formatCurrency } from '@/lib/utils';
-import { CheckCircle, ChevronDown, ChevronRight, Circle, Link2 } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Circle, EyeOff, Link2 } from 'lucide-react';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -305,6 +305,10 @@ export default function ExtratoTable({ lancamentos }: Props) {
                             {item.conciliado ? (
                               <span title="Conciliado">
                                 <CheckCircle size={16} className="text-green-500 mx-auto" />
+                              </span>
+                            ) : item.ignorado ? (
+                              <span title={`Ignorado${item.motivo_ignorado ? ': ' + item.motivo_ignorado : ''}`}>
+                                <EyeOff size={16} className="text-amber-500 mx-auto" />
                               </span>
                             ) : (
                               <span title="Pendente">

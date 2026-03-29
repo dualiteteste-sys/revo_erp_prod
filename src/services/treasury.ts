@@ -95,6 +95,8 @@ export type ExtratoItem = {
   movimentacao_data: string | null;
   movimentacao_descricao: string | null;
   movimentacao_valor: number | null;
+  ignorado: boolean;
+  motivo_ignorado: string | null;
 };
 
 export type ImportarExtratoPayload = {
@@ -253,11 +255,12 @@ export async function listExtratos(options: {
   startDate?: Date | null;
   endDate?: Date | null;
   conciliado?: boolean | null;
+  ignorado?: boolean | null;
   searchTerm?: string;
   page: number;
   pageSize: number;
 }): Promise<{ data: ExtratoItem[]; count: number }> {
-  const { contaCorrenteId, startDate, endDate, conciliado, searchTerm, page, pageSize } = options;
+  const { contaCorrenteId, startDate, endDate, conciliado, ignorado, searchTerm, page, pageSize } = options;
   const offset = (page - 1) * pageSize;
 
   const data = await callRpc<any[]>('financeiro_extratos_bancarios_list', {
@@ -268,6 +271,7 @@ export async function listExtratos(options: {
     p_q: searchTerm || null,
     p_limit: pageSize,
     p_offset: offset,
+    p_ignorado: ignorado,
   });
 
   if (!data || data.length === 0) {
@@ -307,6 +311,21 @@ export type ReverterConciliacaoExtratoResult = {
 export async function reverterConciliacaoExtrato(extratoId: string): Promise<ReverterConciliacaoExtratoResult> {
   return callRpc<ReverterConciliacaoExtratoResult>('financeiro_extratos_bancarios_reverter_conciliacao', {
     p_extrato_id: extratoId,
+  });
+}
+
+export type IgnorarExtratoResult = { ok: boolean; count: number; message: string };
+
+export async function ignorarExtrato(extratoIds: string[], motivo?: string | null): Promise<IgnorarExtratoResult> {
+  return callRpc<IgnorarExtratoResult>('financeiro_extratos_bancarios_ignorar', {
+    p_extrato_ids: extratoIds,
+    p_motivo: motivo ?? null,
+  });
+}
+
+export async function designorarExtrato(extratoIds: string[]): Promise<IgnorarExtratoResult> {
+  return callRpc<IgnorarExtratoResult>('financeiro_extratos_bancarios_designorar', {
+    p_extrato_ids: extratoIds,
   });
 }
 
