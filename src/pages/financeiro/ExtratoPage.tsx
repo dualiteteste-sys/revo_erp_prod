@@ -42,6 +42,7 @@ export default function ExtratoPage() {
     endDate,
     tipoLancamento,
     conciliado,
+    ignorado,
     setPage,
     setPageSize,
     setContaCorrenteId,
@@ -50,6 +51,7 @@ export default function ExtratoPage() {
     setEndDate,
     setTipoLancamento,
     setConciliado,
+    setIgnorado,
     refresh,
   } = useExtrato(selectedContaId);
 
@@ -63,6 +65,7 @@ export default function ExtratoPage() {
     setEndDate(null);
     setTipoLancamento(null);
     setConciliado(null);
+    setIgnorado(null);
     setSearchTerm('');
   };
 
@@ -202,13 +205,26 @@ export default function ExtratoPage() {
                 </Select>
             </div>
             <div className="w-40">
-                <Select 
-                    value={conciliado === null ? '' : String(conciliado)} 
-                    onChange={e => setConciliado(e.target.value === '' ? null : e.target.value === 'true')}
+                <Select
+                    value={
+                      ignorado === true
+                        ? 'ignorado'
+                        : conciliado === null
+                          ? ''
+                          : String(conciliado)
+                    }
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === 'ignorado') { setConciliado(null); setIgnorado(true); }
+                      else if (v === 'true') { setConciliado(true); setIgnorado(null); }
+                      else if (v === 'false') { setConciliado(false); setIgnorado(null); }
+                      else { setConciliado(null); setIgnorado(null); }
+                    }}
                 >
                     <option value="">Todos Status</option>
                     <option value="true">Conciliado</option>
                     <option value="false">Pendente</option>
+                    <option value="ignorado">Ignorado</option>
                 </Select>
             </div>
             <button 
