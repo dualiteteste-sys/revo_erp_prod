@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useContasCorrentes, useMovimentacoes, useExtratos } from '@/hooks/useTesouraria';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
-import { PlusCircle, Search, Landmark, ArrowRightLeft, Calendar, UploadCloud, FileSpreadsheet } from 'lucide-react';
+import { PlusCircle, Search, Landmark, ArrowRightLeft, Calendar, UploadCloud, FileSpreadsheet, EyeOff, X } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import ContasCorrentesTable from '@/components/financeiro/tesouraria/ContasCorrentesTable';
@@ -14,10 +14,9 @@ import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
 import ConciliacaoRegrasPanel from '@/components/financeiro/tesouraria/ConciliacaoRegrasPanel';
-import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, reverterConciliacaoExtrato, setContaCorrentePadrao, listMovimentacoes, getContaCorrente, getMovimentacao } from '@/services/treasury';
+import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, reverterConciliacaoExtrato, setContaCorrentePadrao, listMovimentacoes, getContaCorrente, getMovimentacao, ignorarExtrato, designorarExtrato } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
-import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { scoreExtratoToMovimentacao } from '@/lib/conciliacao/matching';
 import Pagination from '@/components/ui/Pagination';
@@ -156,6 +155,7 @@ export default function TesourariaPage() {
     setStartDate: setExtratoStartDate,
     setEndDate: setExtratoEndDate,
     filterConciliado, setFilterConciliado,
+    filterIgnorado, setFilterIgnorado,
     count: extratoCount,
     page: extratoPage,
     pageSize: extratoPageSize,
@@ -165,6 +165,13 @@ export default function TesourariaPage() {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [conciliacaoItem, setConciliacaoItem] = useState<ExtratoItem | null>(null);
+  const [selectedExtratoIds, setSelectedExtratoIds] = useState<Set<string>>(new Set());
+
+  // Clear batch selection when conta, filters, or page change
+  useEffect(() => {
+    setSelectedExtratoIds(new Set());
+  }, [selectedContaId, filterConciliado, filterIgnorado, extratoStartDate, extratoEndDate, extratoPage]);
+
   const extratoAssistKey = useMemo(
     () =>
       (extratos || [])
@@ -653,6 +660,58 @@ export default function TesourariaPage() {
     }
   };
 
+  const handleIgnorar = async (item: ExtratoItem) => {
+    if (busyExtratoId || bulkConciliando) return;
+    setBusyExtratoId(item.id);
+    try {
+      await ignorarExtrato([item.id]);
+      addToast('Lançamento ignorado.', 'success');
+      refreshExtrato();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao ignorar.', 'error');
+    } finally {
+      setBusyExtratoId(null);
+    }
+  };
+
+  const handleDesignorar = async (item: ExtratoItem) => {
+    if (busyExtratoId || bulkConciliando) return;
+    setBusyExtratoId(item.id);
+    try {
+      await designorarExtrato([item.id]);
+      addToast('Lançamento restaurado.', 'success');
+      refreshExtrato();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao restaurar.', 'error');
+    } finally {
+      setBusyExtratoId(null);
+    }
+  };
+
+  const handleBatchIgnorar = async () => {
+    if (selectedExtratoIds.size === 0) return;
+    setBulkConciliando(true);
+    try {
+      const result = await ignorarExtrato(Array.from(selectedExtratoIds));
+      addToast(result.message, 'success');
+      setSelectedExtratoIds(new Set());
+      refreshExtrato();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao ignorar em lote.', 'error');
+    } finally {
+      setBulkConciliando(false);
+    }
+  };
+
+  const handleToggleExtratoSelect = (id: string) => {
+    setSelectedExtratoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleAutoConciliarPagina = async () => {
     if (!selectedContaId) {
       addToast('Selecione uma conta corrente primeiro.', 'warning');
@@ -660,7 +719,7 @@ export default function TesourariaPage() {
     }
     if (busyExtratoId || bulkConciliando) return;
 
-    const pendentes = (extratos || []).filter((e) => !e.conciliado);
+    const pendentes = (extratos || []).filter((e) => !e.conciliado && !e.ignorado);
     if (pendentes.length === 0) {
       addToast('Nenhum lançamento pendente nesta página.', 'info');
       return;
@@ -944,15 +1003,33 @@ export default function TesourariaPage() {
                     </select>
                 </div>
 
-                <div className="md:col-span-2 flex items-end">
-                  <div className="w-full bg-white p-2 rounded-lg border">
-                      <Toggle 
-                          label="Apenas Pendentes" 
-                          name="pendentes" 
-                          checked={filterConciliado === false} 
-                          onChange={(checked) => setFilterConciliado(checked ? false : null)} 
-                      />
-                  </div>
+                <div className="md:col-span-2 min-w-0">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filtro</label>
+                  <select
+                    value={
+                      filterConciliado === false && filterIgnorado === false
+                        ? 'pendentes'
+                        : filterConciliado === true
+                          ? 'conciliados'
+                          : filterIgnorado === true
+                            ? 'ignorados'
+                            : 'todos'
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setExtratoPage(1);
+                      if (v === 'pendentes') { setFilterConciliado(false); setFilterIgnorado(false); }
+                      else if (v === 'conciliados') { setFilterConciliado(true); setFilterIgnorado(null); }
+                      else if (v === 'ignorados') { setFilterConciliado(null); setFilterIgnorado(true); }
+                      else { setFilterConciliado(null); setFilterIgnorado(null); }
+                    }}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="pendentes">Apenas Pendentes</option>
+                    <option value="todos">Todos</option>
+                    <option value="conciliados">Conciliados</option>
+                    <option value="ignorados">Ignorados</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-4 min-w-0 flex flex-wrap gap-3">
@@ -1018,6 +1095,33 @@ export default function TesourariaPage() {
                 </div>
             </div>
 
+            {selectedExtratoIds.size > 0 && (
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
+                <span className="text-sm font-medium text-amber-800">
+                  {selectedExtratoIds.size} selecionado(s)
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleBatchIgnorar()}
+                  disabled={bulkConciliando}
+                  className="gap-1.5"
+                >
+                  {bulkConciliando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <EyeOff size={14} />}
+                  Ignorar selecionados
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedExtratoIds(new Set())}
+                  className="ml-auto text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Limpar seleção"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
                 {!selectedContaId ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
@@ -1028,13 +1132,17 @@ export default function TesourariaPage() {
                     <div className="flex justify-center h-64 items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>
                 ) : (
                   <div className="h-full overflow-auto">
-                    <ExtratosTable 
-                        extratos={extratos} 
-                        onConciliate={(item) => (busyExtratoId ? undefined : setConciliacaoItem(item))} 
+                    <ExtratosTable
+                        extratos={extratos}
+                        onConciliate={(item) => (busyExtratoId ? undefined : setConciliacaoItem(item))}
                         onUnconciliate={handleUnconciliate}
+                        onIgnore={handleIgnorar}
+                        onUnignore={handleDesignorar}
                         busyExtratoId={busyExtratoId}
                         transferAssistByExtratoId={transferAssistByExtratoId}
                         onQuickLinkTransfer={handleQuickLinkTransfer}
+                        selectedIds={selectedExtratoIds}
+                        onToggleSelect={handleToggleExtratoSelect}
                     />
                   </div>
                 )}

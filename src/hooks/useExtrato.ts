@@ -18,6 +18,7 @@ export const useExtrato = (initialContaId?: string | null) => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [tipoLancamento, setTipoLancamento] = useState<'credito' | 'debito' | null>(null);
   const [conciliado, setConciliado] = useState<boolean | null>(null);
+  const [ignorado, setIgnorado] = useState<boolean | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
@@ -60,6 +61,7 @@ export const useExtrato = (initialContaId?: string | null) => {
           endDate,
           tipoLancamento,
           conciliado,
+          ignorado,
           searchTerm: debouncedSearchTerm,
         })
       ];
@@ -87,7 +89,7 @@ export const useExtrato = (initialContaId?: string | null) => {
     } finally {
       setLoading(false);
     }
-  }, [activeEmpresa, page, pageSize, contaCorrenteId, startDate, endDate, tipoLancamento, conciliado, debouncedSearchTerm]);
+  }, [activeEmpresa, page, pageSize, contaCorrenteId, startDate, endDate, tipoLancamento, conciliado, ignorado, debouncedSearchTerm]);
 
   useEffect(() => {
     fetchExtrato();
@@ -110,6 +112,7 @@ export const useExtrato = (initialContaId?: string | null) => {
     endDate,
     tipoLancamento,
     conciliado,
+    ignorado,
     searchTerm,
     setPage,
     setPageSize,
@@ -118,6 +121,7 @@ export const useExtrato = (initialContaId?: string | null) => {
     setEndDate,
     setTipoLancamento,
     setConciliado,
+    setIgnorado,
     setSearchTerm,
     refresh,
   };

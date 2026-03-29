@@ -147,6 +147,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [filterConciliado, setFilterConciliado] = useState<boolean | null>(false); // false = apenas pendentes
+  const [filterIgnorado, setFilterIgnorado] = useState<boolean | null>(false); // false = esconder ignorados
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
@@ -159,6 +160,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     startDate,
     endDate,
     conciliado: filterConciliado,
+    ignorado: filterIgnorado,
     searchTerm: debouncedSearchTerm,
     page,
     pageSize,
@@ -187,12 +189,14 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     startDate,
     endDate,
     filterConciliado,
+    filterIgnorado,
     setPage,
     setPageSize,
     setSearchTerm,
     setStartDate,
     setEndDate,
     setFilterConciliado,
+    setFilterIgnorado,
     refresh: refetch,
   };
 };
