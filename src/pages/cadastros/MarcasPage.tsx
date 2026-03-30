@@ -1,78 +1,118 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Search, FolderTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Tag } from 'lucide-react';
 import { useToast } from '../../contexts/ToastProvider';
 import { useConfirm } from '../../contexts/ConfirmProvider';
-import { listProdutoGrupos, upsertProdutoGrupo, deleteProdutoGrupo, ProdutoGrupo, ProdutoGrupoPayload } from '../../services/produtoGrupos';
+import { listMarcas, upsertMarca, deleteMarca, Marca, MarcaPayload } from '../../services/marcas';
 import Modal from '../../components/ui/Modal';
-import GrupoProdutoForm from '../../components/cadastros/GrupoProdutoForm';
 import { Button } from '../../components/ui/button';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import Input from '@/components/ui/forms/Input';
 
-const GrupoProdutosPage: React.FC = () => {
+interface MarcaFormProps {
+    marca?: Marca | null;
+    onSave: (payload: MarcaPayload) => Promise<void>;
+    onCancel: () => void;
+    isLoading?: boolean;
+}
+
+const MarcaForm: React.FC<MarcaFormProps> = ({ marca, onSave, onCancel, isLoading }) => {
+    const [nome, setNome] = useState('');
+
+    useEffect(() => {
+        setNome(marca?.nome ?? '');
+    }, [marca]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!nome.trim()) return;
+        await onSave({ id: marca?.id, nome: nome.trim() });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+                label="Nome da Marca"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Samsung, Apple, Tramontina..."
+                required
+            />
+            <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                    Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading || !nome.trim()}>
+                    {isLoading ? 'Salvando...' : 'Salvar'}
+                </Button>
+            </div>
+        </form>
+    );
+};
+
+const MarcasPage: React.FC = () => {
     const { addToast } = useToast();
     const { confirm } = useConfirm();
-    const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
+    const [marcas, setMarcas] = useState<Marca[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingGrupo, setEditingGrupo] = useState<ProdutoGrupo | null>(null);
+    const [editingMarca, setEditingMarca] = useState<Marca | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
 
     const columns: TableColumnWidthDef[] = [
-        { id: 'nome', defaultWidth: 400, minWidth: 200 },
-        { id: 'parent_nome', defaultWidth: 250, minWidth: 150 },
+        { id: 'nome', defaultWidth: 520, minWidth: 220 },
         { id: 'acoes', defaultWidth: 180, minWidth: 140 },
     ];
-    const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:grupos-produtos', columns });
+    const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:marcas', columns });
 
-    const sortedGrupos = useMemo(() => {
+    const sortedMarcas = useMemo(() => {
         return sortRows(
-            grupos,
+            marcas,
             sort as any,
-            [{ id: 'nome', type: 'string', getValue: (g) => g.nome ?? '' }] as const
+            [{ id: 'nome', type: 'string', getValue: (m: Marca) => m.nome ?? '' }] as const
         );
-    }, [grupos, sort]);
+    }, [marcas, sort]);
 
-    const fetchGrupos = useCallback(async () => {
+    const fetchMarcas = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await listProdutoGrupos(searchTerm);
-            setGrupos(data);
+            const data = await listMarcas(searchTerm);
+            setMarcas(data);
         } catch (error: any) {
-            addToast('Erro ao carregar grupos: ' + error.message, 'error');
+            addToast('Erro ao carregar marcas: ' + error.message, 'error');
         } finally {
             setLoading(false);
         }
     }, [searchTerm, addToast]);
 
     useEffect(() => {
-        fetchGrupos();
-    }, [fetchGrupos]);
+        fetchMarcas();
+    }, [fetchMarcas]);
 
-    const handleOpenModal = (grupo?: ProdutoGrupo) => {
-        setEditingGrupo(grupo || null);
+    const handleOpenModal = (marca?: Marca) => {
+        setEditingMarca(marca || null);
         setIsModalOpen(true);
     };
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
-        setEditingGrupo(null);
+        setEditingMarca(null);
     };
 
-    const handleSave = async (payload: ProdutoGrupoPayload) => {
+    const handleSave = async (payload: MarcaPayload) => {
         setIsSaving(true);
         try {
-            await upsertProdutoGrupo(payload);
-            addToast('Grupo salvo com sucesso!', 'success');
+            await upsertMarca(payload);
+            addToast('Marca salva com sucesso!', 'success');
             handleCloseModal();
-            fetchGrupos();
+            fetchMarcas();
         } catch (error: any) {
-            addToast('Erro ao salvar grupo: ' + error.message, 'error');
+            addToast('Erro ao salvar marca: ' + error.message, 'error');
         } finally {
             setIsSaving(false);
         }
@@ -80,8 +120,8 @@ const GrupoProdutosPage: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         const ok = await confirm({
-            title: 'Excluir grupo',
-            description: 'Tem certeza que deseja excluir este grupo? Esta ação não pode ser desfeita.',
+            title: 'Excluir marca',
+            description: 'Tem certeza que deseja excluir esta marca? Esta ação não pode ser desfeita.',
             confirmText: 'Excluir',
             cancelText: 'Cancelar',
             variant: 'danger',
@@ -89,11 +129,11 @@ const GrupoProdutosPage: React.FC = () => {
         if (!ok) return;
 
         try {
-            await deleteProdutoGrupo(id);
-            addToast('Grupo excluído com sucesso!', 'success');
-            fetchGrupos();
+            await deleteMarca(id);
+            addToast('Marca excluída com sucesso!', 'success');
+            fetchMarcas();
         } catch (error: any) {
-            addToast('Erro ao excluir grupo: ' + error.message, 'error');
+            addToast('Erro ao excluir marca: ' + error.message, 'error');
         }
     };
 
@@ -101,23 +141,21 @@ const GrupoProdutosPage: React.FC = () => {
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2">
-                    <FolderTree className="text-blue-600" size={28} />
-                    <h1 className="text-2xl font-bold text-gray-800">Grupos de Produtos</h1>
+                    <Tag className="text-blue-600" size={28} />
+                    <h1 className="text-2xl font-bold text-gray-800">Marcas</h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <CsvExportDialog
-                        filename="grupos-produtos.csv"
-                        rows={grupos}
+                        filename="marcas.csv"
+                        rows={marcas}
                         disabled={loading}
                         columns={[
                             { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
-                            { key: 'parent_nome', label: 'Grupo Pai', getValue: (r) => r.parent_nome ?? '' },
-                            { key: 'path', label: 'Caminho', getValue: (r) => r.path ?? '' },
                         ]}
                     />
                     <Button onClick={() => handleOpenModal()}>
                         <Plus size={20} className="mr-2" />
-                        Novo Grupo
+                        Nova Marca
                     </Button>
                 </div>
             </div>
@@ -126,7 +164,7 @@ const GrupoProdutosPage: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
                     type="text"
-                    placeholder="Buscar grupos..."
+                    placeholder="Buscar marcas..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -146,13 +184,6 @@ const GrupoProdutosPage: React.FC = () => {
                                 onResizeStart={startResize as any}
                             />
                             <ResizableSortableTh
-                                columnId="parent_nome"
-                                label="Grupo Pai"
-                                sortable={false}
-                                resizable
-                                onResizeStart={startResize as any}
-                            />
-                            <ResizableSortableTh
                                 columnId="acoes"
                                 label="Ações"
                                 align="right"
@@ -165,34 +196,26 @@ const GrupoProdutosPage: React.FC = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                         {loading ? (
                             <tr>
-                                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">Carregando...</td>
+                                <td colSpan={2} className="px-6 py-4 text-center text-gray-500">Carregando...</td>
                             </tr>
-                        ) : grupos.length === 0 ? (
+                        ) : marcas.length === 0 ? (
                             <tr>
-                                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">Nenhum grupo encontrado.</td>
+                                <td colSpan={2} className="px-6 py-4 text-center text-gray-500">Nenhuma marca encontrada.</td>
                             </tr>
                         ) : (
-                            sortedGrupos.map((grupo) => (
-                                <tr key={grupo.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" title={grupo.path}>
-                                        <span style={{ paddingLeft: `${(grupo.depth ?? 0) * 20}px` }}>
-                                            {(grupo.depth ?? 0) > 0 && <span className="text-gray-400 mr-1">{'└'}</span>}
-                                            {grupo.nome}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {grupo.parent_nome ?? '—'}
-                                    </td>
+                            sortedMarcas.map((marca) => (
+                                <tr key={marca.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{marca.nome}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button
-                                            onClick={() => handleOpenModal(grupo)}
+                                            onClick={() => handleOpenModal(marca)}
                                             className="text-blue-600 hover:text-blue-900 mr-4"
                                             title="Editar"
                                         >
                                             <Pencil size={18} />
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(grupo.id)}
+                                            onClick={() => handleDelete(marca.id)}
                                             className="text-red-600 hover:text-red-900"
                                             title="Excluir"
                                         >
@@ -209,11 +232,11 @@ const GrupoProdutosPage: React.FC = () => {
             <Modal
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
-                title={editingGrupo ? 'Editar Grupo' : 'Novo Grupo'}
+                title={editingMarca ? 'Editar Marca' : 'Nova Marca'}
                 bodyClassName="p-6 md:p-8"
             >
-                <GrupoProdutoForm
-                    grupo={editingGrupo}
+                <MarcaForm
+                    marca={editingMarca}
                     onSave={handleSave}
                     onCancel={handleCloseModal}
                     isLoading={isSaving}
@@ -223,4 +246,4 @@ const GrupoProdutosPage: React.FC = () => {
     );
 };
 
-export default GrupoProdutosPage;
+export default MarcasPage;
