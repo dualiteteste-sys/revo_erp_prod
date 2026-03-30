@@ -16,6 +16,15 @@
 [functions.inter-webhook]
   verify_jwt = false
 
+[functions.meli-webhook]
+  verify_jwt = false
+
+[functions.meli-worker]
+  verify_jwt = false
+
+[functions.meli-scheduler]
+  verify_jwt = false
+
 [functions.manual-create-user]
   cors_origins = ["http://localhost:5173"]
   cors_methods = ["POST", "OPTIONS"]

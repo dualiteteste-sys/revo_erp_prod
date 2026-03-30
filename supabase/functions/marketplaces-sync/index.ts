@@ -1066,7 +1066,8 @@ serve(async (req) => {
   if (action !== "import_orders" && action !== "sync_stock" && action !== "sync_prices") {
     return json(400, { ok: false, error: "INVALID_ACTION" }, cors);
   }
-  if (provider !== "woo" && action !== "import_orders") {
+  // ML now supports sync_stock and sync_prices in addition to import_orders
+  if (provider === "shopee" && action !== "import_orders") {
     return json(400, { ok: false, error: "ACTION_NOT_SUPPORTED_FOR_PROVIDER" }, cors);
   }
 
@@ -1275,6 +1276,134 @@ serve(async (req) => {
   }
 
   if (!accessToken) return json(409, { ok: false, error: "MISSING_ACCESS_TOKEN" }, cors);
+
+  // -----------------------------------------------------------------------
+  // ML sync_stock / sync_prices
+  // -----------------------------------------------------------------------
+  if (action === "sync_stock" || action === "sync_prices") {
+    const syncField = action === "sync_stock" ? "available_quantity" : "price";
+    const adapterVer = await getAdapterVersion({ admin, empresaId, provider: "meli", kind: action });
+    const jobDedupeSync = `meli_${action}:${new Date().toISOString().slice(0, 13)}`;
+    const { data: syncJob } = await admin.from("ecommerce_jobs").upsert(
+      {
+        empresa_id: empresaId,
+        ecommerce_id: ecommerceId,
+        provider: "meli",
+        kind: action,
+        dedupe_key: jobDedupeSync,
+        payload: { field: syncField },
+        adapter_version: adapterVer,
+        status: "processing",
+        attempts: 1,
+        locked_at: new Date().toISOString(),
+        locked_by: "marketplaces-sync",
+        created_by: userId,
+      },
+      { onConflict: "provider,dedupe_key" },
+    ).select("id").maybeSingle();
+    const syncJobId = syncJob?.id ? String(syncJob.id) : null;
+    const { data: syncRun } = await admin.from("ecommerce_job_runs").insert({
+      empresa_id: empresaId,
+      job_id: syncJobId,
+      provider: "meli",
+      kind: action,
+      adapter_version: adapterVer,
+      meta: { field: syncField },
+    }).select("id").single();
+    const syncRunId = syncRun?.id ? String(syncRun.id) : null;
+
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+    try {
+      // Load all ML anuncios with identificador_externo (published items)
+      const { data: anuncios } = await admin
+        .from("produto_anuncios")
+        .select("id,produto_id,identificador_externo,preco_especifico")
+        .eq("empresa_id", empresaId)
+        .eq("ecommerce_id", ecommerceId)
+        .not("identificador_externo", "is", null)
+        .limit(500);
+      if (!anuncios || anuncios.length === 0) {
+        if (syncJobId) await admin.from("ecommerce_jobs").update({ status: "done", locked_at: null, locked_by: null }).eq("id", syncJobId);
+        if (syncRunId) await admin.from("ecommerce_job_runs").update({ ok: true, finished_at: new Date().toISOString() }).eq("id", syncRunId);
+        return json(200, { ok: true, provider: "meli", action, updated: 0, skipped: 0, failed: 0, hint: "No published items" }, cors);
+      }
+
+      for (const anuncio of anuncios) {
+        const meliItemId = String(anuncio.identificador_externo);
+        try {
+          let updateBody: Record<string, unknown>;
+          if (action === "sync_stock") {
+            const { data: prod } = await admin.from("produtos").select("estoque_disponivel,estoque_atual").eq("id", anuncio.produto_id).maybeSingle();
+            const qty = Math.max(0, Math.trunc(Number(prod?.estoque_disponivel ?? prod?.estoque_atual ?? 0)));
+            updateBody = { available_quantity: qty };
+          } else {
+            const { data: prod } = await admin.from("produtos").select("preco_venda,preco_promocional").eq("id", anuncio.produto_id).maybeSingle();
+            const p = anuncio.preco_especifico ?? prod?.preco_promocional ?? prod?.preco_venda ?? 0;
+            updateBody = { price: Number(p) };
+          }
+          const resp = await fetch(`https://api.mercadolibre.com/items/${encodeURIComponent(meliItemId)}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify(updateBody),
+          });
+          if (resp.ok) {
+            updated++;
+            await admin.from("produto_anuncios").update({
+              sync_status: "synced",
+              last_sync_at: new Date().toISOString(),
+              last_error: null,
+            }).eq("id", anuncio.id);
+          } else {
+            const errBody = await resp.json().catch(() => ({}));
+            failed++;
+            await admin.from("produto_anuncios").update({
+              sync_status: "error",
+              last_sync_at: new Date().toISOString(),
+              last_error: String(errBody?.message || `HTTP ${resp.status}`).slice(0, 500),
+            }).eq("id", anuncio.id);
+            await admin.from("ecommerce_logs").insert({
+              empresa_id: empresaId,
+              ecommerce_id: ecommerceId,
+              provider: "meli",
+              level: "error",
+              event: `meli_${action}_item_failed`,
+              message: `Falha ao sincronizar ${syncField} do item ${meliItemId}`,
+              entity_type: "item",
+              entity_external_id: meliItemId,
+              entity_id: anuncio.id,
+              run_id: syncRunId,
+              context: sanitizeForLog({ status: resp.status, error: errBody }),
+            });
+          }
+        } catch {
+          failed++;
+          skipped++;
+        }
+      }
+
+      await admin.from("ecommerces").update({ last_sync_at: new Date().toISOString(), last_error: null }).eq("id", ecommerceId);
+      if (syncJobId) await admin.from("ecommerce_jobs").update({ status: "done", locked_at: null, locked_by: null, last_error: null }).eq("id", syncJobId);
+      if (syncRunId) await admin.from("ecommerce_job_runs").update({ ok: true, finished_at: new Date().toISOString() }).eq("id", syncRunId);
+      await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: true });
+      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: `meli.${action}`, count: updated });
+      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "meli.job_run", count: 1 });
+
+      return json(200, { ok: true, provider: "meli", action, updated, skipped, failed }, cors);
+    } catch (e: any) {
+      const msg = e?.message || `MELI_${action.toUpperCase()}_FAILED`;
+      if (syncJobId) await admin.from("ecommerce_jobs").update({ status: "error", locked_at: null, locked_by: null, last_error: msg }).eq("id", syncJobId);
+      if (syncRunId) await admin.from("ecommerce_job_runs").update({ ok: false, finished_at: new Date().toISOString(), error: msg }).eq("id", syncRunId);
+      await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: msg });
+      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: `meli.${action}_failed`, count: 1 });
+      return json(502, { ok: false, provider: "meli", error: msg }, cors);
+    }
+  }
 
   const windowFrom = since ?? toIsoOrNull(conn.last_sync_at) ?? minusDaysIso(7);
   const windowTo = plusDaysIso(0);
