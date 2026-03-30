@@ -48,6 +48,12 @@ export function normalizeProductPayload(input: any) {
   // Garantir que campos booleanos obrigatórios tenham um valor
   out.controlar_lotes = out.controlar_lotes ?? false;
 
+  // Marketplace fields
+  if (out.fabricante !== undefined) out.fabricante = out.fabricante ? String(out.fabricante).trim() : null;
+  if (out.modelo !== undefined) out.modelo = out.modelo ? String(out.modelo).trim() : null;
+  if (out.pais_origem !== undefined) out.pais_origem = out.pais_origem ? String(out.pais_origem).trim().toUpperCase() : null;
+  out.preco_promocional = toNumberOrNull(out.preco_promocional);
+
   // Defaults fiscais (opcionais) para NF-e
   out.cfop_padrao = (() => {
     const v = digitsOnly(out.cfop_padrao);

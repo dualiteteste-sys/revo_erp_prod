@@ -10,6 +10,7 @@ import { useNumericField } from '../../../hooks/useNumericField';
 import FiscalFields from '../form-sections/FiscalFields';
 import PackagingFields from '../form-sections/PackagingFields';
 import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos';
+import { listMarcas, Marca } from '../../../services/marcas';
 import { listUnidades, UnidadeMedida } from '../../../services/unidades';
 import ProdutoCodigoBarrasSection from '../barcodes/ProdutoCodigoBarrasSection';
 
@@ -33,8 +34,11 @@ interface FormErrors {
   nome?: string;
 }
 
-// Extend ProductFormData to include grupo_id until database types are updated
-type ExtendedProductFormData = ProductFormData & { grupo_id?: string | null };
+// Extend ProductFormData to include fields until database types are updated
+type ExtendedProductFormData = ProductFormData & {
+  grupo_id?: string | null;
+  marca_id?: string | null;
+};
 
 interface DadosGeraisTabProps {
   data: ExtendedProductFormData;
@@ -52,10 +56,12 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
   const barcodeVarianteId = !isService && data.produto_pai_id ? (data.id ?? null) : null;
 
   const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
 
   useEffect(() => {
     listProdutoGrupos().then(setGrupos).catch(console.error);
+    listMarcas().then(setMarcas).catch(console.error);
     listUnidades().then(setUnidades).catch(console.error);
   }, []);
 
@@ -127,7 +133,7 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
         </Select>
 
         <Select
-          label="Grupo"
+          label="Grupo / Categoria"
           name="grupo_id"
           value={data.grupo_id || ''}
           onChange={(e) => onChange('grupo_id', e.target.value || null)}
@@ -135,7 +141,21 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
         >
           <option value="">Selecione um grupo...</option>
           {grupos.map(g => (
-            <option key={g.id} value={g.id}>{g.nome}</option>
+            <option key={g.id} value={g.id} title={g.path}>
+              {'—'.repeat(g.depth ?? 0)}{(g.depth ?? 0) > 0 ? ' ' : ''}{g.nome}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Marca"
+          name="marca_id"
+          value={data.marca_id || ''}
+          onChange={(e) => onChange('marca_id', e.target.value || null)}
+          className="sm:col-span-3"
+        >
+          <option value="">Selecione uma marca...</option>
+          {marcas.map(m => (
+            <option key={m.id} value={m.id}>{m.nome}</option>
           ))}
         </Select>
 

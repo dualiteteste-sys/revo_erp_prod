@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard, Filter, Send, Hash
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, ShieldAlert, Activity, Clock, CreditCard, Filter, Send, Hash, Tag
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -39,6 +39,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Clientes e Fornecedores', icon: Users2, href: '/app/partners', permission: { domain: 'partners', action: 'view' } },
       { name: 'Produtos', icon: Package, href: '/app/products', permission: { domain: 'produtos', action: 'view' } },
       { name: 'Grupos de Produtos', icon: FolderTree, href: '/app/cadastros/grupos-produtos', permission: { domain: 'produtos', action: 'view' } },
+      { name: 'Marcas', icon: Tag, href: '/app/cadastros/marcas', permission: { domain: 'produtos', action: 'view' } },
       { name: 'Unidades de Medida', icon: Ruler, href: '/app/cadastros/unidades-medida', permission: { domain: 'produtos', action: 'view' } },
       { name: 'Transportadoras', icon: Truck, href: '/app/carriers', permission: { domain: 'logistica', action: 'view' } },
       { name: 'Serviços', icon: Wrench, href: '/app/services', permission: { domain: 'servicos', action: 'view' } },

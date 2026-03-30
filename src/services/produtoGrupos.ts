@@ -5,6 +5,8 @@ export interface ProdutoGrupo {
     nome: string;
     parent_id?: string | null;
     parent_nome?: string | null;
+    depth?: number;
+    path?: string;
     created_at?: string;
 }
 
