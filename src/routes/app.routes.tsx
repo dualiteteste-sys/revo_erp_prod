@@ -17,6 +17,7 @@ const PartnersPage = lazyImport(() => import('../pages/partners/PartnersPage'));
 const CarriersPage = lazyImport(() => import("../pages/carriers/CarriersPage"));
 const ServicesPage = lazyImport(() => import("../pages/services/ServicesPage"));
 const GrupoProdutosPage = lazyImport(() => import("../pages/cadastros/GrupoProdutosPage"));
+const MarcasPage = lazyImport(() => import("../pages/cadastros/MarcasPage"));
 const UnidadesPage = lazyImport(() => import("../pages/cadastros/UnidadesPage"));
 const EmbalagensPage = lazyImport(() => import("../pages/cadastros/EmbalagensPage"));
 const MeiosPagamentoPage = lazyImport(() => import("../pages/cadastros/MeiosPagamentoPage"));
@@ -231,6 +232,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "produtos", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "cadastros/marcas",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><MarcasPage /></Suspense>
                 </RequirePermission>
               ),
             },
