@@ -10,10 +10,21 @@ import {
   type ProdutoAnuncio,
   type ProdutoAnuncioPayload,
 } from '@/services/produtoAnuncios';
+import {
+  syncMeliStock,
+  syncMeliPrice,
+  pauseMeliListing,
+  activateMeliListing,
+  updateMeliListing,
+} from '@/services/meliAdmin';
+import MeliPublishDialog from '@/components/products/MeliPublishDialog';
 import type { ProductFormData } from '@/components/products/ProductFormPanel';
 import { Button } from '@/components/ui/button';
 import WooCommerceChannelTab from './WooCommerceChannelTab';
-import { Store, Plus, Pencil, Trash2, ExternalLink, ShoppingBag } from 'lucide-react';
+import {
+  Store, Plus, Pencil, Trash2, ExternalLink, ShoppingBag,
+  Rocket, RefreshCw, Pause, Play, Upload, Loader2,
+} from 'lucide-react';
 
 type Props = {
   data: ProductFormData;
@@ -84,7 +95,66 @@ export default function MarketplaceChannelTab({ data }: Props) {
   const [editingForm, setEditingForm] = useState<AnuncioFormState | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // ML Publish dialog state
+  const [meliPublishAnuncio, setMeliPublishAnuncio] = useState<ProdutoAnuncio | null>(null);
+  const [meliActionLoading, setMeliActionLoading] = useState<string | null>(null);
+
   const hasWoo = connections.some((c) => c.provider === 'woo');
+  const hasMeli = connections.some((c) => c.provider === 'meli');
+  const meliConnection = connections.find((c) => c.provider === 'meli');
+
+  // ML action handlers
+  const handleMeliSync = async (anuncio: ProdutoAnuncio, type: 'stock' | 'price') => {
+    if (!activeEmpresaId || !anuncio.ecommerce_id) return;
+    setMeliActionLoading(`${type}-${anuncio.id}`);
+    try {
+      if (type === 'stock') {
+        await syncMeliStock(activeEmpresaId, anuncio.ecommerce_id, anuncio.id);
+      } else {
+        await syncMeliPrice(activeEmpresaId, anuncio.ecommerce_id, anuncio.id);
+      }
+      addToast(`${type === 'stock' ? 'Estoque' : 'Preço'} sincronizado com o ML.`, 'success');
+      await fetchAnuncios();
+    } catch (e: any) {
+      addToast(e?.message || `Erro ao sincronizar ${type}.`, 'error');
+    } finally {
+      setMeliActionLoading(null);
+    }
+  };
+
+  const handleMeliPauseActivate = async (anuncio: ProdutoAnuncio) => {
+    if (!activeEmpresaId || !anuncio.ecommerce_id) return;
+    const isPaused = anuncio.status_anuncio === 'pausado';
+    setMeliActionLoading(`toggle-${anuncio.id}`);
+    try {
+      if (isPaused) {
+        await activateMeliListing(activeEmpresaId, anuncio.ecommerce_id, anuncio.id);
+        addToast('Anúncio ativado no ML.', 'success');
+      } else {
+        await pauseMeliListing(activeEmpresaId, anuncio.ecommerce_id, anuncio.id);
+        addToast('Anúncio pausado no ML.', 'success');
+      }
+      await fetchAnuncios();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao alterar status.', 'error');
+    } finally {
+      setMeliActionLoading(null);
+    }
+  };
+
+  const handleMeliUpdate = async (anuncio: ProdutoAnuncio) => {
+    if (!activeEmpresaId || !anuncio.ecommerce_id) return;
+    setMeliActionLoading(`update-${anuncio.id}`);
+    try {
+      await updateMeliListing(activeEmpresaId, anuncio.ecommerce_id, anuncio.id);
+      addToast('Anúncio atualizado no ML.', 'success');
+      await fetchAnuncios();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao atualizar.', 'error');
+    } finally {
+      setMeliActionLoading(null);
+    }
+  };
 
   useEffect(() => {
     if (!activeEmpresaId) return;
@@ -317,39 +387,102 @@ export default function MarketplaceChannelTab({ data }: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {anuncios.map((a) => (
-              <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3 flex items-center justify-between hover:shadow-sm transition-shadow">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${PROVIDER_COLORS[a.ecommerce_provider] || PROVIDER_COLORS.custom}`}>
-                    {PROVIDER_LABELS[a.ecommerce_provider] || a.ecommerce_provider}
-                  </span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[a.status_anuncio] || STATUS_COLORS.rascunho}`}>
-                    {STATUS_LABELS[a.status_anuncio] || a.status_anuncio}
-                  </span>
-                  <span className="text-sm text-gray-800 truncate" title={a.titulo || data.nome || ''}>
-                    {a.titulo || data.nome || 'Sem título'}
-                  </span>
-                  {a.preco_especifico != null && (
-                    <span className="text-xs text-gray-500">
-                      R$ {Number(a.preco_especifico).toFixed(2)}
-                    </span>
-                  )}
-                  {a.url_anuncio && (
-                    <a href={a.url_anuncio} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">
-                      <ExternalLink size={14} />
-                    </a>
+            {anuncios.map((a) => {
+              const isMeli = a.ecommerce_provider === 'meli';
+              const isPublished = !!a.identificador_externo;
+              const syncColor =
+                a.sync_status === 'synced' ? 'bg-green-500' :
+                a.sync_status === 'error' ? 'bg-red-500' : 'bg-amber-400';
+
+              return (
+                <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${PROVIDER_COLORS[a.ecommerce_provider] || PROVIDER_COLORS.custom}`}>
+                        {PROVIDER_LABELS[a.ecommerce_provider] || a.ecommerce_provider}
+                      </span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[a.status_anuncio] || STATUS_COLORS.rascunho}`}>
+                        {STATUS_LABELS[a.status_anuncio] || a.status_anuncio}
+                      </span>
+                      {isMeli && isPublished && (
+                        <span className={`inline-block w-2 h-2 rounded-full ${syncColor}`} title={`Sync: ${a.sync_status || 'pending'}`} />
+                      )}
+                      <span className="text-sm text-gray-800 truncate" title={a.titulo || data.nome || ''}>
+                        {a.titulo || data.nome || 'Sem título'}
+                      </span>
+                      {a.preco_especifico != null && (
+                        <span className="text-xs text-gray-500">
+                          R$ {Number(a.preco_especifico).toFixed(2)}
+                        </span>
+                      )}
+                      {a.url_anuncio && (
+                        <a href={a.url_anuncio} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      {/* ML-specific actions */}
+                      {isMeli && !isPublished && (
+                        <button
+                          onClick={() => setMeliPublishAnuncio(a)}
+                          className="p-1.5 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 rounded-md transition-colors"
+                          title="Publicar no Mercado Livre"
+                        >
+                          <Rocket size={15} />
+                        </button>
+                      )}
+                      {isMeli && isPublished && (
+                        <>
+                          <button
+                            onClick={() => handleMeliUpdate(a)}
+                            disabled={meliActionLoading === `update-${a.id}`}
+                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
+                            title="Atualizar no ML"
+                          >
+                            {meliActionLoading === `update-${a.id}` ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                          </button>
+                          <button
+                            onClick={() => handleMeliSync(a, 'stock')}
+                            disabled={meliActionLoading === `stock-${a.id}`}
+                            className="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-md transition-colors disabled:opacity-50"
+                            title="Sync Estoque"
+                          >
+                            {meliActionLoading === `stock-${a.id}` ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                          </button>
+                          <button
+                            onClick={() => handleMeliPauseActivate(a)}
+                            disabled={meliActionLoading === `toggle-${a.id}`}
+                            className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${a.status_anuncio === 'pausado' ? 'text-green-600 hover:text-green-800 hover:bg-green-50' : 'text-amber-600 hover:text-amber-800 hover:bg-amber-50'}`}
+                            title={a.status_anuncio === 'pausado' ? 'Ativar' : 'Pausar'}
+                          >
+                            {meliActionLoading === `toggle-${a.id}` ? <Loader2 size={15} className="animate-spin" /> : a.status_anuncio === 'pausado' ? <Play size={15} /> : <Pause size={15} />}
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => handleEditAnuncio(a)} className="p-1 text-blue-600 hover:text-blue-800" title="Editar">
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => handleDeleteAnuncio(a.id)} className="p-1 text-red-500 hover:text-red-700" title="Excluir">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  {/* ML sync info row */}
+                  {isMeli && isPublished && a.last_sync_at && (
+                    <div className="mt-1.5 flex items-center gap-3 text-[11px] text-gray-400">
+                      <span>ID: {a.identificador_externo}</span>
+                      <span>Última sync: {new Date(a.last_sync_at).toLocaleString('pt-BR')}</span>
+                      {a.last_error && (
+                        <span className="text-red-400 truncate" title={a.last_error}>
+                          Erro: {a.last_error}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1 ml-2">
-                  <button onClick={() => handleEditAnuncio(a)} className="p-1 text-blue-600 hover:text-blue-800" title="Editar">
-                    <Pencil size={15} />
-                  </button>
-                  <button onClick={() => handleDeleteAnuncio(a.id)} className="p-1 text-red-500 hover:text-red-700" title="Excluir">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -359,6 +492,21 @@ export default function MarketplaceChannelTab({ data }: Props) {
           </div>
         )}
       </div>
+
+      {/* ML Publish Dialog */}
+      {meliPublishAnuncio && meliConnection && (
+        <MeliPublishDialog
+          isOpen={!!meliPublishAnuncio}
+          onClose={() => setMeliPublishAnuncio(null)}
+          product={data}
+          anuncio={meliPublishAnuncio}
+          ecommerceId={meliConnection.id}
+          onPublished={() => {
+            setMeliPublishAnuncio(null);
+            void fetchAnuncios();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -55,6 +55,8 @@ const OpsStripeDedupePage = lazyImport(() => import("../pages/dev/OpsStripeDedup
 const OpsEntitlementsPage = lazyImport(() => import("../pages/dev/OpsEntitlementsPage"));
 const WooCommerceStoresPage = lazyImport(() => import("../pages/dev/WooCommerceStoresPage"));
 const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooCommerceStoreDetailPage"));
+const MeliControlPanelPage = lazyImport(() => import("../pages/dev/MeliControlPanelPage"));
+const MeliCatalogPage = lazyImport(() => import("../pages/products/MeliCatalogPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
@@ -722,6 +724,22 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "manage" }}>
                   <Suspense fallback={<PageLoader />}><WooCommerceStoreDetailPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/mercado-livre",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><MeliControlPanelPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "products/mercado-livre/catalogo",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><MeliCatalogPage /></Suspense>
                 </RequirePermission>
               ),
             },
