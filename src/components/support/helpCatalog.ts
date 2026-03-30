@@ -187,6 +187,60 @@ export const HELP_CATALOG: HelpEntry[] = [
     commonMistakes: ['Reexecutar tudo em vez de só falhas.', 'Ignorar códigos de erro/hint por item.', 'Fechar run sem validar contadores finais.'],
   },
   {
+    match: '/app/desenvolvedor/mercado-livre',
+    title: 'Guia Rápido — Painel de Controle Mercado Livre',
+    whatIs:
+      'Painel central para operar a integração com o Mercado Livre: visão da conta ML, saúde da conexão, KPIs de anúncios, webhooks recebidos, fila de sincronização e perguntas de compradores.',
+    steps: [
+      'Acesse via Desenvolvedor → Mercado Livre.',
+      'Na aba Visão Geral, verifique: conta ML conectada, token válido, anúncios ativos/pausados/com erro.',
+      'Use a aba Perguntas para responder compradores diretamente pelo ERP.',
+      'Na aba Webhooks, monitore notificações recebidas do ML (pedidos, itens, perguntas).',
+      'Se houver erros de sync, verifique a aba Fila de Sync e Desenvolvedor → Logs.',
+    ],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (manage)', 'Conexão Mercado Livre ativa'],
+    connectsWith: ['Configurações → Integrações', 'Produtos → Canais/Marketplace', 'Catálogo ML', 'Logs'],
+    fillPerfectly: [
+      'Monitorar diariamente o status da conta e token ML.',
+      'Responder perguntas rapidamente (impacta reputação no ML).',
+      'Tratar erros de sync antes que acumulem.',
+    ],
+    commonMistakes: [
+      'Publicar sem categoria ML definida (bloqueador).',
+      'Ignorar webhooks com status "error" — podem indicar pedidos perdidos.',
+      'Não verificar se o token está expirado antes de sync manual.',
+    ],
+    links: [
+      { label: 'Catálogo ML', href: '/app/products/mercado-livre/catalogo', kind: 'internal' },
+      { label: 'Integrações', href: '/app/configuracoes/ecommerce/marketplaces', kind: 'internal' },
+    ],
+  },
+  {
+    match: '/app/products/mercado-livre/catalogo',
+    title: 'Guia Rápido — Catálogo Mercado Livre',
+    whatIs:
+      'Tabela consolidada de todos os produtos publicados no Mercado Livre: status de sincronização, preço, estoque, link direto ao anúncio. Permite ações em massa (sync estoque, sync preço).',
+    steps: [
+      'Acesse via menu Produtos ou pelo Painel ML.',
+      'Use filtros por nome/SKU e status de sync para localizar itens.',
+      'Selecione itens e use "Sync Estoque" ou "Sync Preço" para sincronizar em lote.',
+      'Clique no ícone de link externo para abrir o anúncio diretamente no ML.',
+    ],
+    dependsOn: ['Permissão: Produtos (view)', 'Conexão Mercado Livre ativa', 'Produtos publicados no ML'],
+    connectsWith: ['Painel ML', 'Produtos → Canais/Marketplace', 'Integrações'],
+    fillPerfectly: [
+      'Sincronizar estoque/preço após alterações no ERP.',
+      'Usar filtro "Com erro" para identificar e resolver problemas rapidamente.',
+    ],
+    commonMistakes: [
+      'Sincronizar preço zero (bloqueador no ML).',
+      'Sincronizar estoque sem ter atualizado no ERP primeiro.',
+    ],
+    links: [
+      { label: 'Painel ML', href: '/app/desenvolvedor/mercado-livre', kind: 'internal' },
+    ],
+  },
+  {
     match: '/app/desenvolvedor/entitlements',
     title: 'Guia Rápido — Entitlements por plano (Ultria)',
     whatIs:
