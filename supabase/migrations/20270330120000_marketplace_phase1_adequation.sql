@@ -36,11 +36,15 @@ ALTER TABLE public.produto_anuncios ADD COLUMN IF NOT EXISTS last_error text;
 
 -- =====================================================================
 -- 3. LIST_PRODUTO_GRUPOS — CTE recursivo com depth + path
+--    Preserva o padrão de wrapper com require_permission_for_current_user
 -- =====================================================================
 
+-- Drop both wrapper and underlying (created by _sec_mt02_wrap_guard)
 DROP FUNCTION IF EXISTS public.list_produto_grupos(text);
+DROP FUNCTION IF EXISTS public._list_produto_grupos(text);
 
-CREATE OR REPLACE FUNCTION public.list_produto_grupos(p_search text DEFAULT NULL)
+-- Underlying function with the actual recursive CTE logic
+CREATE OR REPLACE FUNCTION public._list_produto_grupos(p_search text DEFAULT NULL)
 RETURNS TABLE(id uuid, nome text, parent_id uuid, parent_nome text, depth int, path text, created_at timestamptz)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public
@@ -63,6 +67,21 @@ AS $$
   ORDER BY t.path;
 $$;
 
+REVOKE ALL ON FUNCTION public._list_produto_grupos(text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public._list_produto_grupos(text) TO service_role;
+
+-- Public wrapper with permission guard (same pattern as _sec_mt02_wrap_guard)
+CREATE OR REPLACE FUNCTION public.list_produto_grupos(p_search text DEFAULT NULL)
+RETURNS TABLE(id uuid, nome text, parent_id uuid, parent_nome text, depth int, path text, created_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'view');
+  RETURN QUERY SELECT * FROM public._list_produto_grupos(p_search);
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.list_produto_grupos(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.list_produto_grupos(text) TO authenticated, service_role;
 
@@ -72,14 +91,18 @@ GRANT EXECUTE ON FUNCTION public.list_produto_grupos(text) TO authenticated, ser
 
 CREATE OR REPLACE FUNCTION public.list_marcas(p_search text DEFAULT NULL)
 RETURNS TABLE(id uuid, nome text, created_at timestamptz)
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
+BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'view');
+  RETURN QUERY
   SELECT m.id, m.nome, m.created_at
   FROM public.marcas m
   WHERE m.empresa_id = public.current_empresa_id()
     AND (p_search IS NULL OR m.nome ILIKE '%' || p_search || '%')
   ORDER BY m.nome;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.upsert_marca(p_payload jsonb)
@@ -95,6 +118,8 @@ BEGIN
   IF v_empresa_id IS NULL THEN
     RAISE EXCEPTION 'Nenhuma empresa ativa encontrada.' USING errcode = '42501';
   END IF;
+
+  PERFORM public.require_permission_for_current_user('produtos', 'update');
 
   IF p_payload->>'nome' IS NULL OR trim(p_payload->>'nome') = '' THEN
     RAISE EXCEPTION 'Nome da marca é obrigatório.';
@@ -127,6 +152,8 @@ LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'delete');
+
   IF EXISTS (SELECT 1 FROM public.produtos WHERE marca_id = p_id AND empresa_id = public.current_empresa_id()) THEN
     RAISE EXCEPTION 'Não é possível excluir esta marca pois existem produtos vinculados a ela.';
   END IF;
@@ -156,9 +183,12 @@ RETURNS TABLE(
   url_anuncio text, categoria_marketplace text, sync_status text,
   last_sync_at timestamptz, last_error text
 )
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
+BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'view');
+  RETURN QUERY
   SELECT a.id, a.ecommerce_id, e.nome AS ecommerce_nome, e.provider AS ecommerce_provider,
          a.identificador, a.titulo, a.descricao, a.descricao_complementar,
          a.preco_especifico, a.status_anuncio, a.identificador_externo,
@@ -169,6 +199,7 @@ AS $$
   WHERE a.empresa_id = public.current_empresa_id()
     AND a.produto_id = p_produto_id
   ORDER BY e.nome;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.upsert_produto_anuncio(p_payload jsonb)
@@ -181,6 +212,8 @@ DECLARE
   v_id uuid;
   v_result jsonb;
 BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'update');
+
   IF v_empresa_id IS NULL THEN
     RAISE EXCEPTION 'Nenhuma empresa ativa encontrada.' USING errcode = '42501';
   END IF;
@@ -236,6 +269,8 @@ LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
+  PERFORM public.require_permission_for_current_user('produtos', 'delete');
+
   DELETE FROM public.produto_anuncios
   WHERE id = p_id AND empresa_id = public.current_empresa_id();
 END;
