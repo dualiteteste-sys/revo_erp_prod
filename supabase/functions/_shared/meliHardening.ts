@@ -3,6 +3,8 @@
  * Used by meli-admin, meli-worker, meli-webhook, meli-scheduler, marketplaces-sync
  */
 
+import { hmacSha256Hex, timingSafeEqual } from "./crypto.ts";
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -286,4 +288,74 @@ export function backoffMs(attempt: number, baseMs = 1000, maxMs = 60000): number
   const exp = Math.min(baseMs * Math.pow(2, attempt), maxMs);
   const jitter = Math.random() * exp * 0.3;
   return Math.round(exp + jitter);
+}
+
+// ---------------------------------------------------------------------------
+// Webhook signature verification (x-signature header)
+// ---------------------------------------------------------------------------
+
+/**
+ * Verifies the Mercado Livre webhook x-signature header.
+ *
+ * ML signature format:  ts=1680000000000,v1=abc123...
+ * HMAC message format:  ts:{ts}\nresource:{resource}\nuser_id:{user_id}
+ *
+ * Returns { valid: false, ts: null } when clientSecret is empty (env not set).
+ */
+export async function verifyMeliSignature(params: {
+  clientSecret: string;
+  xSignatureHeader: string;
+  resource: string;
+  userId: string;
+}): Promise<{ valid: boolean; ts: string | null }> {
+  const { clientSecret, xSignatureHeader, resource, userId } = params;
+
+  if (!clientSecret || !xSignatureHeader) return { valid: false, ts: null };
+
+  // Parse header: ts=...,v1=...
+  const parts: Record<string, string> = {};
+  for (const segment of xSignatureHeader.split(",")) {
+    const eq = segment.indexOf("=");
+    if (eq !== -1) {
+      parts[segment.slice(0, eq).trim()] = segment.slice(eq + 1).trim();
+    }
+  }
+
+  const ts = parts["ts"] ?? null;
+  const v1 = parts["v1"] ?? "";
+
+  if (!ts || !v1) return { valid: false, ts };
+
+  // Build the message exactly as ML does
+  const message = `ts:${ts}\nresource:${resource}\nuser_id:${userId}`;
+  const expected = await hmacSha256Hex(clientSecret, message);
+
+  return { valid: timingSafeEqual(expected, v1), ts };
+}
+
+// ---------------------------------------------------------------------------
+// Stock sync guardrails
+// ---------------------------------------------------------------------------
+
+/**
+ * Default minimum stock threshold before ML listing is auto-paused.
+ * Value 0 = threshold disabled (no auto-pause, pushes 0 to ML).
+ * Override per-connection via ecommerces.config.stock_min_threshold.
+ */
+export const MELI_STOCK_MIN_THRESHOLD = 0;
+
+/**
+ * Returns true if the listing should be paused (set status=paused on ML)
+ * instead of pushing available_quantity=0.
+ *
+ * @param qty    Computed stock quantity for the item.
+ * @param config The ecommerces.config JSONB field (parsed object).
+ */
+export function shouldPauseOnZeroStock(
+  qty: number,
+  config: Record<string, unknown> | null,
+): boolean {
+  const threshold = Number(config?.stock_min_threshold ?? MELI_STOCK_MIN_THRESHOLD);
+  if (!Number.isFinite(threshold) || threshold <= 0) return false;
+  return qty < threshold;
 }
