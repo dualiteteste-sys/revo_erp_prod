@@ -353,6 +353,7 @@ const ProductsPage: React.FC = () => {
     try {
       await productsService.deleteProductById(productToDelete.id);
       addToast('Produto excluído com sucesso!', 'success');
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
       handleCloseDeleteModal();
     } catch (e: any) {
       addToast(e.message || 'Erro ao excluir produto.', 'error');
@@ -374,6 +375,7 @@ const ProductsPage: React.FC = () => {
     try {
       const clone = await productsService.cloneProduct(product.id);
       addToast('Produto clonado com sucesso!', 'success');
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
       setSelectedProduct(clone);
       setIsFormOpen(true);
     } catch (e: any) {
@@ -386,6 +388,7 @@ const ProductsPage: React.FC = () => {
     try {
       const seededProducts = await productsService.seedDefaultProducts();
       addToast(`${seededProducts.length} produtos padrão foram adicionados!`, 'success');
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
       refreshList();
     } catch (e: any) {
       addToast(e.message || 'Erro ao popular produtos.', 'error');
@@ -409,6 +412,7 @@ const ProductsPage: React.FC = () => {
       if (fail) addToast(`${fail} falha(s) ao excluir.`, 'warning');
       bulk.clear();
       setBulkDeleteOpen(false);
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
       refreshList();
     } catch (e: any) {
       addToast(e?.message || 'Erro ao excluir selecionados.', 'error');
@@ -697,6 +701,7 @@ const ProductsPage: React.FC = () => {
         deleteFn={(id) => productsService.deleteProductById(id)}
         onImported={() => {
           setIsImportOpen(false);
+          queryClient.invalidateQueries({ queryKey: PRODUCTS_TREE_KEYS.all });
           refreshList();
         }}
       />
