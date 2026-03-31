@@ -1,0 +1,33 @@
+name: shopee-scheduler
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: shopee-scheduler-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Invoke Shopee scheduler
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SHOPEE_SCHEDULER_KEY: ${{ secrets.SHOPEE_SCHEDULER_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" ]] || [[ -z "${SHOPEE_SCHEDULER_KEY:-}" ]]; then
+            echo "::warning::Missing SUPABASE_URL or SHOPEE_SCHEDULER_KEY secrets (skipping scheduler tick)"
+            exit 0
+          fi
+          curl --fail-with-body --show-error --silent \
+            --connect-timeout 10 \
+            --max-time 180 \
+            -X POST "${SUPABASE_URL}/functions/v1/shopee-scheduler" \
+            -H "Content-Type: application/json" \
+            -H "x-shopee-scheduler-key: ${SHOPEE_SCHEDULER_KEY}" \
+            --data '{}'
