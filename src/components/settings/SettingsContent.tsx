@@ -7,7 +7,7 @@ import UsersPage from '@/pages/settings/general/UsersPage';
 import UnidadesPage from '@/pages/settings/general/UnidadesPage';
 import UserProfilePage from '@/components/settings/user-profile/UserProfilePage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
-import WooConnectionPanel from '@/components/settings/ecommerce/WooConnectionPanel';
+const MarketplaceIntegrationsPage = React.lazy(() => import('@/components/settings/ecommerce/MarketplaceIntegrationsPage'));
 const InterBankConfigPanel = React.lazy(() => import('@/components/settings/banking/InterBankConfigPanel'));
 
 interface SettingsContentProps {
@@ -33,7 +33,9 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <FeatureFlagsPage />;
       case 'Integrações':
         return (
-          <WooConnectionPanel />
+          <React.Suspense fallback={<div className="flex justify-center p-12"><span className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+            <MarketplaceIntegrationsPage />
+          </React.Suspense>
         );
       case 'Integrações Bancárias':
         return <React.Suspense fallback={<div className="flex justify-center p-12"><span className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}><InterBankConfigPanel /></React.Suspense>;
