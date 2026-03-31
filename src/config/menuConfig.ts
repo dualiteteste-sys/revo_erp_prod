@@ -109,6 +109,17 @@ export const menuConfig: MenuItem[] = [
     ]
   },
   {
+    name: 'Canais',
+    icon: Layers,
+    href: '#',
+    gradient: 'from-yellow-500 to-orange-500',
+    children: [
+      { name: 'Catálogo ML', icon: Package, href: '/app/canais/mercado-livre/catalogo', permission: { domain: 'ecommerce', action: 'manage' } },
+      { name: 'Painel Mercado Livre', icon: Activity, href: '/app/canais/mercado-livre/painel', permission: { domain: 'ecommerce', action: 'manage' } },
+      { name: 'WooCommerce', icon: Plug, href: '/app/desenvolvedor/woocommerce', permission: { domain: 'ops', action: 'manage' } },
+    ],
+  },
+  {
     name: 'Fiscal',
     icon: Receipt,
     href: '#',
