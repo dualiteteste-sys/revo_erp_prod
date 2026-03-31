@@ -17,6 +17,7 @@ import { trackRequestId } from "../_shared/request.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SCHEDULER_KEY = Deno.env.get("MELI_SCHEDULER_KEY") ?? "";
 
 function json(status: number, body: unknown, cors: Record<string, string>) {
   return new Response(JSON.stringify(body), {
@@ -32,6 +33,14 @@ Deno.serve(async (req: Request) => {
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json(500, { ok: false, error: "MISSING_ENV" }, cors);
+  }
+
+  // Authenticate via scheduler key (prevents unauthorized invocations)
+  if (SCHEDULER_KEY) {
+    const provided = req.headers.get("x-meli-scheduler-key") ?? "";
+    if (provided !== SCHEDULER_KEY) {
+      return json(401, { ok: false, error: "UNAUTHORIZED" }, cors);
+    }
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
