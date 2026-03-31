@@ -165,6 +165,36 @@ export async function getMeliHealthSummary(): Promise<MeliHealthSummary> {
 // Catalog listing (all ML anúncios for empresa)
 // ---------------------------------------------------------------------------
 
+export type MeliOrderRow = {
+  pedido_id: string;
+  numero: number | null;
+  cliente_nome: string | null;
+  status: string;
+  total_geral: number;
+  data_emissao: string;
+  external_order_id: string;
+  ml_status: string | null;
+  imported_at: string;
+};
+
+// ---------------------------------------------------------------------------
+// ML Orders listing (pedidos imported from ML)
+// ---------------------------------------------------------------------------
+
+export async function listMeliOrders(params?: {
+  q?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<MeliOrderRow[]> {
+  return callRpc<MeliOrderRow[]>('meli_orders_list', {
+    p_q: params?.q || null,
+    p_status: params?.status || null,
+    p_limit: params?.limit ?? 50,
+    p_offset: params?.offset ?? 0,
+  });
+}
+
 export async function listMeliCatalog(params?: {
   q?: string;
   status?: string;

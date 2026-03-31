@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
   const payloadHash = await sha256Hex(rawBody);
 
   // -------------------------------------------------------------------------
-  // 4. x-signature verification (non-blocking in this phase)
+  // 4. x-signature verification (blocking — rejects invalid signatures)
   // -------------------------------------------------------------------------
   const xSignatureHeader = req.headers.get("x-signature") ?? "";
   let signatureValid: boolean | null = null;
@@ -116,8 +116,11 @@ Deno.serve(async (req: Request) => {
       userId: userId ?? "",
     });
     signatureValid = sigResult.valid;
-    // Non-blocking: log signature_valid but do not reject.
-    // Once confirmed working in prod, change to: if (!sigResult.valid) return json(401, ...)
+    if (!sigResult.valid) {
+      return json(401, { ok: false, error: "INVALID_SIGNATURE" }, cors);
+    }
+  } else if (MELI_CLIENT_SECRET && !xSignatureHeader) {
+    return json(401, { ok: false, error: "MISSING_SIGNATURE" }, cors);
   }
 
   // -------------------------------------------------------------------------
