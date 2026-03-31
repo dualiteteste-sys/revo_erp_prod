@@ -51,6 +51,25 @@ export type MeliHealthSummary = {
   active_connections: number;
 };
 
+export type MeliCatalogItem = {
+  anuncio_id: string;
+  produto_id: string;
+  produto_nome: string;
+  produto_sku: string | null;
+  titulo_ml: string | null;
+  identificador_externo: string | null;
+  url_anuncio: string | null;
+  preco_especifico: number | null;
+  preco_venda: number | null;
+  estoque_disponivel: number | null;
+  status_anuncio: string;
+  sync_status: string;
+  last_sync_at: string | null;
+  last_error: string | null;
+  categoria_marketplace: string | null;
+  ecommerce_id: string;
+};
+
 // ---------------------------------------------------------------------------
 // Category cache (RPC-based)
 // ---------------------------------------------------------------------------
@@ -140,4 +159,22 @@ export async function listMeliWebhookEvents(
 
 export async function getMeliHealthSummary(): Promise<MeliHealthSummary> {
   return callRpc<MeliHealthSummary>('meli_health_summary', {});
+}
+
+// ---------------------------------------------------------------------------
+// Catalog listing (all ML anúncios for empresa)
+// ---------------------------------------------------------------------------
+
+export async function listMeliCatalog(params?: {
+  q?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<MeliCatalogItem[]> {
+  return callRpc<MeliCatalogItem[]>('meli_catalog_list', {
+    p_q: params?.q || null,
+    p_status: params?.status || null,
+    p_limit: params?.limit ?? 200,
+    p_offset: params?.offset ?? 0,
+  });
 }
