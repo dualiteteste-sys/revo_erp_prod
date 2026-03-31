@@ -241,6 +241,35 @@ export const HELP_CATALOG: HelpEntry[] = [
     ],
   },
   {
+    match: '/app/canais/shopee/painel',
+    title: 'Guia Rápido — Painel de Controle Shopee',
+    whatIs:
+      'Painel central para operar a integração com o Shopee: visão da conta, saúde da conexão, fila de sincronização e pedidos importados.',
+    steps: [
+      'Acesse via Canais → Shopee → Painel.',
+      'Na aba Visão Geral, verifique: conta Shopee conectada, status da API e jobs pendentes/falhos.',
+      'Na aba Fila, monitore jobs de importação de pedidos e sincronização de estoque/preço.',
+      'Use "Importar Pedidos Agora" para forçar uma importação manual.',
+      'Na aba Pedidos Shopee, busque pedidos importados por número, cliente ou Order SN.',
+    ],
+    dependsOn: ['Permissão: E-commerce (manage)', 'Conexão Shopee ativa (OAuth)'],
+    connectsWith: ['Configurações → Integrações', 'Produtos → Canais/Marketplace', 'Logs'],
+    fillPerfectly: [
+      'Monitorar diariamente o status da conexão e API Shopee.',
+      'Tratar erros na fila antes que acumulem (Dead Letter Queue).',
+      'Verificar se pedidos importados estão com status correto no ERP.',
+    ],
+    commonMistakes: [
+      'Token expirado sem refresh configurado (Shopee token dura apenas 4h).',
+      'Ignorar jobs com status "dead" — podem indicar pedidos perdidos.',
+      'Não verificar se o mapeamento SKU → produto está correto antes de importar pedidos.',
+    ],
+    links: [
+      { label: 'Integrações', href: '/app/configuracoes/ecommerce/marketplaces', kind: 'internal' },
+      { label: 'Painel ML (comparativo)', href: '/app/canais/mercado-livre/painel', kind: 'internal' },
+    ],
+  },
+  {
     match: '/app/desenvolvedor/entitlements',
     title: 'Guia Rápido — Entitlements por plano (Ultria)',
     whatIs:

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
+import { shopeeAuthUrl, shopeeExchangeCode } from "../_shared/shopeeHardening.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -10,6 +11,8 @@ const SITE_URL = (Deno.env.get("SITE_URL") ?? "").trim(); // ex: https://app.seu
 
 const MELI_CLIENT_ID = (Deno.env.get("MELI_CLIENT_ID") ?? "").trim();
 const MELI_CLIENT_SECRET = (Deno.env.get("MELI_CLIENT_SECRET") ?? "").trim();
+const SHOPEE_PARTNER_ID = (Deno.env.get("SHOPEE_PARTNER_ID") ?? "").trim();
+const SHOPEE_PARTNER_KEY = (Deno.env.get("SHOPEE_PARTNER_KEY") ?? "").trim();
 
 type StartBody = {
   action?: "start";
@@ -109,8 +112,38 @@ serve(async (req) => {
     }
 
     if (provider === "shopee") {
+      if (!SHOPEE_PARTNER_ID || !SHOPEE_PARTNER_KEY) {
+        await admin.from("ecommerce_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", stRow.id);
+        return redirect(`${redirectTo}?oauth=error&reason=missing_shopee_secrets&provider=shopee`, cors);
+      }
+      const shopId = (url.searchParams.get("shop_id") ?? "").trim();
+      if (!code || !shopId) {
+        await admin.from("ecommerce_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", stRow.id);
+        return redirect(`${redirectTo}?oauth=error&reason=missing_code_or_shop_id&provider=shopee`, cors);
+      }
+      const ex = await shopeeExchangeCode({ partnerId: SHOPEE_PARTNER_ID, partnerKey: SHOPEE_PARTNER_KEY, code, shopId });
+      if (!ex.ok) {
+        await admin.from("ecommerces").update({ status: "error", last_error: JSON.stringify(ex.data).slice(0, 900) }).eq("id", stRow.ecommerce_id);
+        await admin.from("ecommerce_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", stRow.id);
+        return redirect(`${redirectTo}?oauth=error&reason=token_exchange_failed&provider=shopee`, cors);
+      }
+      const accessToken = String(ex.data?.access_token ?? "");
+      const refreshToken = String(ex.data?.refresh_token ?? "");
+      const expiresIn = Number(ex.data?.expire_in ?? 0);
+      const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
+
+      await admin.from("ecommerce_connection_secrets").upsert(
+        { empresa_id: stRow.empresa_id, ecommerce_id: stRow.ecommerce_id, access_token: accessToken || null, refresh_token: refreshToken || null, token_expires_at: expiresAt, token_scopes: null, token_type: null },
+        { onConflict: "ecommerce_id" },
+      );
+      await admin.from("ecommerces").update({ status: "connected", external_account_id: shopId, connected_at: new Date().toISOString(), last_error: null, last_sync_at: null }).eq("id", stRow.ecommerce_id);
+      const { data: acct } = await admin.from("ecommerce_accounts").upsert(
+        { empresa_id: stRow.empresa_id, ecommerce_id: stRow.ecommerce_id, provider: "shopee", external_account_id: shopId, nome: `Loja Shopee ${shopId}`, connected_at: new Date().toISOString(), meta: { shop_id: shopId } },
+        { onConflict: "ecommerce_id,external_account_id" },
+      ).select("id").maybeSingle();
+      if (acct?.id) await admin.from("ecommerces").update({ active_account_id: acct.id }).eq("id", stRow.ecommerce_id);
       await admin.from("ecommerce_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", stRow.id);
-      return redirect(`${redirectTo}?oauth=error&reason=not_implemented&provider=shopee`, cors);
+      return redirect(`${redirectTo}?oauth=success&provider=shopee`, cors);
     }
 
     if (!MELI_CLIENT_ID || !MELI_CLIENT_SECRET) {
@@ -217,6 +250,9 @@ serve(async (req) => {
     return json(200, { ok: true, provider: "meli", url: authUrl }, cors);
   }
 
-  // Shopee: esqueleto (a URL/parametrização varia conforme SDK/contrato do parceiro)
-  return json(501, { ok: false, provider: "shopee", error: "NOT_IMPLEMENTED_YET", hint: "SHO-01 será implementado após definição de credenciais/fluxo Shopee." }, cors);
+  // Shopee OAuth start
+  if (!SHOPEE_PARTNER_ID || !SHOPEE_PARTNER_KEY) return json(500, { ok: false, error: "MISSING_SHOPEE_SECRETS" }, cors);
+  const shopeeRedirectUri = buildCallbackUrl(req, "shopee");
+  const shopeeUrl = await shopeeAuthUrl({ partnerId: SHOPEE_PARTNER_ID, partnerKey: SHOPEE_PARTNER_KEY, redirectUrl: shopeeRedirectUri });
+  return json(200, { ok: true, provider: "shopee", url: shopeeUrl }, cors);
 });

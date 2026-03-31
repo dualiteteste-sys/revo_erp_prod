@@ -56,6 +56,7 @@ const OpsEntitlementsPage = lazyImport(() => import("../pages/dev/OpsEntitlement
 const WooCommerceStoresPage = lazyImport(() => import("../pages/dev/WooCommerceStoresPage"));
 const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooCommerceStoreDetailPage"));
 const MeliControlPanelPage = lazyImport(() => import("../pages/dev/MeliControlPanelPage"));
+const ShopeeControlPanelPage = lazyImport(() => import("../pages/dev/ShopeeControlPanelPage"));
 const MeliCatalogPage = lazyImport(() => import("../pages/products/MeliCatalogPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
@@ -757,6 +758,22 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ecommerce", action: "manage" }}>
                   <Suspense fallback={<PageLoader />}><MeliControlPanelPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/shopee",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><ShopeeControlPanelPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "canais/shopee/painel",
+              element: (
+                <RequirePermission permission={{ domain: "ecommerce", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><ShopeeControlPanelPage /></Suspense>
                 </RequirePermission>
               ),
             },
