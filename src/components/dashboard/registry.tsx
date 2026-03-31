@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     DollarSign, Users, ShoppingCart, TrendingUp, BarChart3, Activity, List, PieChart,
     Calendar, AlertTriangle, Zap, Server, Trophy, FileText, ArrowRight, ArrowUp, ArrowDown,
-    Wallet, Target, Clock, Settings, Check
+    Wallet, Target, Clock, Settings, Check, Layers, CheckCircle2, XCircle
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid, ComposedChart, Line, Cell, Legend, ReferenceLine } from 'recharts';
 import KPICard from './KPICard';
@@ -24,6 +24,7 @@ import { ALL_SHORTCUTS, DEFAULT_SHORTCUT_IDS } from '@/config/shortcutsConfig';
 import { getShortcuts, setShortcuts } from '@/services/dashboardShortcuts';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { useNavigate } from 'react-router-dom';
+import { getMeliHealthSummary, type MeliHealthSummary } from '@/services/meliCategories';
 
 // --- Types ---
 
@@ -810,6 +811,89 @@ const GoalGaugeWidget: React.FC<WidgetProps> = ({ data, loading }) => {
     );
 };
 
+// --- Marketplace Health Widget (self-fetching) ---
+
+const MarketplaceHealthWidget: React.FC<WidgetProps> = () => {
+    const [summary, setSummary] = useState<MeliHealthSummary | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+        getMeliHealthSummary()
+            .then(s => { if (mounted) setSummary(s); })
+            .catch(() => { if (mounted) setSummary(null); })
+            .finally(() => { if (mounted) setLoading(false); });
+        return () => { mounted = false; };
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="h-full p-5 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (!summary) {
+        return (
+            <div className="h-full p-5 flex flex-col items-center justify-center text-center">
+                <Layers size={28} className="text-slate-300 mb-2" />
+                <p className="text-sm text-slate-400">Nenhuma integração ML configurada</p>
+            </div>
+        );
+    }
+
+    const items = [
+        { label: 'Sincronizados', value: String(summary.synced ?? 0), icon: CheckCircle2, color: 'emerald' },
+        { label: 'Pendentes', value: String(summary.pending ?? 0), icon: Clock, color: 'amber' },
+        { label: 'Com Erro', value: String(summary.error ?? 0), icon: XCircle, color: 'rose' },
+    ];
+
+    const gradients: Record<string, string> = {
+        emerald: 'from-emerald-50/80 to-teal-50/50 border-emerald-100/50',
+        amber: 'from-amber-50/80 to-yellow-50/50 border-amber-100/50',
+        rose: 'from-rose-50/80 to-pink-50/50 border-rose-100/50',
+    };
+    const textColors: Record<string, string> = {
+        emerald: 'text-emerald-500',
+        amber: 'text-amber-500',
+        rose: 'text-rose-500',
+    };
+    const badgeColors: Record<string, string> = {
+        emerald: 'text-emerald-700 bg-emerald-100',
+        amber: 'text-amber-700 bg-amber-100',
+        rose: 'text-rose-700 bg-rose-100',
+    };
+
+    return (
+        <div className="h-full p-5 flex flex-col">
+            <WidgetHeader icon={Layers} title="Marketplace ML" iconColor="text-yellow-500" />
+            <div className="flex-1 flex flex-col justify-center space-y-3">
+                {items.map((item, i) => (
+                    <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className={`flex items-center justify-between p-3 rounded-xl bg-gradient-to-r ${gradients[item.color]} border`}
+                    >
+                        <span className="text-sm text-slate-600 flex items-center gap-2">
+                            <item.icon size={14} className={textColors[item.color]} />
+                            {item.label}
+                        </span>
+                        <span className={`text-xs font-bold ${badgeColors[item.color]} px-2.5 py-1 rounded-lg`}>{item.value}</span>
+                    </motion.div>
+                ))}
+            </div>
+            {summary.last_sync_at && (
+                <p className="text-xs text-slate-400 mt-3 text-center">
+                    Última sync: {new Date(summary.last_sync_at).toLocaleDateString('pt-BR')}
+                </p>
+            )}
+        </div>
+    );
+};
+
 // --- Registry ---
 
 export const WIDGETS: Record<string, WidgetDefinition> = {
@@ -827,6 +911,7 @@ export const WIDGETS: Record<string, WidgetDefinition> = {
     'system-health': { id: 'system-health', component: SystemHealthWidget, title: 'Saude do Sistema', icon: Server, defaultW: 4, defaultH: 5, minW: 2, minH: 4 },
     'activities': { id: 'activities', component: ActivitiesWidget, title: 'Atividades Recentes', icon: List, defaultW: 4, defaultH: 10, minW: 3, minH: 6 },
     'calendar': { id: 'calendar', component: CalendarWidget, title: 'Calendario', icon: Calendar, defaultW: 3, defaultH: 5, minW: 2, minH: 4 },
+    'marketplace-health': { id: 'marketplace-health', component: MarketplaceHealthWidget, title: 'Marketplace ML', icon: Layers, defaultW: 4, defaultH: 6, minW: 3, minH: 5 },
 };
 
 export const DEFAULT_LAYOUT = [

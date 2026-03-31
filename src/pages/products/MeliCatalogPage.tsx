@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import GlassCard from '@/components/ui/GlassCard';
@@ -6,18 +6,13 @@ import { Button } from '@/components/ui/button';
 import {
   syncMeliStock,
   syncMeliPrice,
-  pauseMeliListing,
-  activateMeliListing,
   batchSyncMeliStock,
   batchSyncMeliPrice,
 } from '@/services/meliAdmin';
-import { listEcommerceConnections, type EcommerceConnection } from '@/services/ecommerceIntegrations';
-import { callRpc } from '@/lib/api';
+import { listMeliCatalog, type MeliCatalogItem } from '@/services/meliCategories';
 import {
   Package,
   RefreshCw,
-  Pause,
-  Play,
   ExternalLink,
   Search,
   Loader2,
@@ -25,105 +20,66 @@ import {
   AlertTriangle,
   XCircle,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-type MeliCatalogItem = {
-  anuncio_id: string;
-  produto_id: string;
-  produto_nome: string;
-  produto_sku: string | null;
-  titulo_ml: string | null;
-  identificador_externo: string | null;
-  url_anuncio: string | null;
-  preco_especifico: number | null;
-  preco_venda: number | null;
-  estoque_disponivel: number | null;
-  status_anuncio: string;
-  sync_status: string;
-  last_sync_at: string | null;
-  last_error: string | null;
-  categoria_marketplace: string | null;
-};
 
 export default function MeliCatalogPage() {
   const { activeEmpresaId } = useAuth();
   const { addToast } = useToast();
-  const [meliConn, setMeliConn] = useState<EcommerceConnection | null>(null);
   const [items, setItems] = useState<MeliCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const empresaId = activeEmpresaId || '';
-  const ecommerceId = meliConn?.id || '';
 
-  // Load connection
-  useEffect(() => {
-    if (!activeEmpresaId) return;
-    listEcommerceConnections()
-      .then((conns) => {
-        const meli = conns.find((c) => c.provider === 'meli');
-        setMeliConn(meli || null);
-      })
-      .catch(console.error);
-  }, [activeEmpresaId]);
-
-  // Load catalog items
-  const loadItems = useCallback(async () => {
-    if (!empresaId || !ecommerceId) {
+  // Load catalog items via RPC (server-side search + filter)
+  const loadItems = useCallback(async (q?: string, status?: string) => {
+    if (!empresaId) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      // Use a custom RPC or build from produto_anuncios + produtos
-      const data = await callRpc<any[]>('list_produto_anuncios_for_product', {
-        p_produto_id: null, // Load all for this ecommerce
-      }).catch(() => []);
-
-      // Since we don't have a dedicated catalog RPC yet, we'll load anuncios
-      // for the meli connection specifically
-      const { data: anuncios } = await (await import('@/lib/supabaseClient')).supabase.rpc(
-        'list_produto_anuncios_for_product' as any,
-        { p_produto_id: null as any },
-      ).catch(() => ({ data: null }));
-
-      // Fallback: use the service
-      const { listProdutoAnunciosForProduct } = await import('@/services/produtoAnuncios');
-      // We can't list all easily, so we show a message for now
-      setItems([]);
+      const data = await listMeliCatalog({
+        q: q || undefined,
+        status: status === 'all' ? undefined : status || undefined,
+      });
+      setItems(data ?? []);
     } catch {
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [empresaId, ecommerceId]);
+  }, [empresaId]);
 
+  // Initial load
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    loadItems(search, statusFilter);
+  }, [empresaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter items
-  const filtered = items.filter((item) => {
-    const matchSearch = !search ||
-      item.produto_nome?.toLowerCase().includes(search.toLowerCase()) ||
-      item.produto_sku?.toLowerCase().includes(search.toLowerCase()) ||
-      item.titulo_ml?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || item.sync_status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadItems(search, statusFilter);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search, statusFilter, loadItems]);
+
+  // Derive ecommerceId from first item (RPC resolves it)
+  const ecommerceId = items[0]?.ecommerce_id || '';
 
   // Bulk actions
   const handleBatchSyncStock = async () => {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || !ecommerceId) return;
     setActionLoading('batch-stock');
     try {
       await batchSyncMeliStock(empresaId, ecommerceId, Array.from(selected));
       addToast(`Estoque sincronizado para ${selected.size} itens.`, 'success');
       setSelected(new Set());
-      await loadItems();
+      await loadItems(search, statusFilter);
     } catch (e: any) {
       addToast(e?.message || 'Erro no sync em lote.', 'error');
     } finally {
@@ -132,13 +88,13 @@ export default function MeliCatalogPage() {
   };
 
   const handleBatchSyncPrice = async () => {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || !ecommerceId) return;
     setActionLoading('batch-price');
     try {
       await batchSyncMeliPrice(empresaId, ecommerceId, Array.from(selected));
       addToast(`Preços sincronizados para ${selected.size} itens.`, 'success');
       setSelected(new Set());
-      await loadItems();
+      await loadItems(search, statusFilter);
     } catch (e: any) {
       addToast(e?.message || 'Erro no sync em lote.', 'error');
     } finally {
@@ -153,10 +109,10 @@ export default function MeliCatalogPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === filtered.length) {
+    if (selected.size === items.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((i) => i.anuncio_id)));
+      setSelected(new Set(items.map((i) => i.anuncio_id)));
     }
   };
 
@@ -165,21 +121,6 @@ export default function MeliCatalogPage() {
     if (status === 'error') return <XCircle size={14} className="text-red-500" />;
     return <AlertTriangle size={14} className="text-amber-500" />;
   };
-
-  if (!meliConn) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Catálogo Mercado Livre</h1>
-        <GlassCard className="p-8 text-center">
-          <Package size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Nenhuma conexão Mercado Livre configurada.</p>
-          <p className="text-sm text-gray-400 mt-2">
-            Configure a integração em Configurações &gt; Integrações.
-          </p>
-        </GlassCard>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -241,13 +182,13 @@ export default function MeliCatalogPage() {
           <div className="flex items-center justify-center py-16">
             <Loader2 size={32} className="animate-spin text-blue-500" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="py-16 text-center">
             <Package size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">
-              {items.length === 0
-                ? 'Nenhum produto publicado no Mercado Livre.'
-                : 'Nenhum resultado para os filtros aplicados.'}
+              {search || statusFilter !== 'all'
+                ? 'Nenhum resultado para os filtros aplicados.'
+                : 'Nenhum produto publicado no Mercado Livre.'}
             </p>
             <p className="text-sm text-gray-400 mt-2">
               Publique produtos pela aba Canais/Marketplace na ficha do produto.
@@ -261,7 +202,7 @@ export default function MeliCatalogPage() {
                   <th className="px-4 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selected.size === filtered.length && filtered.length > 0}
+                      checked={selected.size === items.length && items.length > 0}
                       onChange={toggleSelectAll}
                       className="rounded"
                     />
@@ -276,7 +217,7 @@ export default function MeliCatalogPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200/30">
-                {filtered.map((item) => (
+                {items.map((item) => (
                   <tr key={item.anuncio_id} className="hover:bg-white/40 transition-colors">
                     <td className="px-4 py-3">
                       <input

@@ -743,6 +743,23 @@ export const appRoutes: RouteObject[] = [
                 </RequirePermission>
               ),
             },
+            // Canais (user-facing marketplace routes)
+            {
+              path: "canais/mercado-livre/catalogo",
+              element: (
+                <RequirePermission permission={{ domain: "ecommerce", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><MeliCatalogPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "canais/mercado-livre/painel",
+              element: (
+                <RequirePermission permission={{ domain: "ecommerce", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><MeliControlPanelPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
             {
                 path: 'tools/xml-tester',
                 element: (
