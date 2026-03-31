@@ -25,6 +25,15 @@
 [functions.meli-scheduler]
   verify_jwt = false
 
+[functions.shopee-webhook]
+  verify_jwt = false
+
+[functions.shopee-worker]
+  verify_jwt = false
+
+[functions.shopee-scheduler]
+  verify_jwt = false
+
 [functions.manual-create-user]
   cors_origins = ["http://localhost:5173"]
   cors_methods = ["POST", "OPTIONS"]
