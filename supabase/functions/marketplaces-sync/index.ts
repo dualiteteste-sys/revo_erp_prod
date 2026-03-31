@@ -4,6 +4,18 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { chooseNextPedidoStatus, mapMeliOrderStatus } from "../_shared/meli_mapping.ts";
 import { finopsTrackUsage } from "../_shared/finops.ts";
+import {
+  refreshMeliToken as refreshMeliTokenShared,
+  meliFetchJson as meliFetchJsonShared,
+  shouldPauseOnZeroStock,
+} from "../_shared/meliHardening.ts";
+import {
+  upsertPedidoFromMeliOrder,
+  ensureBuyerAsPartner,
+  findProductForMeliItem,
+  num,
+  toIsoOrNull,
+} from "../_shared/meliOrderImport.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -125,13 +137,7 @@ async function rateLimitCheck(params: {
   }
 }
 
-function toIsoOrNull(value: unknown): string | null {
-  if (!value) return null;
-  const s = String(value).trim();
-  if (!s) return null;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
+// toIsoOrNull — imported from _shared/meliOrderImport.ts
 
 function plusDaysIso(days: number): string {
   return new Date(Date.now() + days * 86400000).toISOString();
@@ -153,30 +159,11 @@ async function canManageEcommerce(userClient: any): Promise<boolean> {
   }
 }
 
-async function refreshMeliToken(params: { refreshToken: string; }): Promise<{ ok: boolean; status: number; data: any }> {
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("client_id", MELI_CLIENT_ID);
-  body.set("client_secret", MELI_CLIENT_SECRET);
-  body.set("refresh_token", params.refreshToken);
-  const resp = await fetch("https://api.mercadolibre.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const data = await resp.json().catch(() => ({}));
-  return { ok: resp.ok, status: resp.status, data };
-}
+// refreshMeliToken — imported from _shared/meliHardening.ts (as refreshMeliTokenShared)
 
+// meliFetchJson — imported from _shared/meliHardening.ts (as meliFetchJsonShared)
 async function meliFetchJson(url: string, accessToken: string): Promise<{ ok: boolean; status: number; data: any }> {
-  const resp = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-  });
-  const data = await resp.json().catch(() => ({}));
-  return { ok: resp.ok, status: resp.status, data };
+  return meliFetchJsonShared(url, accessToken);
 }
 
 function normalizeStoreUrl(input: string): string {
@@ -380,165 +367,8 @@ async function findProductForWooItem(admin: any, empresaId: string, item: any): 
   return data?.id ? String(data.id) : null;
 }
 
-function num(value: any, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-async function ensureBuyerAsPartner(admin: any, empresaId: string, buyer: any): Promise<string> {
-  const buyerId = buyer?.id != null ? String(buyer.id) : "";
-  const code = buyerId ? `meli:${buyerId}` : null;
-  const name =
-    [buyer?.first_name, buyer?.last_name].filter(Boolean).join(" ").trim() ||
-    String(buyer?.nickname ?? "").trim() ||
-    (buyerId ? `Cliente Mercado Livre ${buyerId}` : "Cliente Mercado Livre");
-
-  if (code) {
-    const { data: existing } = await admin
-      .from("pessoas")
-      .select("id")
-      .eq("empresa_id", empresaId)
-      .eq("codigo_externo", code)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (existing?.id) return existing.id as string;
-  }
-
-  const payload: any = {
-    empresa_id: empresaId,
-    tipo: "cliente",
-    nome: name,
-    email: buyer?.email ? String(buyer.email) : null,
-    telefone: null,
-    doc_unico: null,
-    codigo_externo: code,
-    tipo_pessoa: "fisica",
-  };
-  const { data: created, error } = await admin.from("pessoas").insert(payload).select("id").single();
-  if (error) throw error;
-  return created.id as string;
-}
-
-async function findProductForMeliItem(admin: any, ecommerceId: string, empresaId: string, item: any): Promise<string | null> {
-  const itemId = item?.item?.id != null ? String(item.item.id) : null;
-  if (!itemId) return null;
-  const { data } = await admin
-    .from("produto_anuncios")
-    .select("produto_id")
-    .eq("empresa_id", empresaId)
-    .eq("ecommerce_id", ecommerceId)
-    .eq("identificador", itemId)
-    .maybeSingle();
-  return data?.produto_id ? String(data.produto_id) : null;
-}
-
-async function upsertPedidoFromMeliOrder(params: {
-  admin: any;
-  empresaId: string;
-  ecommerceId: string;
-  order: any;
-}): Promise<{ pedidoId: string | null; skippedItems: number; totalItems: number }> {
-  const { admin, empresaId, ecommerceId, order } = params;
-
-  const externalOrderId = order?.id != null ? String(order.id) : "";
-  if (!externalOrderId) return { pedidoId: null, skippedItems: 0, totalItems: 0 };
-
-  const buyer = order?.buyer ?? {};
-  const clienteId = await ensureBuyerAsPartner(admin, empresaId, buyer);
-
-  const desiredStatus = mapMeliOrderStatus(order);
-  const createdAtIso = toIsoOrNull(order?.date_created) ?? new Date().toISOString();
-  const dataEmissao = createdAtIso.slice(0, 10); // date
-
-  const orderItems = Array.isArray(order?.order_items) ? order.order_items : [];
-  let totalProdutos = 0;
-  let skippedItems = 0;
-
-  // Cria/atualiza pedido local
-  const basePedido: any = {
-    empresa_id: empresaId,
-    cliente_id: clienteId,
-    data_emissao: dataEmissao,
-    frete: num(order?.shipping?.cost, 0),
-    desconto: 0,
-    condicao_pagamento: null,
-    observacoes: `Mercado Livre #${externalOrderId}`,
-    canal: "marketplace",
-  };
-
-  // vínculo
-  const { data: linkExisting } = await admin
-    .from("ecommerce_order_links")
-    .select("vendas_pedido_id")
-    .eq("empresa_id", empresaId)
-    .eq("ecommerce_id", ecommerceId)
-    .eq("external_order_id", externalOrderId)
-    .maybeSingle();
-
-  let pedidoId: string | null = linkExisting?.vendas_pedido_id ? String(linkExisting.vendas_pedido_id) : null;
-
-  if (pedidoId) {
-    const { data: existing } = await admin.from("vendas_pedidos").select("status").eq("id", pedidoId).eq("empresa_id", empresaId).maybeSingle();
-    basePedido.status = chooseNextPedidoStatus(existing?.status, desiredStatus);
-    await admin.from("vendas_pedidos").update(basePedido).eq("id", pedidoId).eq("empresa_id", empresaId);
-    await admin.from("vendas_itens_pedido").delete().eq("empresa_id", empresaId).eq("pedido_id", pedidoId);
-  } else {
-    basePedido.status = desiredStatus;
-    const { data: created, error } = await admin.from("vendas_pedidos").insert(basePedido).select("id").single();
-    if (error) throw error;
-    pedidoId = String(created.id);
-  }
-
-  const itemsToInsert: any[] = [];
-  for (const it of orderItems) {
-    const produtoId = await findProductForMeliItem(admin, ecommerceId, empresaId, it);
-    if (!produtoId) {
-      skippedItems += 1;
-      continue;
-    }
-    const qty = num(it?.quantity, 0);
-    const unit = num(it?.unit_price, 0);
-    const total = Math.max(0, qty * unit);
-    totalProdutos += total;
-    itemsToInsert.push({
-      empresa_id: empresaId,
-      pedido_id: pedidoId,
-      produto_id: produtoId,
-      quantidade: qty,
-      preco_unitario: unit,
-      desconto: 0,
-      total,
-      observacoes: null,
-    });
-  }
-
-  if (itemsToInsert.length > 0) {
-    const { error: itErr } = await admin.from("vendas_itens_pedido").insert(itemsToInsert);
-    if (itErr) throw itErr;
-  }
-
-  const totalGeral = Math.max(0, totalProdutos + basePedido.frete - basePedido.desconto);
-  await admin.from("vendas_pedidos").update({
-    total_produtos: totalProdutos,
-    total_geral: totalGeral,
-  }).eq("id", pedidoId).eq("empresa_id", empresaId);
-
-  await admin.from("ecommerce_order_links").upsert(
-    {
-      empresa_id: empresaId,
-      ecommerce_id: ecommerceId,
-      provider: "meli",
-      external_order_id: externalOrderId,
-      vendas_pedido_id: pedidoId,
-      status: String(order?.status ?? null),
-      payload: sanitizeForLog(order ?? {}),
-      imported_at: new Date().toISOString(),
-    },
-    { onConflict: "ecommerce_id,external_order_id" },
-  );
-
-  return { pedidoId, skippedItems, totalItems: orderItems.length };
-}
+// num, ensureBuyerAsPartner, findProductForMeliItem, upsertPedidoFromMeliOrder
+// — imported from _shared/meliOrderImport.ts
 
 async function upsertPedidoFromWooOrder(params: {
   admin: any;
@@ -1259,7 +1089,7 @@ serve(async (req) => {
   let orderDetailCalls = 0;
 
   if ((!accessToken || expired) && refreshToken) {
-    const r = await refreshMeliToken({ refreshToken });
+    const r = await refreshMeliTokenShared({ clientId: MELI_CLIENT_ID, clientSecret: MELI_CLIENT_SECRET, refreshToken });
     if (!r.ok) {
       await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: `MELI_REFRESH_FAILED:${r.status}` });
       return json(502, { ok: false, error: "MELI_REFRESH_FAILED", status: r.status, data: sanitizeForLog(r.data) }, cors);
@@ -1337,7 +1167,12 @@ serve(async (req) => {
           if (action === "sync_stock") {
             const { data: prod } = await admin.from("produtos").select("estoque_disponivel,estoque_atual").eq("id", anuncio.produto_id).maybeSingle();
             const qty = Math.max(0, Math.trunc(Number(prod?.estoque_disponivel ?? prod?.estoque_atual ?? 0)));
-            updateBody = { available_quantity: qty };
+            const connConfig = (conn.config ?? {}) as Record<string, unknown>;
+            if (shouldPauseOnZeroStock(qty, connConfig)) {
+              updateBody = { status: "paused" };
+            } else {
+              updateBody = { available_quantity: qty };
+            }
           } else {
             const { data: prod } = await admin.from("produtos").select("preco_venda,preco_promocional").eq("id", anuncio.produto_id).maybeSingle();
             const p = anuncio.preco_especifico ?? prod?.preco_promocional ?? prod?.preco_venda ?? 0;
