@@ -1,0 +1,33 @@
+name: meli-scheduler
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: meli-scheduler-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Invoke ML scheduler
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          MELI_SCHEDULER_KEY: ${{ secrets.MELI_SCHEDULER_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" ]] || [[ -z "${MELI_SCHEDULER_KEY:-}" ]]; then
+            echo "::warning::Missing SUPABASE_URL or MELI_SCHEDULER_KEY secrets (skipping scheduler tick)"
+            exit 0
+          fi
+          curl --fail-with-body --show-error --silent \
+            --connect-timeout 10 \
+            --max-time 180 \
+            -X POST "${SUPABASE_URL}/functions/v1/meli-scheduler" \
+            -H "Content-Type: application/json" \
+            -H "x-meli-scheduler-key: ${MELI_SCHEDULER_KEY}" \
+            --data '{}'
