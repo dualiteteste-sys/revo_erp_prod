@@ -23,6 +23,8 @@ export type NfeImportItem = {
   cprod: string | null;
   ean: string | null;
   xprod: string | null;
+  ncm: string | null;
+  cfop: string | null;
   ucom: string | null;
   qcom: number;
   vuncom: number;

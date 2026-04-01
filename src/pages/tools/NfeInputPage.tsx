@@ -980,6 +980,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                                   gtin: isValidEan(item.ean) ? (item.ean || '') : '',
                                   unidade: item.ucom || 'un',
                                   preco_custo: item.vuncom || 0,
+                                  ...(item.ncm ? { ncm: item.ncm } : {}),
                                 }}
                               />
                             </div>
