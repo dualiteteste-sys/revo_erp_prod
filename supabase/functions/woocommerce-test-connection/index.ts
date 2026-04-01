@@ -140,18 +140,20 @@ async function syncStoreRuntimeStatus(params: {
     .eq("id", store.id)
     .eq("empresa_id", params.empresaId);
 
-  await params.adminClient.from("woocommerce_sync_log").insert({
-    empresa_id: params.empresaId,
-    store_id: store.id,
-    level: "info",
-    message: "legacy_test_connection_synced_store",
-    meta: {
-      request_id: params.requestId || null,
-      status: params.status,
-      auth_mode: params.authMode,
-      note: params.note || null,
-    },
-  }).catch(() => null);
+  try {
+    await params.adminClient.from("woocommerce_sync_log").insert({
+      empresa_id: params.empresaId,
+      store_id: store.id,
+      level: "info",
+      message: "legacy_test_connection_synced_store",
+      meta: {
+        request_id: params.requestId || null,
+        status: params.status,
+        auth_mode: params.authMode,
+        note: params.note || null,
+      },
+    });
+  } catch { /* best-effort logging */ }
 }
 
 async function wooFetch(

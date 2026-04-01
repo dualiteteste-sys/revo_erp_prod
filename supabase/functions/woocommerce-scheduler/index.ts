@@ -83,33 +83,41 @@ Deno.serve(async (req) => {
 
     if (!workerResp.ok) {
       const resolved = resolveWooError("CLAIM_FAILED");
-      await Promise.all(storeRows.map((store: any) => svc.from("woocommerce_sync_log").insert({
-        empresa_id: String(store.empresa_id),
-        store_id: String(store.id),
-        level: "error",
-        message: "scheduler_tick_failed",
-        meta: sanitizeForLog({
-          code: "CLAIM_FAILED",
-          hint: resolved.hint,
-          duration_ms: durationMs,
-          worker: workerData,
-        }),
-      }).catch(() => null)));
+      await Promise.all(storeRows.map(async (store: any) => {
+        try {
+          await svc.from("woocommerce_sync_log").insert({
+            empresa_id: String(store.empresa_id),
+            store_id: String(store.id),
+            level: "error",
+            message: "scheduler_tick_failed",
+            meta: sanitizeForLog({
+              code: "CLAIM_FAILED",
+              hint: resolved.hint,
+              duration_ms: durationMs,
+              worker: workerData,
+            }),
+          });
+        } catch { /* best-effort logging */ }
+      }));
       return json(502, { ok: false, error: "WORKER_INVOKE_FAILED", details: workerData }, cors);
     }
 
-    await Promise.all(storeRows.map((store: any) => svc.from("woocommerce_sync_log").insert({
-      empresa_id: String(store.empresa_id),
-      store_id: String(store.id),
-      level: "info",
-      message: "scheduler_tick",
-      meta: sanitizeForLog({
-        duration_ms: durationMs,
-        processed_jobs: Number((workerData as any)?.processed_jobs ?? 0),
-        limit,
-        max_batches: maxBatches,
-      }),
-    }).catch(() => null)));
+    await Promise.all(storeRows.map(async (store: any) => {
+      try {
+        await svc.from("woocommerce_sync_log").insert({
+          empresa_id: String(store.empresa_id),
+          store_id: String(store.id),
+          level: "info",
+          message: "scheduler_tick",
+          meta: sanitizeForLog({
+            duration_ms: durationMs,
+            processed_jobs: Number((workerData as any)?.processed_jobs ?? 0),
+            limit,
+            max_batches: maxBatches,
+          }),
+        });
+      } catch { /* best-effort logging */ }
+    }));
   }
 
   if (!workerResp.ok) return json(502, { ok: false, error: "WORKER_INVOKE_FAILED", details: workerData }, cors);

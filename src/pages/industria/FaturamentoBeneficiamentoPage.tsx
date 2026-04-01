@@ -55,6 +55,7 @@ export default function FaturamentoBeneficiamentoPage() {
   const columns: TableColumnWidthDef[] = [
     { id: 'check', defaultWidth: 50, minWidth: 50, resizable: false },
     { id: 'ob', defaultWidth: 100, minWidth: 90 },
+    { id: 'codigo', defaultWidth: 130, minWidth: 100 },
     { id: 'produto', defaultWidth: 250, minWidth: 180 },
     { id: 'cliente', defaultWidth: 200, minWidth: 160 },
     { id: 'data', defaultWidth: 120, minWidth: 110 },
@@ -278,6 +279,7 @@ export default function FaturamentoBeneficiamentoPage() {
                   />
                 </th>
                 <ResizableSortableTh columnId="ob" label="OB" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
+                <ResizableSortableTh columnId="codigo" label="Código" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
                 <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
                 <ResizableSortableTh columnId="cliente" label="Cliente" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
                 <ResizableSortableTh columnId="data" label="Data Entrega" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
@@ -289,14 +291,14 @@ export default function FaturamentoBeneficiamentoPage() {
             <tbody className="divide-y divide-gray-100 bg-white">
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                     <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" size={18} /> Carregando...</span>
                   </td>
                 </tr>
               )}
               {!loading && entregas.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                     <FileText className="mx-auto h-10 w-10 text-gray-300 mb-2" />
                     <p>Nenhuma entrega elegível encontrada.</p>
                     <p className="text-xs mt-1">Libere entregas para faturamento na tela da OB.</p>
@@ -319,6 +321,7 @@ export default function FaturamentoBeneficiamentoPage() {
                       />
                     </td>
                     <td className="px-3 py-3 font-semibold text-gray-900">{formatOrderNumber(e.ordem_numero)}</td>
+                    <td className="px-3 py-3 text-gray-600 font-mono text-xs">{e.produto_sku || '—'}</td>
                     <td className="px-3 py-3 text-gray-800">{e.produto_nome}</td>
                     <td className="px-3 py-3 text-gray-700">{e.cliente_nome}</td>
                     <td className="px-3 py-3 text-gray-700">
