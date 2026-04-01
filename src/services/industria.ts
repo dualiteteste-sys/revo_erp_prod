@@ -35,6 +35,8 @@ export type OrdemIndustria = {
   qtde_caixas?: number | null;
   numero_nf?: string | null;
   pedido_numero?: string | null;
+  lote?: string | null;
+  numero_serie?: string | null;
   status_faturamento?: StatusFaturamentoOB;
   pedido_venda_id?: string | null;
 };
@@ -98,6 +100,8 @@ export type OrdemIndustriaDetails = {
   numero_nf?: string | null;
   pedido_numero?: string | null;
   qtde_caixas?: number | null;
+  lote?: string | null;
+  numero_serie?: string | null;
   // Origem fiscal (NF-e / XML)
   origem_fiscal_nfe_import_id?: string | null;
   origem_fiscal_nfe_item_id?: string | null;

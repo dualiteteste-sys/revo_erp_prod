@@ -47,6 +47,8 @@ interface Props {
     origemNfeItemId?: string | null;
     origemQtdXml?: number | null;
     origemUnidadeXml?: string | null;
+    lote?: string | null;
+    numeroSerie?: string | null;
   };
   allowTipoOrdemChange?: boolean;
   onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
@@ -163,6 +165,12 @@ export default function OrdemFormPanel({
         }
         if (initialPrefill.materialClienteUnidade && !next.material_cliente_unidade) {
           next.material_cliente_unidade = initialPrefill.materialClienteUnidade;
+        }
+        if (initialPrefill.lote && !next.lote) {
+          next.lote = initialPrefill.lote;
+        }
+        if (initialPrefill.numeroSerie && !next.numero_serie) {
+          next.numero_serie = initialPrefill.numeroSerie;
         }
       }
 
@@ -301,6 +309,8 @@ export default function OrdemFormPanel({
         qtde_caixas: formData.qtde_caixas,
         numero_nf: formData.numero_nf,
         pedido_numero: formData.pedido_numero,
+        lote: formData.lote,
+        numero_serie: formData.numero_serie,
         origem_fiscal_nfe_import_id: formData.origem_fiscal_nfe_import_id,
         origem_fiscal_nfe_item_id: formData.origem_fiscal_nfe_item_id,
         origem_qtd_xml: formData.origem_qtd_xml,
@@ -992,6 +1002,24 @@ export default function OrdemFormPanel({
             <Section title="Outros" description="Detalhes adicionais.">
               {formData.tipo_ordem === 'beneficiamento' && (
                 <>
+                  <Input
+                    label="Lote"
+                    name="lote"
+                    value={formData.lote || ''}
+                    onChange={e => handleHeaderChange('lote', e.target.value)}
+                    disabled={isLockedEffective}
+                    className="sm:col-span-2"
+                    placeholder="Número do lote"
+                  />
+                  <Input
+                    label="Número de Série"
+                    name="numero_serie"
+                    value={formData.numero_serie || ''}
+                    onChange={e => handleHeaderChange('numero_serie', e.target.value)}
+                    disabled={isLockedEffective}
+                    className="sm:col-span-2"
+                    placeholder="Serial do material"
+                  />
                   <Input
                     label="Qtde. de Caixas"
                     name="qtde_caixas"
