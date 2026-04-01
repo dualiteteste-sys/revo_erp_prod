@@ -157,19 +157,21 @@ async function logPayloadLimitExceeded(params: {
       received_bytes: params.receivedBytes,
     },
   });
-  await params.svc.from("woocommerce_webhook_event").insert({
-    empresa_id: params.empresaId,
-    store_id: params.storeId,
-    topic: params.topic || "unknown.unknown",
-    woo_resource_id: 0,
-    delivery_id: null,
-    payload_hash: params.payloadHash,
-    signature_valid: false,
-    payload: { dropped: true, reason: "WEBHOOK_PAYLOAD_TOO_LARGE" },
-    process_status: "dropped",
-    last_error: "WEBHOOK_PAYLOAD_TOO_LARGE",
-    error_code: "WEBHOOK_PAYLOAD_TOO_LARGE",
-  }).catch(() => null);
+  try {
+    await params.svc.from("woocommerce_webhook_event").insert({
+      empresa_id: params.empresaId,
+      store_id: params.storeId,
+      topic: params.topic || "unknown.unknown",
+      woo_resource_id: 0,
+      delivery_id: null,
+      payload_hash: params.payloadHash,
+      signature_valid: false,
+      payload: { dropped: true, reason: "WEBHOOK_PAYLOAD_TOO_LARGE" },
+      process_status: "dropped",
+      last_error: "WEBHOOK_PAYLOAD_TOO_LARGE",
+      error_code: "WEBHOOK_PAYLOAD_TOO_LARGE",
+    });
+  } catch { /* best-effort logging */ }
   await enqueueDroppedReconcileJob({
     svc: params.svc,
     empresaId: params.empresaId,
@@ -272,19 +274,21 @@ Deno.serve(async (req) => {
       context: "webhook_rate_limited",
       meta: { request_id: requestId, limit_per_minute: webhookRateLimitPerMinute },
     });
-    await svc.from("woocommerce_webhook_event").insert({
-      empresa_id: empresaId,
-      store_id: storeId,
-      topic: headers.topic,
-      woo_resource_id: wooResourceId,
-      delivery_id: headers.deliveryId,
-      payload_hash: payloadHash,
-      signature_valid: false,
-      payload: { dropped: true, reason: "WEBHOOK_RATE_LIMITED" },
-      process_status: "dropped",
-      last_error: "WEBHOOK_RATE_LIMITED",
-      error_code: "WEBHOOK_RATE_LIMITED",
-    }).catch(() => null);
+    try {
+      await svc.from("woocommerce_webhook_event").insert({
+        empresa_id: empresaId,
+        store_id: storeId,
+        topic: headers.topic,
+        woo_resource_id: wooResourceId,
+        delivery_id: headers.deliveryId,
+        payload_hash: payloadHash,
+        signature_valid: false,
+        payload: { dropped: true, reason: "WEBHOOK_RATE_LIMITED" },
+        process_status: "dropped",
+        last_error: "WEBHOOK_RATE_LIMITED",
+        error_code: "WEBHOOK_RATE_LIMITED",
+      });
+    } catch { /* best-effort logging */ }
     await enqueueDroppedReconcileJob({
       svc,
       empresaId,
@@ -368,11 +372,13 @@ Deno.serve(async (req) => {
   }
 
   // Best-effort retention cleanup. Keep only recent webhook payloads.
-  await svc.rpc("woocommerce_webhook_event_cleanup", {
-    p_store_id: storeId,
-    p_keep_days: webhookRetentionDays,
-    p_limit: 50,
-  }).catch(() => null);
+  try {
+    await svc.rpc("woocommerce_webhook_event_cleanup", {
+      p_store_id: storeId,
+      p_keep_days: webhookRetentionDays,
+      p_limit: 50,
+    });
+  } catch { /* best-effort cleanup */ }
 
   // Webhook must respond fast; processing happens asynchronously.
   return new Response(null, { status: 204, headers: cors });

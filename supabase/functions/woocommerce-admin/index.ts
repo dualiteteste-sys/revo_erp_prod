@@ -142,20 +142,22 @@ async function logTenantSpoofBlocked(params: {
 
   if (!logStore) return;
 
-  await params.svc.from("woocommerce_sync_log").insert({
-    empresa_id: logStore.empresa_id,
-    store_id: logStore.id,
-    level: "error",
-    message: "tenant_spoof_blocked",
-    meta: sanitizeForLog({
-      request_id: params.requestId,
-      caller_id: params.callerId,
-      action: String(params.body?.action ?? "").trim() || null,
-      header_empresa_id: params.headerEmpresaId,
-      attempted_store_id: storeIdFromBody,
-      error_code: "EMPRESA_CONTEXT_FORBIDDEN",
-    }),
-  }).catch(() => null);
+  try {
+    await params.svc.from("woocommerce_sync_log").insert({
+      empresa_id: logStore.empresa_id,
+      store_id: logStore.id,
+      level: "error",
+      message: "tenant_spoof_blocked",
+      meta: sanitizeForLog({
+        request_id: params.requestId,
+        caller_id: params.callerId,
+        action: String(params.body?.action ?? "").trim() || null,
+        header_empresa_id: params.headerEmpresaId,
+        attempted_store_id: storeIdFromBody,
+        error_code: "EMPRESA_CONTEXT_FORBIDDEN",
+      }),
+    });
+  } catch { /* best-effort logging */ }
 }
 
 async function resolveEmpresaIdFallback(baseUser: any): Promise<string> {
@@ -286,18 +288,19 @@ async function bootstrapStoresFromLegacyConnections(params: {
     const alreadyCleared = keyEnc.length < 12 && secretEnc.length < 12 && String((store as any)?.status ?? "") === "paused";
     if (alreadyCleared) continue;
 
-    await svc
-      .from("integrations_woocommerce_store")
-      .update({
-        status: "paused",
-        consumer_key_enc: "",
-        consumer_secret_enc: "",
-        legacy_secrets_updated_at: null,
-        updated_at: nowIso,
-      })
-      .eq("id", String((store as any)?.id ?? ""))
-      .eq("empresa_id", empresaId)
-      .catch(() => null);
+    try {
+      await svc
+        .from("integrations_woocommerce_store")
+        .update({
+          status: "paused",
+          consumer_key_enc: "",
+          consumer_secret_enc: "",
+          legacy_secrets_updated_at: null,
+          updated_at: nowIso,
+        })
+        .eq("id", String((store as any)?.id ?? ""))
+        .eq("empresa_id", empresaId);
+    } catch { /* best-effort cleanup */ }
   }
 
   let imported = 0;
@@ -391,16 +394,18 @@ async function bootstrapStoresFromLegacyConnections(params: {
   }
 
   if (imported > 0) {
-    await svc.from("woocommerce_sync_log").insert({
-      empresa_id: empresaId,
-      store_id: null,
-      level: "info",
-      message: "legacy_woo_stores_bootstrapped",
-      meta: sanitizeForLog({
-        request_id: requestId,
-        imported,
-      }),
-    }).catch(() => null);
+    try {
+      await svc.from("woocommerce_sync_log").insert({
+        empresa_id: empresaId,
+        store_id: null,
+        level: "info",
+        message: "legacy_woo_stores_bootstrapped",
+        meta: sanitizeForLog({
+          request_id: requestId,
+          imported,
+        }),
+      });
+    } catch { /* best-effort logging */ }
   }
   return imported;
 }
@@ -577,12 +582,13 @@ async function resolveWooStoreSettingsForCatalog(params: {
   if (legacyConfig) {
     const normalizedDb = normalizeWooStoreSettingsV1(storeSettings ?? {});
     if (JSON.stringify(normalizedDb) !== JSON.stringify(settings)) {
-      await params.svc
-        .from("integrations_woocommerce_store")
-        .update({ settings, updated_at: new Date().toISOString() })
-        .eq("id", String(params.store?.id ?? ""))
-        .eq("empresa_id", params.empresaId)
-        .catch(() => null);
+      try {
+        await params.svc
+          .from("integrations_woocommerce_store")
+          .update({ settings, updated_at: new Date().toISOString() })
+          .eq("id", String(params.store?.id ?? ""))
+          .eq("empresa_id", params.empresaId);
+      } catch { /* best-effort settings sync */ }
     }
   }
 
@@ -1060,17 +1066,19 @@ Deno.serve(async (req) => {
         .eq("empresa_id", empresaId)
         .order("updated_at", { ascending: false });
       if (error) {
-        await svc.from("woocommerce_sync_log").insert({
-          empresa_id: empresaId,
-          store_id: null,
-          level: "error",
-          message: "stores_list_failed",
-          meta: sanitizeForLog({
-            request_id: requestId,
-            action,
-            error: error.message ?? String(error),
-          }),
-        }).catch(() => null);
+        try {
+          await svc.from("woocommerce_sync_log").insert({
+            empresa_id: empresaId,
+            store_id: null,
+            level: "error",
+            message: "stores_list_failed",
+            meta: sanitizeForLog({
+              request_id: requestId,
+              action,
+              error: error.message ?? String(error),
+            }),
+          });
+        } catch { /* best-effort logging */ }
         throw error;
       }
       // Sempre tenta sincronizar com "Configurações → Marketplaces" (ecommerces + ecommerce_connection_secrets),
