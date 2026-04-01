@@ -174,7 +174,28 @@ export default function ConferenciaPage() {
         const base = effectiveItens.map((it) => {
             const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
             const disabled = !it.produto_id;
-            return { it, qty, disabled };
+
+            // Conversão de unidade preview
+            const unidadeXml = (it.fiscal_nfe_import_items?.ucom || it.produtos?.unidade || 'UN').toString().toUpperCase().trim();
+            const prodUnidade = (it.produtos?.unidade || 'UN').toUpperCase().trim();
+            const prodFator = it.produtos?.fator_conversao;
+            const prodUnidadeTrib = (it.produtos?.unidade_tributavel || '').toUpperCase().trim();
+
+            let qtyConvertida = qty;
+            let unidadeConvertida = unidadeXml;
+            let conversao = false;
+
+            if (unidadeXml !== prodUnidade && prodUnidadeTrib && unidadeXml === prodUnidadeTrib && prodFator && prodFator > 0) {
+                qtyConvertida = qty * prodFator;
+                unidadeConvertida = it.produtos?.unidade || 'UN';
+                conversao = true;
+            } else if (unidadeXml !== prodUnidade && !prodUnidadeTrib && prodFator && prodFator > 0) {
+                qtyConvertida = qty * prodFator;
+                unidadeConvertida = it.produtos?.unidade || 'UN';
+                conversao = true;
+            }
+
+            return { it, qty, disabled, qtyConvertida, unidadeConvertida, unidadeXml, conversao };
         });
         return sortRows(
             base,
@@ -1156,7 +1177,7 @@ export default function ConferenciaPage() {
                                         />
                                         <ResizableSortableTh
                                             columnId="qtd"
-                                            label="Qtd (conf.)"
+                                            label="Qtd p/ OB"
                                             align="right"
                                             className="px-4 py-3 text-xs font-semibold"
                                             sort={obSort as any}
@@ -1166,7 +1187,7 @@ export default function ConferenciaPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 bg-white">
-                                    {sortedGerarObItens.map(({ it, qty, disabled }) => {
+                                    {sortedGerarObItens.map(({ it, qty, disabled, qtyConvertida, unidadeConvertida, unidadeXml, conversao }) => {
                                         return (
                                             <tr key={it.id} className={disabled ? 'bg-gray-50' : ''}>
                                                 <td className="px-4 py-3">
@@ -1184,8 +1205,21 @@ export default function ConferenciaPage() {
                                                 <td className="px-4 py-3 text-sm text-gray-800">
                                                     {it.produtos?.nome || <span className="text-gray-400">Vincule um produto</span>}
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800">
-                                                    {qty} <span className="text-xs text-gray-500">{it.fiscal_nfe_import_items?.ucom || it.produtos?.unidade || ''}</span>
+                                                <td className="px-4 py-3 text-right text-sm text-gray-800">
+                                                    {conversao ? (
+                                                        <div>
+                                                            <div className="font-semibold text-emerald-700">
+                                                                {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(qtyConvertida)} <span className="text-xs">{unidadeConvertida}</span>
+                                                            </div>
+                                                            <div className="text-[11px] text-gray-400 line-through">
+                                                                {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(qty)} {unidadeXml}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="font-semibold">
+                                                            {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(qty)} <span className="text-xs text-gray-500">{unidadeXml}</span>
+                                                        </span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
