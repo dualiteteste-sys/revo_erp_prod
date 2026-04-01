@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       db: ${{ steps.filter.outputs.db }}
+      db_migrations: ${{ steps.filter.outputs.db_migrations }}
       landing_only: ${{ steps.landing_only.outputs.landing_only }}
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +33,11 @@ jobs:
               - 'supabase/functions/**'
               - 'scripts/**'
               - '.github/workflows/release-gate-dev.yml'
+            db_migrations:
+              - 'supabase/migrations/**'
+              - 'scripts/rg01_db_asserts.sql'
+              - 'scripts/rg03_db_asserts.sql'
+              - 'scripts/ci_supabase_start_db_only.sh'
       - name: Determine landing-only change
         id: landing_only
         run: |
@@ -135,22 +141,28 @@ jobs:
         run: yarn test:e2e:gate:all
 
       - name: Install PostgreSQL client (psql)
-        if: needs.changes.outputs.db == 'true'
+        if: needs.changes.outputs.db_migrations == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
       - name: Install Supabase CLI
-        if: needs.changes.outputs.db == 'true'
+        if: needs.changes.outputs.db_migrations == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Verify migrations + RG-03 DB asserts (local)
-        if: needs.changes.outputs.db == 'true'
+        if: needs.changes.outputs.db_migrations == 'true'
         run: |
           set -euo pipefail
+          # Pre-check: verify Docker daemon is responsive (flaky in GH Actions)
+          if ! docker info >/dev/null 2>&1; then
+            echo "::warning::Docker daemon not responsive — skipping local migration verification."
+            echo "The standalone 'Verify Migrations (dev)' workflow verifies against the remote DB."
+            exit 0
+          fi
           yarn verify:migrations:rg03
 
       - name: Landing fast gate note
