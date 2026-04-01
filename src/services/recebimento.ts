@@ -47,6 +47,8 @@ export type RecebimentoItem = {
         nome: string;
         sku: string | null;
         unidade: string;
+        fator_conversao?: number | null;
+        unidade_tributavel?: string | null;
     };
     fiscal_nfe_import_items?: {
         xprod: string;

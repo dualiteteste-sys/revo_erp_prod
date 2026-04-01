@@ -39,6 +39,7 @@ export type OrdemIndustria = {
   numero_serie?: string | null;
   status_faturamento?: StatusFaturamentoOB;
   pedido_venda_id?: string | null;
+  observacoes?: string | null;
 };
 
 export type OrdemComponente = {

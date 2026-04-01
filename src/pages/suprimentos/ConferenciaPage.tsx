@@ -676,17 +676,44 @@ export default function ConferenciaPage() {
             const pedido = gerarObPedido.trim() || null;
 
             const createdIds: string[] = [];
+            let convertedCount = 0;
+            const missingFatorItems: string[] = [];
+
             for (const it of selected) {
                 const produtoId = it.produto_id!;
-                const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
+                const qtyOriginal = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
                 const unidadeXml = it.fiscal_nfe_import_items?.ucom || null;
-                const unidade = (unidadeXml || it.produtos?.unidade || 'UN').toString();
+                const unidadeRaw = (unidadeXml || it.produtos?.unidade || 'UN').toString();
+
+                // --- Conversão de unidade ---
+                const prodUnidade = (it.produtos?.unidade || 'UN').toUpperCase().trim();
+                const prodFator = it.produtos?.fator_conversao;
+                const prodUnidadeTrib = (it.produtos?.unidade_tributavel || '').toUpperCase().trim();
+                const unidadeXmlNorm = unidadeRaw.toUpperCase().trim();
+
+                let qtyFinal = qtyOriginal;
+                let unidadeFinal = unidadeRaw;
+
+                if (unidadeXmlNorm !== prodUnidade && prodUnidadeTrib && unidadeXmlNorm === prodUnidadeTrib) {
+                    if (prodFator && prodFator > 0) {
+                        qtyFinal = qtyOriginal * prodFator;
+                        unidadeFinal = it.produtos?.unidade || 'UN';
+                        convertedCount++;
+                    } else {
+                        missingFatorItems.push(it.fiscal_nfe_import_items?.xprod || it.produtos?.nome || 'Item');
+                    }
+                } else if (unidadeXmlNorm !== prodUnidade && !prodUnidadeTrib && prodFator && prodFator > 0) {
+                    // Unidade difere e há fator mas sem unidade_tributavel configurada — aplicar mesmo assim
+                    qtyFinal = qtyOriginal * prodFator;
+                    unidadeFinal = it.produtos?.unidade || 'UN';
+                    convertedCount++;
+                }
 
                 const materialClienteId = await ensureMaterialClienteV2(
                     recebimento.cliente_id,
                     produtoId,
                     it.produtos?.nome || 'Material',
-                    unidade,
+                    unidadeFinal,
                     {
                         codigoCliente: it.fiscal_nfe_import_items?.cprod || it.fiscal_nfe_import_items?.ean || null,
                         nomeCliente: it.fiscal_nfe_import_items?.xprod || null,
@@ -698,8 +725,8 @@ export default function ConferenciaPage() {
                     status: 'rascunho',
                     cliente_id: recebimento.cliente_id,
                     produto_final_id: produtoId,
-                    quantidade_planejada: qty,
-                    unidade,
+                    quantidade_planejada: qtyFinal,
+                    unidade: unidadeFinal,
                     usa_material_cliente: true,
                     material_cliente_id: materialClienteId,
                     documento_ref: documentoRef,
@@ -708,14 +735,24 @@ export default function ConferenciaPage() {
                     lote: it.lote || null,
                     origem_fiscal_nfe_import_id: recebimento.fiscal_nfe_import_id,
                     origem_fiscal_nfe_item_id: it.fiscal_nfe_item_id,
-                    origem_qtd_xml: qty,
-                    origem_unidade_xml: unidadeXml || unidade,
+                    origem_qtd_xml: qtyOriginal,
+                    origem_unidade_xml: unidadeXml || unidadeRaw,
                 });
 
                 createdIds.push(saved.id);
             }
 
-            addToast(`OB(s) gerada(s): ${createdIds.length}.`, 'success');
+            if (convertedCount > 0) {
+                addToast(`OB(s) gerada(s): ${createdIds.length}. Conversão de unidade aplicada em ${convertedCount} item(ns).`, 'success');
+            } else {
+                addToast(`OB(s) gerada(s): ${createdIds.length}.`, 'success');
+            }
+            if (missingFatorItems.length > 0) {
+                addToast(
+                    `Atenção: ${missingFatorItems.length} item(ns) com unidade diferente do cadastro mas sem fator de conversão configurado no produto. Configure em Produtos → aba Outros.`,
+                    'warning'
+                );
+            }
             setIsGerarObOpen(false);
             navigate('/app/industria/ordens?tipo=beneficiamento');
         } catch (e: any) {
