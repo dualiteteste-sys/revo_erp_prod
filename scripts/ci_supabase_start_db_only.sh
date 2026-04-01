@@ -40,12 +40,25 @@ run_with_timeout() {
   "$@"
 }
 
-if ! run_with_timeout 1200 "${SUPABASE_START_CMD[@]}"; then
-  echo "::error::supabase start timed out or failed."
+MAX_RETRIES=3
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  echo "[CI] Attempt $attempt/$MAX_RETRIES …"
+  if run_with_timeout 300 "${SUPABASE_START_CMD[@]}"; then
+    echo "[CI] supabase start succeeded on attempt $attempt."
+    break
+  fi
+  echo "[CI] supabase start failed on attempt $attempt."
   supabase status || true
   docker ps || true
-  exit 1
-fi
+  supabase stop --no-backup 2>/dev/null || true
+  docker rm -f $(docker ps -aq --filter "name=supabase_") 2>/dev/null || true
+  if [ "$attempt" -eq "$MAX_RETRIES" ]; then
+    echo "::error::supabase start timed out or failed after $MAX_RETRIES attempts."
+    exit 1
+  fi
+  echo "[CI] Retrying in 10s…"
+  sleep 10
+done
 
 LOCAL_DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
 echo "[CI] Waiting for Postgres on 54322…"
