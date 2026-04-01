@@ -869,7 +869,16 @@ export default function OrdemFormPanel({
                 />
                 {hasOrigemNfe && (
                   <div className="mt-1 text-xs text-gray-500">
-                    Definida pelo XML: {formData.origem_qtd_xml ?? '—'} {formData.origem_unidade_xml || formData.unidade || ''}
+                    {formData.origem_unidade_xml && formData.unidade &&
+                     formData.origem_unidade_xml.toUpperCase() !== formData.unidade.toUpperCase() ? (
+                      <>
+                        Origem XML: {formData.origem_qtd_xml ?? '—'} {formData.origem_unidade_xml}
+                        {' → '}{formData.quantidade_planejada?.toLocaleString('pt-BR')} {formData.unidade}
+                        {' '}(convertido)
+                      </>
+                    ) : (
+                      <>Definida pelo XML: {formData.origem_qtd_xml ?? '—'} {formData.origem_unidade_xml || formData.unidade || ''}</>
+                    )}
                   </div>
                 )}
               </div>
