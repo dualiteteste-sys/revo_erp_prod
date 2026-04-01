@@ -158,15 +158,17 @@ async function logEvent(svc: any, params: {
   message: string;
   meta?: Record<string, unknown>;
 }) {
-  await svc.from("ecommerce_logs").insert({
-    empresa_id: params.empresaId,
-    ecommerce_id: params.ecommerceId,
-    provider: "meli",
-    level: params.level,
-    message: params.message,
-    meta: params.meta ? sanitizeForLog(params.meta) : null,
-    created_at: new Date().toISOString(),
-  }).catch(() => null);
+  try {
+    await svc.from("ecommerce_logs").insert({
+      empresa_id: params.empresaId,
+      ecommerce_id: params.ecommerceId,
+      provider: "meli",
+      level: params.level,
+      message: params.message,
+      meta: params.meta ? sanitizeForLog(params.meta) : null,
+      created_at: new Date().toISOString(),
+    });
+  } catch { /* best-effort logging */ }
 }
 
 // ---------------------------------------------------------------------------
