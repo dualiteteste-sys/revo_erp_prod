@@ -39,6 +39,9 @@ export type RecebimentoItem = {
     quantidade_xml: number;
     quantidade_conferida: number;
     status: 'pendente' | 'ok' | 'divergente';
+    lote?: string | null;
+    data_fabricacao?: string | null;
+    data_validade?: string | null;
     // Joins
     produtos?: {
         nome: string;

@@ -684,6 +684,7 @@ export default function ConferenciaPage() {
                     documento_ref: documentoRef,
                     numero_nf: numeroNf,
                     pedido_numero: pedido,
+                    lote: it.lote || null,
                     origem_fiscal_nfe_import_id: recebimento.fiscal_nfe_import_id,
                     origem_fiscal_nfe_item_id: it.fiscal_nfe_item_id,
                     origem_qtd_xml: qty,
