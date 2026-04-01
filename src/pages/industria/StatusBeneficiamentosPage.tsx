@@ -82,6 +82,7 @@ export default function StatusBeneficiamentosPage() {
     { id: 'pedido', defaultWidth: 140, minWidth: 120 },
     { id: 'entregue', defaultWidth: 160, minWidth: 140 },
     { id: 'saldo', defaultWidth: 170, minWidth: 150 },
+    { id: 'obs', defaultWidth: 200, minWidth: 140 },
     { id: 'status', defaultWidth: 160, minWidth: 140 },
     { id: 'acao', defaultWidth: 140, minWidth: 120, resizable: false },
   ];
@@ -153,6 +154,7 @@ export default function StatusBeneficiamentosPage() {
         Pedido: o.pedido_numero || '',
         'Qtde. Entregue': o.total_entregue ?? 0,
         'Saldo a Entregar': computeSaldo(o),
+        'Observações': o.observacoes || '',
         Status: o.status || '',
       }))
     );
@@ -244,6 +246,7 @@ export default function StatusBeneficiamentosPage() {
                 <Th columnId="pedido" onResizeStart={startResize}>Pedido</Th>
                 <Th columnId="entregue" align="right" onResizeStart={startResize}>Qtde. Entregue</Th>
                 <Th columnId="saldo" onClick={() => toggleSort('saldo')} active={sortKey === 'saldo'} dir={sortDir} align="right" onResizeStart={startResize}>Saldo a Entregar</Th>
+                <Th columnId="obs" onResizeStart={startResize}>Observações</Th>
                 <Th columnId="status" onResizeStart={startResize}>Status</Th>
                 <Th columnId="acao" align="right" onResizeStart={startResize}>Ação</Th>
               </tr>
@@ -251,7 +254,7 @@ export default function StatusBeneficiamentosPage() {
             <tbody className="divide-y divide-gray-100 bg-white">
               {loading && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={12} className="px-4 py-10 text-center text-gray-500">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="animate-spin" size={18} /> Carregando...
                     </span>
@@ -260,7 +263,7 @@ export default function StatusBeneficiamentosPage() {
               )}
               {!loading && sorted.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={12} className="px-4 py-10 text-center text-gray-500">
                     Nenhuma ordem encontrada com os filtros atuais.
                   </td>
                 </tr>
@@ -278,6 +281,7 @@ export default function StatusBeneficiamentosPage() {
                     <td className="px-4 py-3 text-gray-700">{o.pedido_numero || '—'}</td>
                     <td className="px-4 py-3 text-right text-gray-800">{formatQtyPtBr(o.total_entregue)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatQtyPtBr(saldo)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs truncate" title={o.observacoes || ''}>{o.observacoes || '—'}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={o.status} />
                     </td>
