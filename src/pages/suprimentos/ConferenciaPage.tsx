@@ -998,11 +998,11 @@ export default function ConferenciaPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right font-medium text-gray-700">
-                                        {item.quantidade_xml}
+                                        {Number(item.quantidade_xml).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         {isLocked ? (
-                                            <span className="font-bold">{item.quantidade_conferida}</span>
+                                            <span className="font-bold">{Number(item.quantidade_conferida).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}</span>
                                         ) : (
                                             <input
                                                 type="number"
