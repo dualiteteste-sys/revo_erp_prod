@@ -39,11 +39,16 @@ export type RecebimentoItem = {
     quantidade_xml: number;
     quantidade_conferida: number;
     status: 'pendente' | 'ok' | 'divergente';
+    lote?: string | null;
+    data_fabricacao?: string | null;
+    data_validade?: string | null;
     // Joins
     produtos?: {
         nome: string;
         sku: string | null;
         unidade: string;
+        fator_conversao?: number | null;
+        unidade_tributavel?: string | null;
     };
     fiscal_nfe_import_items?: {
         xprod: string;

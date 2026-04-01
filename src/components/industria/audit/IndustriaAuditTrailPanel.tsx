@@ -143,6 +143,7 @@ const fieldLabels: Partial<Record<string, string>> = {
   quantidade_entregue: 'Quantidade entregue',
   data_entrega: 'Data da entrega',
   lote: 'Lote',
+  numero_serie: 'Número de série',
   centro_trabalho_id: 'Centro de trabalho',
   centro_trabalho_nome: 'Centro de trabalho',
   sequencia: 'Sequência',

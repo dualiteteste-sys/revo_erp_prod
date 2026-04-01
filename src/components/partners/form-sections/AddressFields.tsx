@@ -174,6 +174,7 @@ const AddressFields: React.FC<AddressFieldsProps> = ({ address, onAddressChange,
           onChange={handleFieldChange}
           className="sm:col-span-2"
           disabled={isFetchingCep}
+          maxLength={60}
         />
 
         <Input
