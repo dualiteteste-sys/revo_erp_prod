@@ -7,7 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { AlertTriangle, Ban, Calculator, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
+import { AlertTriangle, Ban, Calculator, Copy, Download, Eye, FileText, Lightbulb, Loader2, Plus, Printer, Receipt, Search, Send, Settings, Trash2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import NaturezaOperacaoAutocomplete from '@/components/common/NaturezaOperacaoAutocomplete';
@@ -35,12 +35,13 @@ import { calculateItemTax, type NaturezaFiscalConfig, type CalculatedImpostos } 
 import type { NaturezaOperacaoSearchHit } from '@/services/fiscalNaturezasOperacao';
 import { fiscalNaturezasOperacaoGet } from '@/services/fiscalNaturezasOperacao';
 import { getFiscalNfeEmitente } from '@/services/fiscalNfeSettings';
-import { getPartnerPrimaryUf } from '@/services/partners';
+import { getPartnerPrimaryUf, getPartnerDetails } from '@/services/partners';
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 import { getCarriers, type CarrierListItem } from '@/services/carriers';
 import { fiscalNfeGerarDuplicatas, type DuplicataItem } from '@/services/fiscalNfeEmissoes';
 import NfeStatusBadge from '@/components/fiscal/NfeStatusBadge';
 import NfeModeToggle, { getNfeMode, setNfeMode, type NfeMode } from '@/components/fiscal/NfeModeToggle';
+import DanfePreview, { type DanfePreviewProps } from '@/components/fiscal/DanfePreview';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -216,6 +217,9 @@ export default function NfeEmissoesPage() {
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const [previewXml, setPreviewXml] = useState<string>('');
+  const [danfePreviewOpen, setDanfePreviewOpen] = useState(false);
+  const [danfePreviewLoading, setDanfePreviewLoading] = useState(false);
+  const [danfePreviewData, setDanfePreviewData] = useState<Omit<DanfePreviewProps, never> | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditItems, setAuditItems] = useState<any[]>([]);
@@ -1051,6 +1055,120 @@ export default function NfeEmissoesPage() {
     } finally {
       setPreviewLoading(false);
       await fetchList();
+    }
+  };
+
+  const handlePreviewDanfe = async () => {
+    const local = validateDraftLocal();
+    if (!local.ok) {
+      addToast('Corrija os erros do rascunho antes de visualizar o DANFE.', 'warning');
+      return;
+    }
+
+    setDanfePreviewOpen(true);
+    setDanfePreviewLoading(true);
+
+    try {
+      const [emitenteData, destDetails] = await Promise.all([
+        getFiscalNfeEmitente().catch(() => null),
+        formDestinatarioId ? getPartnerDetails(formDestinatarioId).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      const destAddr = destDetails?.enderecos?.[0] ?? null;
+
+      // Aggregate tax breakdown from items
+      let icmsBase = 0, icmsVal = 0, pisVal = 0, cofinsVal = 0, ipiVal = 0;
+      for (const it of items) {
+        if (it.impostos) {
+          icmsBase += Number(it.impostos.icms?.base_calculo ?? 0);
+          icmsVal += Number(it.impostos.icms?.valor ?? 0);
+          pisVal += Number(it.impostos.pis?.valor ?? 0);
+          cofinsVal += Number(it.impostos.cofins?.valor ?? 0);
+          ipiVal += Number(it.impostos.ipi?.valor ?? 0);
+        }
+      }
+
+      setDanfePreviewData({
+        emitente: emitenteData ? {
+          razao_social: emitenteData.razao_social,
+          nome_fantasia: emitenteData.nome_fantasia,
+          cnpj: emitenteData.cnpj,
+          ie: emitenteData.ie,
+          endereco_logradouro: emitenteData.endereco_logradouro,
+          endereco_numero: emitenteData.endereco_numero,
+          endereco_complemento: emitenteData.endereco_complemento,
+          endereco_bairro: emitenteData.endereco_bairro,
+          endereco_municipio: emitenteData.endereco_municipio,
+          endereco_uf: emitenteData.endereco_uf,
+          endereco_cep: emitenteData.endereco_cep,
+          telefone: emitenteData.telefone,
+        } : null,
+        destinatario: destDetails ? {
+          nome: destDetails.nome ?? formDestinatarioName ?? '---',
+          doc_unico: destDetails.doc_unico ?? null,
+          ie: null,
+          endereco: destAddr ? {
+            logradouro: destAddr.logradouro,
+            numero: destAddr.numero,
+            complemento: destAddr.complemento,
+            bairro: destAddr.bairro,
+            cidade: destAddr.cidade,
+            uf: destAddr.uf,
+            cep: destAddr.cep,
+          } : null,
+          telefone: destDetails.telefone ?? null,
+        } : null,
+        emissao: {
+          numero: editing?.numero ?? null,
+          serie: editing?.serie ?? null,
+          chave_acesso: editing?.chave_acesso ?? null,
+          natureza_operacao: formNaturezaOperacaoName ?? formNaturezaOperacao ?? null,
+          ambiente: formAmbiente,
+          status: editing?.status ?? 'rascunho',
+          forma_pagamento: formFormaPagamento || null,
+          modalidade_frete: formModalidadeFrete || '9',
+          transportadora_nome: formTransportadoraNome || null,
+          duplicatas: duplicatasPreview.length > 0 ? duplicatasPreview : null,
+          peso_bruto: formPesoBruto ? Number(formPesoBruto) : null,
+          peso_liquido: formPesoLiquido ? Number(formPesoLiquido) : null,
+          quantidade_volumes: formQtdVolumes ? Number(formQtdVolumes) : null,
+          especie_volumes: formEspecieVolumes || null,
+          created_at: editing?.created_at ?? new Date().toISOString(),
+        },
+        totals: {
+          total_produtos: totalsDraft.total_produtos,
+          total_descontos: totalsDraft.total_descontos,
+          total_frete: totalsDraft.frete,
+          total_impostos: totalsDraft.total_impostos,
+          total_nfe: totalsDraft.total_nfe,
+          icms_base_calculo: icmsBase,
+          icms_valor: icmsVal,
+          pis_valor: pisVal,
+          cofins_valor: cofinsVal,
+          ipi_valor: ipiVal,
+        },
+        items: items.map((it, idx) => ({
+          index: idx + 1,
+          produto_nome: it.produto_nome,
+          ncm: it.ncm || '',
+          cst: it.cst || '',
+          csosn: it.csosn || '',
+          cfop: it.cfop || '',
+          unidade: it.unidade || 'UN',
+          quantidade: it.quantidade,
+          valor_unitario: it.valor_unitario,
+          valor_total: it.quantidade * it.valor_unitario,
+          valor_desconto: it.valor_desconto || 0,
+          icms_base: Number(it.impostos?.icms?.base_calculo ?? 0),
+          icms_valor: Number(it.impostos?.icms?.valor ?? 0),
+          icms_aliquota: Number(it.impostos?.icms?.aliquota ?? 0),
+        })),
+      });
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar preview DANFE.', 'error');
+      setDanfePreviewOpen(false);
+    } finally {
+      setDanfePreviewLoading(false);
     }
   };
 
@@ -1963,6 +2081,10 @@ export default function NfeEmissoesPage() {
               <Eye size={18} />
               <span className="ml-2">Preview XML</span>
             </Button>
+            <Button variant="secondary" onClick={handlePreviewDanfe} disabled={saving}>
+              <FileText size={18} />
+              <span className="ml-2">Preview DANFE</span>
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="animate-spin" size={18} /> : null}
               <span className="ml-2">Salvar</span>
@@ -2024,6 +2146,28 @@ export default function NfeEmissoesPage() {
                 {previewXml || '—'}
               </pre>
             </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={danfePreviewOpen} onClose={() => { setDanfePreviewOpen(false); setDanfePreviewData(null); }} title="Preview DANFE" size="80pct">
+        <div className="p-6">
+          {danfePreviewLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-600" size={28} />
+            </div>
+          ) : danfePreviewData ? (
+            <>
+              <div className="flex justify-end mb-4 gap-3 no-print">
+                <Button variant="secondary" onClick={() => window.print()}>
+                  <Printer size={18} />
+                  <span className="ml-2">Imprimir</span>
+                </Button>
+              </div>
+              <DanfePreview {...danfePreviewData} />
+            </>
+          ) : (
+            <p className="text-sm text-slate-500 text-center">Sem dados para exibir.</p>
           )}
         </div>
       </Modal>
