@@ -35,9 +35,6 @@ jobs:
               - '.github/workflows/release-gate-dev.yml'
             db_migrations:
               - 'supabase/migrations/**'
-              - 'scripts/rg01_db_asserts.sql'
-              - 'scripts/rg03_db_asserts.sql'
-              - 'scripts/ci_supabase_start_db_only.sh'
       - name: Determine landing-only change
         id: landing_only
         run: |
