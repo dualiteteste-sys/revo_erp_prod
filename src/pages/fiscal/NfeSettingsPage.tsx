@@ -715,8 +715,9 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                     value={emitente?.endereco_complemento ?? ''}
                     onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_complemento: e.target.value || null } : prev))}
                     disabled={!canAdmin}
+                    maxLength={60}
                     className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Sala, Andar…"
+                    placeholder="Sala, Andar… (máx. 60 caracteres)"
                   />
                 </div>
                 <div>
