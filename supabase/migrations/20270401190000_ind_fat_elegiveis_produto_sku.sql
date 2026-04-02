@@ -1,7 +1,10 @@
 -- Migration: Add produto_sku to industria_faturamento_listar_elegiveis
 -- Allows FaturamentoBeneficiamentoPage to display the product code (SKU).
+-- NOTE: Must DROP first because PostgreSQL cannot change RETURNS TABLE via CREATE OR REPLACE.
 
-CREATE OR REPLACE FUNCTION public.industria_faturamento_listar_elegiveis(
+DROP FUNCTION IF EXISTS public.industria_faturamento_listar_elegiveis(uuid, date, date, text, int, int);
+
+CREATE FUNCTION public.industria_faturamento_listar_elegiveis(
   p_cliente_id uuid    DEFAULT NULL,
   p_data_inicio date   DEFAULT NULL,
   p_data_fim    date   DEFAULT NULL,
