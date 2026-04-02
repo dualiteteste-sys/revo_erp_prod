@@ -212,12 +212,13 @@ async function loadStoreSecrets(params: {
   if (legacyConfig) {
     const normalizedDb = normalizeWooStoreSettingsV1(storeSettings ?? {});
     if (JSON.stringify(normalizedDb) !== JSON.stringify(settings)) {
-      await svc
-        .from("integrations_woocommerce_store")
-        .update({ settings, updated_at: new Date().toISOString() })
-        .eq("id", storeId)
-        .eq("empresa_id", empresaId)
-        .catch(() => null);
+      try {
+        await svc
+          .from("integrations_woocommerce_store")
+          .update({ settings, updated_at: new Date().toISOString() })
+          .eq("id", storeId)
+          .eq("empresa_id", empresaId);
+      } catch { /* best-effort settings sync */ }
     }
   }
 
@@ -1661,18 +1662,20 @@ Deno.serve(async (req) => {
     const code = detectWooErrorCode(message);
     const resolved = resolveWooError(code);
     if (svc && storeId && empresaId) {
-      await svc.from("woocommerce_sync_log").insert({
-        empresa_id: empresaId,
-        store_id: storeId,
-        level: "error",
-        message: "worker_unhandled_error",
-        meta: sanitizeForLog({
-          request_id: requestId,
-          error: message,
-          error_code: resolved.code,
-          hint: resolved.hint,
-        }),
-      }).catch(() => null);
+      try {
+        await svc.from("woocommerce_sync_log").insert({
+          empresa_id: empresaId,
+          store_id: storeId,
+          level: "error",
+          message: "worker_unhandled_error",
+          meta: sanitizeForLog({
+            request_id: requestId,
+            error: message,
+            error_code: resolved.code,
+            hint: resolved.hint,
+          }),
+        });
+      } catch { /* best-effort logging */ }
     }
     return json(500, {
       ok: false,

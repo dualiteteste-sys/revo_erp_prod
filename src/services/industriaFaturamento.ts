@@ -8,6 +8,7 @@ export type EntregaElegivel = {
   ordem_numero: number;
   produto_id: string;
   produto_nome: string;
+  produto_sku: string | null;
   produto_ncm: string | null;
   produto_unidade: string;
   produto_preco_venda: number;
