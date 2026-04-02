@@ -88,6 +88,29 @@ export type WooCatalogRunItem = {
   updated_at: string;
 };
 
+export type WooSearchRow = {
+  id: number;
+  name: string | null;
+  sku: string | null;
+  type: string;
+  status: string | null;
+  price: string | null;
+  stock_status: string | null;
+  updated_at: string | null;
+  image: string | null;
+  import_status: 'new' | 'imported';
+  revo_product_id: string | null;
+};
+
+export type WooSearchResponse = {
+  ok: true;
+  page: number;
+  per_page: number;
+  total: number;
+  totalPages: number;
+  rows: WooSearchRow[];
+};
+
 export type WooWorkerRunResponse = {
   ok: true;
   worker: unknown;
@@ -261,7 +284,7 @@ export function searchWooCatalogProducts(params: {
   page?: number;
   perPage?: number;
 }) {
-  return invoke<{ ok: true; rows: Array<{ id: number; name: string | null; sku: string | null; type: string; status: string | null; price: string | null; stock_status: string | null; updated_at: string | null }> }>('stores.products.search', {
+  return invoke<WooSearchResponse>('stores.products.search', {
     empresaId: params.empresaId,
     storeId: params.storeId,
     payload: {

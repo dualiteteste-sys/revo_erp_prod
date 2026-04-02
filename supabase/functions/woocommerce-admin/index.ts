@@ -86,13 +86,13 @@ function randomSecretBase64(bytes = 32): string {
   return btoa(bin);
 }
 
-async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
+async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any; headers?: Headers }> {
   const mock = maybeHandleWooMockRequest({ url, init, getEnv: (k) => Deno.env.get(k) });
   if (mock) return { ok: mock.ok, status: mock.status, data: mock.data };
 
   const resp = await fetch(url, init);
   const data = await resp.json().catch(() => ({}));
-  return { ok: resp.ok, status: resp.status, data };
+  return { ok: resp.ok, status: resp.status, data, headers: resp.headers };
 }
 
 async function resolveEmpresaId(params: { baseUser: any; svc: any; req: Request; callerId: string }): Promise<string> {
@@ -1417,6 +1417,9 @@ Deno.serve(async (req) => {
         }, cors);
       }
 
+      const total = Number(resp.headers?.get("X-WP-Total") ?? 0) || 0;
+      const totalPages = Number(resp.headers?.get("X-WP-TotalPages") ?? 0) || 0;
+
       const rows = (Array.isArray(resp.data) ? resp.data : []).map((row: any) => ({
         id: Number(row?.id ?? 0) || null,
         name: String(row?.name ?? "").trim() || null,
@@ -1426,9 +1429,36 @@ Deno.serve(async (req) => {
         price: String(row?.regular_price ?? row?.price ?? "").trim() || null,
         stock_status: String(row?.stock_status ?? "").trim() || null,
         updated_at: row?.date_modified_gmt ?? row?.date_modified ?? null,
+        image: (Array.isArray(row?.images) && row.images.length > 0)
+          ? String(row.images[0]?.src ?? "").trim() || null
+          : null,
       }));
 
-      return json(200, { ok: true, page, per_page: perPage, rows }, cors);
+      // Enrich with import status from woocommerce_product_map
+      const wooIds = rows.map((r: any) => r.id).filter(Boolean);
+      let mapByWooId: Record<number, { revo_product_id: string | null }> = {};
+      if (wooIds.length > 0) {
+        const { data: mapRows } = await svc
+          .from("woocommerce_product_map")
+          .select("woo_product_id,revo_product_id")
+          .eq("empresa_id", empresaId)
+          .eq("store_id", storeId)
+          .in("woo_product_id", wooIds);
+        for (const m of (mapRows ?? [])) {
+          if (m.woo_product_id) mapByWooId[m.woo_product_id] = { revo_product_id: m.revo_product_id ?? null };
+        }
+      }
+
+      const enrichedRows = rows.map((r: any) => {
+        const mapped = r.id ? mapByWooId[r.id] : undefined;
+        return {
+          ...r,
+          import_status: mapped ? "imported" : "new",
+          revo_product_id: mapped?.revo_product_id ?? null,
+        };
+      });
+
+      return json(200, { ok: true, page, per_page: perPage, total, totalPages, rows: enrichedRows }, cors);
     }
 
     if (action === "stores.product_map.build") {
