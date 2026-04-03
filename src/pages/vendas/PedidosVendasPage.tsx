@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
-import { VendaPedido, seedVendas } from '@/services/vendas';
+import { VendaPedido, seedVendas, deleteVenda } from '@/services/vendas';
 import { Loader2, PlusCircle, Search, ShoppingCart } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PedidosVendasTable from '@/components/vendas/PedidosVendasTable';
@@ -60,6 +60,32 @@ export default function PedidosVendasPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [gerandoNfeId, setGerandoNfeId] = useState<string | null>(null);
+
+  const handleDeletePedido = async (order: VendaPedido) => {
+    const ok = await confirm({
+      title: `Excluir Orçamento #${order.numero}?`,
+      description: 'Esta ação é irreversível. Os itens do pedido serão removidos.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    try {
+      await deleteVenda(order.id);
+      addToast('Orçamento excluído.', 'success');
+      refresh();
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (msg.includes('orçamento') || msg.includes('orcamento')) {
+        addToast('Só é possível excluir pedidos em orçamento.', 'error');
+      } else if (msg.includes('NF-e')) {
+        addToast('Não é possível excluir: há NF-e vinculada.', 'error');
+      } else {
+        addToast(`Erro ao excluir: ${msg}`, 'error');
+      }
+    }
+  };
 
   const handleGerarNfe = async (order: VendaPedido) => {
     const ok = await confirm({
@@ -301,7 +327,7 @@ export default function PedidosVendasPage() {
               data={effectiveOrders}
               getItemId={(o) => o.id}
               loading={effectiveLoading}
-              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} onGerarNfe={handleGerarNfe} gerandoNfeId={gerandoNfeId} />}
+              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} onGerarNfe={handleGerarNfe} onDelete={handleDeletePedido} gerandoNfeId={gerandoNfeId} />}
               renderMobileCard={(order) => (
                 <PedidoVendaMobileCard
                   key={order.id}
