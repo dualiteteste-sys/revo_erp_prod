@@ -32,6 +32,7 @@ import { useNumericField } from '@/hooks/useNumericField';
 import PdvPaymentModal, { type PdvPagamento } from '@/components/vendas/PdvPaymentModal';
 import { checkNfceEnabled, createNfceDraftFromPdv, submitNfce, checkNfceStatus, calculateNfceTaxes, getNfceInfoForPedido, downloadDanfce, type NfceEmissaoInfo } from '@/services/fiscalNfceEmissoes';
 import DanfceReceipt, { buildDanfceHtml } from '@/components/vendas/DanfceReceipt';
+import { buildNonFiscalReceiptHtml } from '@/lib/vendas/buildNonFiscalReceipt';
 
 type PdvRow = {
   id: string;
@@ -47,85 +48,7 @@ function formatMoneyBRL(n: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
 }
 
-function buildReceiptHtml(
-  venda: VendaDetails,
-  contaNome?: string,
-  pagamentos?: Array<{ forma_pagamento: string; valor: number; troco?: number }>,
-  opts?: { logoUrl?: string | null; empresaNome?: string },
-) {
-  const lines = (venda.itens || []).map((it) => {
-    const total = Number(it.total || 0);
-    return `<tr>
-      <td style="padding:6px 0">${it.produto_nome || 'Produto'}</td>
-      <td style="padding:6px 0;text-align:right">${Number(it.quantidade || 0)}</td>
-      <td style="padding:6px 0;text-align:right">${formatMoneyBRL(Number(it.preco_unitario || 0))}</td>
-      <td style="padding:6px 0;text-align:right">${formatMoneyBRL(total)}</td>
-    </tr>`;
-  });
-
-  const logoHtml = opts?.logoUrl
-    ? `<div style="text-align:center;margin-bottom:8px"><img src="${opts.logoUrl}" alt="Logo" style="max-height:48px;object-fit:contain" /></div>`
-    : '';
-  const empresaHtml = opts?.empresaNome
-    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:4px">${opts.empresaNome}</div>`
-    : '';
-
-  const totalTroco = (pagamentos || []).reduce((s, p) => s + Number(p.troco || 0), 0);
-  const paymentsHtml = (pagamentos || []).length > 0
-    ? `<div style="margin-top:14px;padding:8px;background:#f9f9f9;border-radius:4px">
-        <div style="font-weight:bold;font-size:11px;margin-bottom:4px">PAGAMENTO</div>
-        ${(pagamentos || []).map((p) => `<div style="display:flex;justify-content:space-between;font-size:12px"><span>${p.forma_pagamento}</span><span>${formatMoneyBRL(p.valor)}</span></div>`).join('')}
-        ${totalTroco > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-top:4px"><span>Troco:</span><span>${formatMoneyBRL(totalTroco)}</span></div>` : ''}
-       </div>`
-    : '';
-
-  return `<!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Comprovante PDV #${venda.numero}</title>
-    <style>
-      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 20px; }
-      h1 { font-size: 18px; margin: 0 0 4px; }
-      .muted { color: #666; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      thead th { text-align: left; font-size: 12px; color: #666; border-bottom: 1px solid #ddd; padding: 8px 0; }
-      tfoot td { border-top: 1px solid #ddd; padding-top: 10px; font-weight: 700; }
-      .right { text-align: right; }
-      @media print { button { display: none; } body { padding: 0; } }
-    </style>
-  </head>
-  <body>
-    ${logoHtml}
-    ${empresaHtml}
-    <h1>Comprovante PDV</h1>
-    <div class="muted">Pedido #${venda.numero} · Data: ${venda.data_emissao || ''}</div>
-    ${contaNome ? `<div class="muted">Recebimento: ${contaNome}</div>` : ''}
-    ${venda.cliente_nome ? `<div class="muted">Cliente: ${venda.cliente_nome}</div>` : ''}
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th class="right">Qtd</th>
-          <th class="right">Unit.</th>
-          <th class="right">Total</th>
-        </tr>
-      </thead>
-      <tbody>${lines.join('')}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3" class="right">Total</td>
-          <td class="right">${formatMoneyBRL(venda.total_geral || 0)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    ${paymentsHtml}
-    <div class="muted" style="margin-top: 14px">Obrigado pela preferência!</div>
-    <button onclick="window.print()" style="margin-top: 18px; padding: 10px 14px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 8px">Imprimir</button>
-  </body>
-</html>`;
-}
+// Non-fiscal receipt is now in @/lib/vendas/buildNonFiscalReceipt
 
 export default function PdvPage() {
   const { addToast } = useToast();
@@ -642,7 +565,7 @@ export default function PdvPage() {
     const printOpts = { logoUrl: logoSignedUrl, empresaNome: activeEmpresa?.razao_social || activeEmpresa?.nome_fantasia || undefined };
     const html = receiptNfce
       ? buildDanfceHtml(receiptVenda, receiptNfce, receiptPagamentos, printOpts)
-      : buildReceiptHtml(receiptVenda, contas.find((c) => c.id === contaCorrenteId)?.nome, receiptPagamentos, printOpts);
+      : buildNonFiscalReceiptHtml({ venda: receiptVenda, pagamentos: receiptPagamentos, contaNome: contas.find((c) => c.id === contaCorrenteId)?.nome, ...printOpts });
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
