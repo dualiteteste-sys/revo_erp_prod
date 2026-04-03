@@ -71,6 +71,38 @@ export const HELP_CATALOG: HelpEntry[] = [
     ],
   },
   {
+    match: '/app/settings',
+    title: 'Guia Rápido — Cadastro da Empresa (Super Cadastro)',
+    whatIs:
+      'Cadastro central da empresa que serve como fonte única de verdade para todas as integrações: NF-e, Marketplaces, relatórios e documentos fiscais. Preencha aqui uma vez e todos os módulos usam os mesmos dados automaticamente.',
+    steps: [
+      'Preencha razão social, nome fantasia e CNPJ. Use o botão de busca no CNPJ para auto-completar dados da Receita Federal.',
+      'Complete a seção "Dados Fiscais": Inscrição Estadual (IE), Inscrição Municipal (IM), CNAE e Regime Tributário (CRT).',
+      'Preencha o endereço completo. Digite o CEP e o sistema auto-preenche logradouro, bairro, cidade, UF e código IBGE.',
+      'Confira telefone e email de contato.',
+      'Clique em "Salvar Alterações". Os dados são sincronizados automaticamente para NF-e e demais integrações.',
+    ],
+    dependsOn: ['Empresa ativa', 'Permissão: Configurações (manage)'],
+    connectsWith: ['Configurações NF-e', 'Marketplaces (WooCommerce, Mercado Livre)', 'Emissões NF-e', 'Relatórios fiscais'],
+    fillPerfectly: [
+      'CNPJ válido (14 dígitos) — use a busca automática para preencher razão social e endereço.',
+      'IE no formato correto do estado (sem pontos, apenas dígitos).',
+      'Código IBGE do município preenchido (auto-preenchido pelo CEP).',
+      'CRT correto: 1=Simples Nacional, 2=Excesso sublimite, 3=Regime Normal.',
+      'CNAE principal da atividade econômica.',
+    ],
+    commonMistakes: [
+      'Esquecer de preencher o código IBGE — causa rejeição de NF-e.',
+      'CRT errado (ex: Simples Nacional marcado como Regime Normal) — altera toda a tributação.',
+      'Não salvar após preencher e perder os dados digitados.',
+      'Tentar editar dados da empresa na tela de NF-e — agora é centralizado aqui.',
+    ],
+    links: [
+      { label: 'Configurações NF-e', href: '/app/fiscal/nfe/configuracoes', kind: 'internal' as const },
+      { label: 'Integrações Marketplace', href: '/app/configuracoes/ecommerce/marketplaces', kind: 'internal' as const },
+    ],
+  },
+  {
     match: '/app/suporte',
     title: 'Guia Rápido de Suporte (Tickets + Diagnóstico)',
     whatIs:
@@ -1541,16 +1573,18 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/fiscal/nfe/configuracoes',
     title: 'Guia Rápido de Configurações de NF-e',
     whatIs:
-      'Configurações de NF-e definem emitente, série/numeração, ambiente e toggle IBS/CBS 2026. O objetivo é evitar rejeição e suporte na hora de emitir.',
+      'Configurações de NF-e definem certificado digital, série/numeração, ambiente e toggle IBS/CBS 2026. Os dados da empresa (emitente) vêm automaticamente do Cadastro Central em Configurações > Empresa.',
     steps: [
-      'Preencha emitente (dados da empresa) e confirme ambiente (homologação/produção).',
+      'Verifique se os dados da empresa estão completos em Configurações > Empresa (CNPJ, IE, endereço, CNAE, CRT, código IBGE).',
+      'Faça upload do certificado digital A1 e informe a senha.',
       'Defina série e numeração (ponto crítico para não duplicar).',
+      'Confirme ambiente (homologação/produção).',
       'Valide um rascunho antes de emitir (quando a emissão estiver ativa).',
     ],
-    dependsOn: ['Dados da empresa', 'Permissão: Fiscal (manage)', 'Plano com NF-e (quando habilitado)'],
-    connectsWith: ['Pedidos/PDV', 'Produtos (tributação)', 'Clientes (dados fiscais)', 'Emissões NF-e'],
-    fillPerfectly: ['Série/numeração sem conflito.', 'CNPJ/IE corretos.', 'Ambiente correto (produção ≠ homologação).'],
-    commonMistakes: ['Numeração duplicada.', 'Ambiente errado e “não emite”.', 'Emitente incompleto e rejeição.'],
+    dependsOn: ['Cadastro da Empresa completo', 'Permissão: Fiscal (manage)', 'Plano com NF-e (quando habilitado)'],
+    connectsWith: ['Cadastro da Empresa', 'Pedidos/PDV', 'Produtos (tributação)', 'Clientes (dados fiscais)', 'Emissões NF-e'],
+    fillPerfectly: ['Série/numeração sem conflito.', 'Dados da empresa completos (IE, CNAE, CRT, código IBGE).', 'Certificado A1 válido e com senha correta.', 'Ambiente correto (produção ≠ homologação).'],
+    commonMistakes: ['Numeração duplicada.', 'Ambiente errado e “não emite”.', 'Dados da empresa incompletos (código IBGE ou CRT faltando) — editar em Configurações > Empresa.', 'Certificado expirado ou senha incorreta.'],
     roadmapKey: 'fiscal',
   },
   {
@@ -2243,8 +2277,8 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
     },
     configuracoes: {
       titlePrefix: 'Guia Rápido de Configurações',
-      whatIs: 'Aqui você ajusta empresa, permissões, plano e integrações. O objetivo é habilitar o que precisa sem travar o uso do sistema.',
-      steps: ['Complete dados da empresa e onboarding mínimo.', 'Revise papéis e permissões por função.', 'Confira assinatura e limites do plano.'],
+      whatIs: 'Aqui você ajusta empresa (cadastro central), permissões, plano e integrações. O cadastro da empresa serve como fonte única para NF-e, Marketplaces e tudo mais.',
+      steps: ['Complete o cadastro central da empresa (dados fiscais, endereço, IBGE).', 'Revise papéis e permissões por função.', 'Confira assinatura e limites do plano.'],
     },
     desenvolvedor: {
       titlePrefix: 'Guia Rápido de Desenvolvedor',
