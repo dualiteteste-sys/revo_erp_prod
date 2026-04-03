@@ -351,13 +351,13 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
     setLinkingId(row.titulo_id);
     try {
-      await conciliarExtratoComTitulo({
+      const result = await conciliarExtratoComTitulo({
         extratoId: extratoItem.id,
         tipo: row.tipo,
         tituloId: row.titulo_id,
       });
       addToast('Título conciliado com o extrato!', 'success');
-      onClose();
+      await onConciliate(result.movimentacaoId);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao conciliar título.', 'error');
     } finally {
@@ -382,14 +382,14 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       });
 
       // 2. Now conciliate (backend reads the updated saldo)
-      await conciliarExtratoComTitulo({
+      const result = await conciliarExtratoComTitulo({
         extratoId: extratoItem.id,
         tipo: row.tipo,
         tituloId: row.titulo_id,
       });
 
       addToast(`Juros/multa de ${formatBRL(diff)} adicionados e título conciliado!`, 'success');
-      onClose();
+      await onConciliate(result.movimentacaoId);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao ajustar e conciliar.', 'error');
     } finally {
