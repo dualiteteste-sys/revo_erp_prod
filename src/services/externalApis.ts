@@ -65,7 +65,7 @@ export const fetchNcmByCode = async (code: string): Promise<NcmResult | null> =>
 };
 
 // --- CNPJ (BrasilAPI) ---
-interface CnpjData {
+export interface CnpjData {
   cnpj: string;
   razao_social: string;
   nome_fantasia: string;
@@ -77,6 +77,11 @@ interface CnpjData {
   municipio: string;
   uf: string;
   ddd_telefone_1: string;
+  cnae_fiscal: number;
+  cnae_fiscal_descricao: string;
+  /** Alias returned by some providers (BrasilAPI field name) */
+  cnae_fiscal_principal?: string;
+  inscricao_estadual?: string;
 }
 
 export const fetchCnpjData = async (cnpj: string): Promise<Partial<CnpjData>> => {

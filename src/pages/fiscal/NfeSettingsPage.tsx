@@ -7,9 +7,10 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin, ShieldAlert, CheckCircle2, Eye, EyeOff, Smartphone } from 'lucide-react';
+import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, ShieldAlert, CheckCircle2, Eye, EyeOff, Smartphone, ExternalLink, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
-import { cnpjMask, cepMask } from '@/lib/masks';
+import { cnpjMask } from '@/lib/masks';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import {
   getFiscalFeatureFlags,
@@ -84,6 +85,7 @@ type Props = {
 export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: Props) {
   const supabase = useSupabase() as any;
   const { activeEmpresa } = useAuth();
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
   const empresaRoleQuery = useEmpresaRole();
@@ -287,42 +289,8 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     }
   };
 
-  const handleSaveEmitente = async () => {
-    if (!empresaId || !emitente) return;
-    if (!canAdmin) {
-      addToast('Sem permissão para salvar emitente. Apenas admin/owner.', 'error');
-      return;
-    }
-
-    const cnpj = digitsOnly(emitente.cnpj);
-    if (cnpj.length !== 14) {
-      addToast('CNPJ inválido (precisa ter 14 dígitos).', 'error');
-      return;
-    }
-    if (!emitente.razao_social.trim()) {
-      addToast('Razão social é obrigatória.', 'error');
-      return;
-    }
-
-    setSavingEmitente(true);
-    try {
-      const payload = {
-        ...emitente,
-        empresa_id: empresaId,
-        cnpj,
-        endereco_cep: digitsOnly(emitente.endereco_cep || '') || null,
-        endereco_municipio_codigo: digitsOnly(emitente.endereco_municipio_codigo || '') || null,
-      };
-      await upsertFiscalNfeEmitente(payload);
-      addToast('Emitente salvo.', 'success');
-      await fetchData();
-      await onEmitenteSaved?.();
-    } catch (e: any) {
-      addToast(e?.message || 'Erro ao salvar emitente.', 'error');
-    } finally {
-      setSavingEmitente(false);
-    }
-  };
+  // handleSaveEmitente removed — identity is now managed via Super Cadastro (CompanySettingsForm).
+  // Certificate and NFC-e saves use upsertFiscalNfeEmitente directly.
 
   const handleSaveNumeracao = async () => {
     if (!empresaId || !numeracao) return;
@@ -564,218 +532,52 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
             )}
           </GlassCard>
 
+          {/* ── Dados da Empresa (read-only summary) ── */}
           <GlassCard className="p-6">
             <div className="flex items-start justify-between gap-6">
               <div>
                 <div className="flex items-center gap-2">
-                  <FileKey size={18} className="text-slate-700" />
-                  <h2 className="text-lg font-bold text-slate-900">Emitente (Empresa)</h2>
+                  <Building2 size={18} className="text-slate-700" />
+                  <h2 className="text-lg font-bold text-slate-900">Dados da Empresa</h2>
                 </div>
                 <p className="text-sm text-slate-600 mt-1">
-                  Preencha os dados fiscais do emitente. O certificado A1 fica em Storage privado (sem senha no banco).
+                  Identidade e dados fiscais da empresa. Gerenciados no cadastro central.
                 </p>
               </div>
-              <Button onClick={handleSaveEmitente} disabled={savingEmitente || !emitente || !canAdmin}>
-                {savingEmitente ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                <span className="ml-2">Salvar</span>
+              <Button variant="secondary" onClick={() => navigate('/app/settings')}>
+                <ExternalLink size={16} />
+                <span className="ml-2">Editar cadastro</span>
               </Button>
             </div>
 
-            {/* ── Identificação ── */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Razão social</label>
-                <input
-                  value={emitente?.razao_social ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, razao_social: e.target.value } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex.: Minha Empresa LTDA"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Nome fantasia</label>
-                <input
-                  value={emitente?.nome_fantasia ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, nome_fantasia: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex.: Minha Marca"
-                />
-              </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { label: 'Razão Social', value: activeEmpresa?.nome_razao_social || emitente?.razao_social },
+                { label: 'CNPJ', value: cnpjMask(activeEmpresa?.cnpj || emitente?.cnpj || '') },
+                { label: 'Regime Tributário', value: (() => { const c = (activeEmpresa as any)?.crt ?? emitente?.crt; return c === 1 ? '1 — Simples Nacional' : c === 2 ? '2 — Simples (excesso)' : c === 3 ? '3 — Regime Normal' : '—'; })() },
+                { label: 'IE', value: (activeEmpresa as any)?.inscr_estadual || emitente?.ie },
+                { label: 'IM', value: (activeEmpresa as any)?.inscr_municipal || emitente?.im },
+                { label: 'CNAE', value: (activeEmpresa as any)?.cnae || emitente?.cnae },
+                { label: 'Cidade/UF', value: [activeEmpresa?.endereco_cidade || emitente?.endereco_municipio, activeEmpresa?.endereco_uf || emitente?.endereco_uf].filter(Boolean).join('/') },
+                { label: 'Cód. IBGE', value: (activeEmpresa as any)?.endereco_municipio_codigo || emitente?.endereco_municipio_codigo },
+                { label: 'CEP', value: activeEmpresa?.endereco_cep || emitente?.endereco_cep },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className="text-sm font-medium text-slate-800 truncate">{value || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">CNPJ</label>
-                <input
-                  value={cnpjMask(emitente?.cnpj ?? '')}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnpj: e.target.value.replace(/\D/g, '') } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">IE (Inscrição Estadual)</label>
-                <input
-                  value={emitente?.ie ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, ie: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Somente dígitos"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">IM (Inscrição Municipal)</label>
-                <input
-                  value={emitente?.im ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, im: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Opcional"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">CNAE</label>
-                <input
-                  value={emitente?.cnae ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnae: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex.: 6201501"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Telefone</label>
-                <input
-                  value={emitente?.telefone ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, telefone: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex.: 11999998888"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">E-mail</label>
-                <input
-                  type="email"
-                  value={emitente?.email ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, email: e.target.value || null } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="fiscal@empresa.com.br"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">CRT</label>
-                <Select
-                  value={String(emitente?.crt ?? 1)}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, crt: Number(e.target.value) || 1 } : prev))}
-                  disabled={!canAdmin}
-                  className="min-w-[220px]"
-                >
-                  <option value="1">1 — Simples Nacional</option>
-                  <option value="2">2 — Simples (excesso sublimite)</option>
-                  <option value="3">3 — Regime Normal</option>
-                </Select>
-              </div>
+          {/* ── Certificado Digital A1 ── */}
+          <GlassCard className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileKey size={18} className="text-slate-700" />
+              <h2 className="text-lg font-bold text-slate-900">Certificado Digital A1</h2>
             </div>
 
-            {/* ── Endereço ── */}
-            <div className="mt-6">
-              <div className="flex items-center gap-2 mb-4">
-                <MapPin size={16} className="text-slate-600" />
-                <h3 className="text-sm font-semibold text-slate-700">Endereço do emitente</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Logradouro</label>
-                  <input
-                    value={emitente?.endereco_logradouro ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_logradouro: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Rua, Av., Travessa…"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Número</label>
-                  <input
-                    value={emitente?.endereco_numero ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_numero: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="123"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Complemento</label>
-                  <input
-                    value={emitente?.endereco_complemento ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_complemento: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    maxLength={60}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Sala, Andar… (máx. 60 caracteres)"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Bairro</label>
-                  <input
-                    value={emitente?.endereco_bairro ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_bairro: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Centro"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">CEP</label>
-                  <input
-                    value={cepMask(emitente?.endereco_cep ?? '')}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_cep: e.target.value.replace(/\D/g, '') } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="00000-000"
-                    maxLength={9}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Município</label>
-                  <input
-                    value={emitente?.endereco_municipio ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_municipio: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="São Paulo"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Cód. IBGE do Município</label>
-                  <input
-                    value={emitente?.endereco_municipio_codigo ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_municipio_codigo: e.target.value || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Ex.: 3550308"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">UF</label>
-                  <input
-                    value={emitente?.endereco_uf ?? ''}
-                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_uf: (e.target.value || '').toUpperCase().slice(0, 2) || null } : prev))}
-                    disabled={!canAdmin}
-                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="SP"
-                    maxLength={2}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
+            <div className="mt-2">
               <div className="md:col-span-3">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                   <div className="flex items-start justify-between gap-4">
