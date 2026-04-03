@@ -33,6 +33,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 import { fiscalNfeGerarDePedido } from '@/services/fiscalNfeEmissoes';
 import { printPedido, type PrintPedidoMode } from '@/lib/vendas/printPedido';
+import { buildNonFiscalReceiptHtml } from '@/lib/vendas/buildNonFiscalReceipt';
 import { getPartnerDetails } from '@/services/partners';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useSupabase } from '@/providers/SupabaseProvider';
@@ -451,6 +452,20 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
       logoUrl,
       clientDetails: clientPrintDetails,
     });
+  };
+
+  const handlePrintRecibo = () => {
+    if (!formData.id) return;
+    const html = buildNonFiscalReceiptHtml({
+      venda: formData as VendaDetails,
+      logoUrl,
+      empresaNome: activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social || undefined,
+    });
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.addEventListener('load', () => { setTimeout(() => win.print(), 200); });
   };
 
   const handleSaveHeader = async () => {
@@ -1502,6 +1517,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handlePrint('simples')}>
                   Separação (sem preços)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handlePrintRecibo}>
+                  Recibo Não Fiscal
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
