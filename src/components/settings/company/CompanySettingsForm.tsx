@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthProvider';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Search } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastProvider';
 import { EmpresaUpdate, updateCompany } from '@/services/company';
-import { fetchCnpjData } from '@/services/externalApis';
+import { fetchCnpjData, fetchCepData } from '@/services/externalApis';
 import LogoUploader from './LogoUploader';
 import { documentMask, cepMask, phoneMask } from '@/lib/masks';
 
@@ -11,23 +11,33 @@ type Props = {
   onSaved?: () => void | Promise<void>;
 };
 
+const CRT_OPTIONS = [
+  { value: '', label: 'Selecione...' },
+  { value: '1', label: '1 — Simples Nacional' },
+  { value: '2', label: '2 — Simples Nacional (excesso sublimite)' },
+  { value: '3', label: '3 — Regime Normal' },
+] as const;
+
+interface CompanyFormState extends EmpresaUpdate {
+  razao_social?: string;
+  fantasia?: string;
+  inscr_estadual?: string | null;
+  inscr_municipal?: string | null;
+  cnae?: string | null;
+  crt?: number | null;
+  endereco_municipio_codigo?: string | null;
+}
+
 const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
   const { activeEmpresa, refreshEmpresas } = useAuth();
   const { addToast } = useToast();
-
-	  // Extend EmpresaUpdate to include form-specific fields
-	  interface CompanyFormState extends EmpresaUpdate {
-	    razao_social?: string;
-	    fantasia?: string;
-	    inscr_estadual?: string | null;
-	    inscr_municipal?: string | null;
-	  }
 
   const [formData, setFormData] = useState<CompanyFormState | null>(null);
   const [initialData, setInitialData] = useState<CompanyFormState | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
 
   useEffect(() => {
     if (activeEmpresa) {
@@ -35,6 +45,11 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
         ...activeEmpresa,
         razao_social: activeEmpresa.nome_razao_social || '',
         fantasia: (activeEmpresa as any).nome_fantasia || (activeEmpresa as any).fantasia || '',
+        inscr_estadual: (activeEmpresa as any).inscr_estadual || '',
+        inscr_municipal: (activeEmpresa as any).inscr_municipal || '',
+        cnae: (activeEmpresa as any).cnae || '',
+        crt: (activeEmpresa as any).crt ?? null,
+        endereco_municipio_codigo: (activeEmpresa as any).endereco_municipio_codigo || '',
       };
       setFormData(initialFormState);
       setInitialData(initialFormState);
@@ -48,12 +63,13 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
     }
   }, [formData, initialData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    let maskedValue = value;
+    let maskedValue: string | number | null = value;
     if (name === 'cnpj') maskedValue = documentMask(value);
     if (name === 'endereco_cep') maskedValue = cepMask(value);
     if (name === 'telefone') maskedValue = phoneMask(value);
+    if (name === 'crt') maskedValue = value ? Number(value) : null;
 
     setFormData(prev => (prev ? { ...prev, [name]: maskedValue } : null));
   };
@@ -81,10 +97,21 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
         endereco_cidade: data.municipio || prev?.endereco_cidade,
         endereco_uf: data.uf || prev?.endereco_uf,
         telefone: data.ddd_telefone_1 || prev?.telefone,
-        email: prev?.email, // Keep existing email
+        email: prev?.email,
+        // Enrich fiscal fields from CNPJ lookup when available
+        cnae: (data as any).cnae_fiscal_principal || (data as any).cnae_fiscal || prev?.cnae,
       }));
       addToast('Dados da empresa preenchidos com sucesso!', 'success');
 
+      // Auto-fetch CEP to get IBGE code if we got an address
+      if (data.cep) {
+        try {
+          const cepResult = await fetchCepData(data.cep);
+          if (cepResult.ibge) {
+            setFormData(prev => prev ? { ...prev, endereco_municipio_codigo: cepResult.ibge } : null);
+          }
+        } catch { /* CEP lookup for IBGE is best-effort */ }
+      }
     } catch (error: any) {
       addToast(error.message, 'error');
     } finally {
@@ -92,27 +119,56 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
     }
   };
 
+  const handleFetchCepData = useCallback(async () => {
+    const cep = formData?.endereco_cep?.replace(/\D/g, '');
+    if (!cep || cep.length !== 8) return;
+    setIsFetchingCep(true);
+
+    try {
+      const data = await fetchCepData(cep);
+      setFormData(prev => ({
+        ...prev,
+        endereco_logradouro: data.logradouro || prev?.endereco_logradouro,
+        endereco_complemento: data.complemento || prev?.endereco_complemento,
+        endereco_bairro: data.bairro || prev?.endereco_bairro,
+        endereco_cidade: data.localidade || prev?.endereco_cidade,
+        endereco_uf: data.uf || prev?.endereco_uf,
+        endereco_municipio_codigo: data.ibge || prev?.endereco_municipio_codigo,
+      }));
+      addToast('Endereço preenchido pelo CEP.', 'success');
+    } catch (error: any) {
+      addToast(error.message, 'error');
+    } finally {
+      setIsFetchingCep(false);
+    }
+  }, [formData?.endereco_cep, addToast]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData) return;
 
     setLoading(true);
 
-	    const finalPayload: EmpresaUpdate = {
-	      nome_razao_social: formData.razao_social?.trim() || undefined,
-	      nome_fantasia: formData.fantasia?.trim() || null,
-	      cnpj: formData.cnpj?.replace(/\D/g, '') || null,
-	      endereco_cep: formData.endereco_cep?.replace(/\D/g, '') || null,
-	      endereco_logradouro: formData.endereco_logradouro?.trim() || null,
-	      endereco_numero: formData.endereco_numero?.trim() || null,
-	      endereco_complemento: formData.endereco_complemento?.trim() || null,
-	      endereco_bairro: formData.endereco_bairro?.trim() || null,
-	      endereco_cidade: formData.endereco_cidade?.trim() || null,
-	      endereco_uf: formData.endereco_uf?.trim() || null,
-	      telefone: formData.telefone?.replace(/\D/g, '') || null,
-	      email: formData.email?.trim() || null,
-	      logotipo_url: formData.logotipo_url ?? null,
-	    };
+    const finalPayload: EmpresaUpdate = {
+      nome_razao_social: formData.razao_social?.trim() || undefined,
+      nome_fantasia: formData.fantasia?.trim() || null,
+      cnpj: formData.cnpj?.replace(/\D/g, '') || null,
+      inscr_estadual: (formData.inscr_estadual as any)?.trim() || null,
+      inscr_municipal: (formData.inscr_municipal as any)?.trim() || null,
+      cnae: (formData.cnae as any)?.trim() || null,
+      crt: formData.crt ?? null,
+      endereco_municipio_codigo: (formData.endereco_municipio_codigo as any)?.replace(/\D/g, '') || null,
+      endereco_cep: formData.endereco_cep?.replace(/\D/g, '') || null,
+      endereco_logradouro: formData.endereco_logradouro?.trim() || null,
+      endereco_numero: formData.endereco_numero?.trim() || null,
+      endereco_complemento: formData.endereco_complemento?.trim() || null,
+      endereco_bairro: formData.endereco_bairro?.trim() || null,
+      endereco_cidade: formData.endereco_cidade?.trim() || null,
+      endereco_uf: formData.endereco_uf?.trim() || null,
+      telefone: formData.telefone?.replace(/\D/g, '') || null,
+      email: formData.email?.trim() || null,
+      logotipo_url: formData.logotipo_url ?? null,
+    };
 
     try {
       const updatedCompany = await updateCompany(finalPayload);
@@ -124,6 +180,11 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
         ...updatedCompany,
         razao_social: razaoValue,
         fantasia: fantasiaValue,
+        inscr_estadual: (updatedCompany as any).inscr_estadual || '',
+        inscr_municipal: (updatedCompany as any).inscr_municipal || '',
+        cnae: (updatedCompany as any).cnae || '',
+        crt: (updatedCompany as any).crt ?? null,
+        endereco_municipio_codigo: (updatedCompany as any).endereco_municipio_codigo || '',
       };
 
       setInitialData(newFormState);
@@ -188,6 +249,29 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
                 </button>
               </div>
             </div>
+
+            {/* Dados Fiscais */}
+            <div className="pt-2">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4">Dados Fiscais</h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <InputField label="Inscrição Estadual (IE)" name="inscr_estadual" value={String(formData.inscr_estadual || '')} onChange={handleChange} />
+                  <InputField label="Inscrição Municipal (IM)" name="inscr_municipal" value={String(formData.inscr_municipal || '')} onChange={handleChange} />
+                </div>
+                <InputField label="CNAE" name="cnae" value={String(formData.cnae || '')} onChange={handleChange} placeholder="Ex: 4751201" />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="crt">Regime Tributário (CRT)</label>
+                  <select
+                    id="crt" name="crt" value={formData.crt ?? ''} onChange={handleChange}
+                    className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
+                  >
+                    {CRT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Coluna Direita */}
@@ -202,9 +286,21 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
 
             <div>
               <h2 className="text-lg font-semibold text-gray-700 mb-4">Endereço</h2>
-              <div className="grid grid-cols-6 gap-6">
+              <div className="grid grid-cols-6 gap-4">
                 <div className="col-span-6 sm:col-span-2">
-                  <InputField label="CEP" name="endereco_cep" value={formData.endereco_cep || ''} onChange={handleChange} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="endereco_cep">CEP</label>
+                  <div className="relative">
+                    <input
+                      id="endereco_cep" name="endereco_cep" type="text"
+                      value={formData.endereco_cep || ''} onChange={handleChange}
+                      onBlur={handleFetchCepData}
+                      className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm pr-10"
+                      placeholder="00000-000"
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-gray-400 pointer-events-none">
+                      {isFetchingCep ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                    </div>
+                  </div>
                 </div>
                 <div className="col-span-6 sm:col-span-4">
                   <InputField label="Logradouro" name="endereco_logradouro" value={formData.endereco_logradouro || ''} onChange={handleChange} />
@@ -215,14 +311,17 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
                 <div className="col-span-6 sm:col-span-4">
                   <InputField label="Complemento" name="endereco_complemento" value={formData.endereco_complemento || ''} onChange={handleChange} />
                 </div>
-                <div className="col-span-6 sm:col-span-3">
+                <div className="col-span-6 sm:col-span-2">
                   <InputField label="Bairro" name="endereco_bairro" value={formData.endereco_bairro || ''} onChange={handleChange} />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
                   <InputField label="Cidade" name="endereco_cidade" value={formData.endereco_cidade || ''} onChange={handleChange} />
                 </div>
-                <div className="col-span-6 sm:col-span-1">
+                <div className="col-span-3 sm:col-span-1">
                   <InputField label="UF" name="endereco_uf" value={formData.endereco_uf || ''} onChange={handleChange} />
+                </div>
+                <div className="col-span-3 sm:col-span-1">
+                  <InputField label="Cód. IBGE" name="endereco_municipio_codigo" value={String(formData.endereco_municipio_codigo || '')} onChange={handleChange} placeholder="7 dígitos" />
                 </div>
               </div>
             </div>
@@ -250,14 +349,16 @@ interface InputFieldProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   type?: string;
   required?: boolean;
+  placeholder?: string;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ label, name, value, onChange, type = 'text', required = false }) => (
+const InputField: React.FC<InputFieldProps> = ({ label, name, value, onChange, type = 'text', required = false, placeholder }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={name}>{label}</label>
     <input
       id={name} name={name} type={type} value={value} onChange={onChange} required={required}
       className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
+      placeholder={placeholder}
     />
   </div>
 );
