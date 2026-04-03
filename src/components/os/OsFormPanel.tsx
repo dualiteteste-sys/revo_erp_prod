@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw, Settings2, Printer, ChevronDown } from 'lucide-react';
-import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary, getOsObservacoesPadrao, setOsObservacoesPadrao } from '@/services/os';
+import { OrdemServicoDetails, saveOs, deleteOsItem, updateOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary, getOsObservacoesPadrao, setOsObservacoesPadrao } from '@/services/os';
 import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '../ui/forms/Section';
@@ -977,6 +977,20 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
   };
 
+  const handleUpdateItem = async (itemId: string, payload: { quantidade?: number; preco?: number; desconto_pct?: number }) => {
+    if (readOnly) {
+      addToast('Você não tem permissão para editar itens.', 'warning');
+      return;
+    }
+    if (!canRunTenantMutation()) return;
+    try {
+      await updateOsItem(itemId, payload);
+      if (formData.id) await refreshOsData(formData.id);
+    } catch (error: any) {
+      addToast(error.message || 'Erro ao atualizar item.', 'error');
+    }
+  };
+
   const handleUploadDoc = async () => {
     if (readOnly) {
       addToast('Você não tem permissão para anexar arquivos.', 'warning');
@@ -1377,7 +1391,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           <Input label="Hora" name="hora" type="time" value={formData.hora || ''} onChange={e => handleFormChange('hora', e.target.value)} className="sm:col-span-2" disabled={readOnly} />
         </Section>
         
-        <OsFormItems items={formData.itens || []} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} isAddingItem={isAddingItem} readOnly={readOnly} />
+        <OsFormItems items={formData.itens || []} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} isAddingItem={isAddingItem} readOnly={readOnly} />
 
         <Section title="Custos" description="Controle básico de custos para cálculo de margem e relatórios.">
           <Input label="Custo Estimado" name="custo_estimado" startAdornment="R$" inputMode="numeric" {...custoEstimadoProps} className="sm:col-span-3" disabled={readOnly} />
