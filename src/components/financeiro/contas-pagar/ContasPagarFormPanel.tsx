@@ -214,14 +214,16 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
   const buildParcelamentoPatch = () => {
     const base: any = conta ?? {};
     const patch: Record<string, any> = {};
-    // Campos seguros para propagação em parcelamentos (sem valor_total nem data_vencimento)
-    const keys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id'];
+    const keys = ['descricao', 'documento_ref', 'observacoes', 'categoria', 'forma_pagamento', 'centro_de_custo_id', 'fornecedor_id', 'valor_total'];
     for (const k of keys) {
       const next = (formData as any)?.[k];
       const prev = (base as any)?.[k];
       const normNext = next ?? null;
       const normPrev = prev ?? null;
-      if (String(normNext) !== String(normPrev)) patch[k] = normNext;
+      const changed = k === 'valor_total'
+        ? Number(normNext ?? 0) !== Number(normPrev ?? 0)
+        : String(normNext) !== String(normPrev);
+      if (changed) patch[k] = normNext;
     }
     return patch;
   };
