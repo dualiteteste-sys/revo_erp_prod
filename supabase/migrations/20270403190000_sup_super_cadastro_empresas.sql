@@ -5,7 +5,10 @@
 
 BEGIN;
 
--- 1. Adicionar colunas fiscais que faltam em empresas
+-- 1. Adicionar colunas que faltam em empresas
+--    inscr_estadual e inscr_municipal foram removidas em align_dev_schema (20260227030000); re-adicionamos aqui.
+ALTER TABLE public.empresas ADD COLUMN IF NOT EXISTS inscr_estadual text;
+ALTER TABLE public.empresas ADD COLUMN IF NOT EXISTS inscr_municipal text;
 ALTER TABLE public.empresas ADD COLUMN IF NOT EXISTS cnae text;
 ALTER TABLE public.empresas ADD COLUMN IF NOT EXISTS crt integer;  -- 1=Simples Nacional, 2=Excesso sublimite, 3=Regime Normal
 ALTER TABLE public.empresas ADD COLUMN IF NOT EXISTS endereco_municipio_codigo text;  -- IBGE 7 dígitos
