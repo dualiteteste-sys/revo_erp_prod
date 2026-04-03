@@ -607,7 +607,7 @@ function TituloRow({
 
   return (
     <tr
-      className={`transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''} ${selected && !paid ? 'bg-blue-100 hover:bg-blue-200/70 border-l-2 border-l-blue-500' : 'hover:bg-gray-50/50 border-l-2 border-l-transparent'}`}
+      className={`transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''} ${selected && !paid ? 'bg-[#d7d8db]' : 'hover:bg-gray-50/50'}`}
       onClick={handleRowClick}
     >
       {showCheckbox && (
