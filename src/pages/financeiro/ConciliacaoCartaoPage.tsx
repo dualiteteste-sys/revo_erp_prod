@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, Plus, RefreshCw, Repeat2 } from 'lucide-react';
+import { CreditCard, ChevronDown, ChevronRight, CheckSquare, Loader2, Plus, RefreshCw, Repeat2, Layers } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import {
@@ -607,7 +607,7 @@ function TituloRow({
 
   return (
     <tr
-      className={`transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''} ${selected && !paid ? 'bg-blue-50/70 hover:bg-blue-100/60' : 'hover:bg-gray-50/50'}`}
+      className={`transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''} ${selected && !paid ? 'bg-blue-100 hover:bg-blue-200/70 border-l-2 border-l-blue-500' : 'hover:bg-gray-50/50 border-l-2 border-l-transparent'}`}
       onClick={handleRowClick}
     >
       {showCheckbox && (
@@ -630,6 +630,12 @@ function TituloRow({
             <span title="Conta recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-700">
               <Repeat2 size={11} />
               Recorrente
+            </span>
+          )}
+          {titulo.origem_tipo === 'PARCELAMENTO_PARCELA' && (
+            <span title="Conta parcelada" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-100 text-sky-700">
+              <Layers size={11} />
+              Parcelada
             </span>
           )}
         </span>
