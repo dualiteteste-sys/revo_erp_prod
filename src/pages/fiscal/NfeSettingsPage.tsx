@@ -541,10 +541,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                   <h2 className="text-lg font-bold text-slate-900">Dados da Empresa</h2>
                 </div>
                 <p className="text-sm text-slate-600 mt-1">
-                  Identidade e dados fiscais da empresa. Gerenciados no cadastro central.
+                  Estes dados são gerenciados no cadastro central da empresa e sincronizados automaticamente com a NF-e.
                 </p>
               </div>
-              <Button variant="secondary" onClick={() => navigate('/app/settings')}>
+              <Button variant="secondary" onClick={() => navigate('/app/configuracoes/geral/empresa')}>
                 <ExternalLink size={16} />
                 <span className="ml-2">Editar cadastro</span>
               </Button>
@@ -562,12 +562,16 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                 { label: 'Cód. IBGE', value: (activeEmpresa as any)?.endereco_municipio_codigo || emitente?.endereco_municipio_codigo },
                 { label: 'CEP', value: activeEmpresa?.endereco_cep || emitente?.endereco_cep },
               ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2">
-                  <p className="text-xs text-slate-500">{label}</p>
-                  <p className="text-sm font-medium text-slate-800 truncate">{value || '—'}</p>
+                <div key={label} className="rounded-lg border border-slate-200 bg-white/60 px-3 py-2.5 opacity-90">
+                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{label}</p>
+                  <p className="text-sm font-medium text-slate-700 truncate mt-0.5">{value || '—'}</p>
                 </div>
               ))}
             </div>
+
+            <p className="text-xs text-slate-400 mt-3">
+              Para alterar, acesse Configurações → Empresa. As mudanças refletem automaticamente na emissão de NF-e.
+            </p>
           </GlassCard>
 
           {/* ── Certificado Digital A1 ── */}
