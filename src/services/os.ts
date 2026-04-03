@@ -191,6 +191,16 @@ export async function deleteOsItem(itemId: string) {
   return callRpc<void>("delete_os_item_for_current_user", { p_item_id: itemId });
 }
 
+export async function updateOsItem(
+  itemId: string,
+  payload: { quantidade?: number; preco?: number; desconto_pct?: number }
+): Promise<OrdemServicoItem> {
+  return callRpc<OrdemServicoItem>('update_os_item_for_current_user', {
+    p_item_id: itemId,
+    payload,
+  });
+}
+
 // --- Autocomplete Functions ---
 
 export async function searchItemsForOs(q: string, limit = 20, onlySales = true, type: 'all' | 'product' | 'service' = 'all'): Promise<OsItemSearchResult[]> {
