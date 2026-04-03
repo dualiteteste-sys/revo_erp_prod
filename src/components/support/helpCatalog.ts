@@ -955,6 +955,7 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Quantidade/unidade incoerentes (estoque “quebra”).',
       'Esperar preço automático sem configurar faixas no produto.',
       'Esquecer observações de entrega e virar suporte.',
+      'Não é possível excluir pedidos aprovados/concluídos — use cancelamento.',
     ],
     links: [{ label: 'Abrir Expedição', href: '/app/vendas/expedicao', kind: 'internal' }],
     roadmapKey: 'vendas',

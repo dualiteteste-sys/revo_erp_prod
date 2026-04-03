@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { VendaPedido } from '@/services/vendas';
-import { Edit, Eye, FileText } from 'lucide-react';
+import { Edit, Eye, FileText, Trash2 } from 'lucide-react';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -13,6 +13,7 @@ interface Props {
   orders: VendaPedido[];
   onEdit: (order: VendaPedido) => void;
   onGerarNfe?: (order: VendaPedido) => void;
+  onDelete?: (order: VendaPedido) => void;
   gerandoNfeId?: string | null;
   basePath?: string;
 }
@@ -24,7 +25,7 @@ const statusColors: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-800',
 };
 
-export default function PedidosVendasTable({ orders, onEdit, onGerarNfe, gerandoNfeId, basePath = '/app/vendas/pedidos' }: Props) {
+export default function PedidosVendasTable({ orders, onEdit, onGerarNfe, onDelete, gerandoNfeId, basePath = '/app/vendas/pedidos' }: Props) {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
@@ -155,6 +156,15 @@ export default function PedidosVendasTable({ orders, onEdit, onGerarNfe, gerando
                     title="Gerar NF-e"
                   >
                     <FileText size={18} />
+                  </button>
+                )}
+                {onDelete && order.status === 'orcamento' && (
+                  <button
+                    onClick={() => onDelete(order)}
+                    className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full transition-colors"
+                    title="Excluir orçamento"
+                  >
+                    <Trash2 size={18} />
                   </button>
                 )}
                 <button
