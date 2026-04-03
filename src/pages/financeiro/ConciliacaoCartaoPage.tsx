@@ -18,8 +18,11 @@ import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import SideSheet from '@/components/ui/SideSheet';
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import { toggleSort, sortRows, type SortState, type SortColumnDef } from '@/components/ui/table/sortUtils';
 
 type Tipo = 'receber' | 'pagar';
+type ConcSortId = 'descricao' | 'pessoa' | 'vencimento' | 'valor' | 'status';
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateBR = (iso: string) => {
@@ -67,6 +70,16 @@ export default function ConciliacaoCartaoPage() {
   const [baixaModalTotal, setBaixaModalTotal] = useState<number>(0);
 
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+
+  const [sort, setSort] = useState<SortState<ConcSortId>>(null);
+  const handleSort = useCallback((col: ConcSortId) => setSort((prev) => toggleSort(prev, col)), []);
+  const sortColumns = useMemo<SortColumnDef<ConciliacaoTitulo, ConcSortId>[]>(() => [
+    { id: 'descricao', type: 'string', getValue: (r) => r.descricao },
+    { id: 'pessoa', type: 'string', getValue: (r) => (tipo === 'pagar' ? r.fornecedor_nome : r.cliente_nome) },
+    { id: 'vencimento', type: 'date', getValue: (r) => r.data_vencimento },
+    { id: 'valor', type: 'number', getValue: (r) => r.saldo ?? r.valor },
+    { id: 'status', type: 'string', getValue: (r) => r.status },
+  ], [tipo]);
 
   // Derived from selectedMap for UI
   const selectedIds = useMemo(() => new Set(selectedMap.keys()), [selectedMap]);
@@ -363,6 +376,9 @@ export default function ConciliacaoCartaoPage() {
           onSelectAll={() => selectAllInGroup(group)}
           onBaixaDia={() => openBaixaDia(group)}
           statusFilter={statusFilter}
+          sort={sort}
+          onSort={handleSort}
+          sortColumns={sortColumns}
         />
       ))}
 
@@ -463,6 +479,9 @@ function DateGroup({
   onSelectAll,
   onBaixaDia,
   statusFilter,
+  sort,
+  onSort,
+  sortColumns,
 }: {
   group: ConciliacaoGroup;
   tipo: Tipo;
@@ -473,6 +492,9 @@ function DateGroup({
   onSelectAll: () => void;
   onBaixaDia: () => void;
   statusFilter: string;
+  sort: SortState<ConcSortId>;
+  onSort: (col: ConcSortId) => void;
+  sortColumns: SortColumnDef<ConciliacaoTitulo, ConcSortId>[];
 }) {
   const paidStatus = PAID_STATUS[tipo];
   const paidFilterValue = STATUS_OPTIONS_PAID[tipo].value;
@@ -534,15 +556,15 @@ function DateGroup({
                     />
                   </th>
                 )}
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{PERSON_LABEL[tipo]}</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                <ResizableSortableTh<ConcSortId> columnId="descricao" label="Descrição" sort={sort} onSort={onSort} resizable={false} className="px-4 py-2 text-xs font-medium text-gray-500 uppercase" />
+                <ResizableSortableTh<ConcSortId> columnId="pessoa" label={PERSON_LABEL[tipo]} sort={sort} onSort={onSort} resizable={false} className="px-4 py-2 text-xs font-medium text-gray-500 uppercase" />
+                <ResizableSortableTh<ConcSortId> columnId="vencimento" label="Vencimento" sort={sort} onSort={onSort} resizable={false} className="px-4 py-2 text-xs font-medium text-gray-500 uppercase" />
+                <ResizableSortableTh<ConcSortId> columnId="valor" label="Valor" align="right" sort={sort} onSort={onSort} resizable={false} className="px-4 py-2 text-xs font-medium text-gray-500 uppercase" />
+                <ResizableSortableTh<ConcSortId> columnId="status" label="Status" align="center" sort={sort} onSort={onSort} resizable={false} className="px-4 py-2 text-xs font-medium text-gray-500 uppercase" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {group.titulos.map((t) => (
+              {sortRows(group.titulos, sort, sortColumns).map((t) => (
                 <TituloRow
                   key={t.id}
                   titulo={t}
@@ -585,7 +607,7 @@ function TituloRow({
 
   return (
     <tr
-      className={`hover:bg-gray-50/50 transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''}`}
+      className={`transition ${paid ? 'opacity-60' : ''} ${!paid && showCheckbox ? 'cursor-pointer' : ''} ${selected && !paid ? 'bg-blue-50/70 hover:bg-blue-100/60' : 'hover:bg-gray-50/50'}`}
       onClick={handleRowClick}
     >
       {showCheckbox && (
